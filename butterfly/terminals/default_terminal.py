@@ -35,6 +35,8 @@ import tornado.websocket
 
 from butterfly import __version__, utils
 
+from .base_terminal import BaseTerminal
+
 log = getLogger('butterfly')
 ioloop = tornado.ioloop.IOLoop.instance()
 server = utils.User()
@@ -48,7 +50,7 @@ except NameError:
     pass
 
 
-class Terminal(object):
+class DefaultTerminal(BaseTerminal):
     sessions = {}
 
     def __init__(self, user, path, session, socket, uri, render_string,

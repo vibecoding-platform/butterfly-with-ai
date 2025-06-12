@@ -32,7 +32,7 @@ import tornado.web
 import tornado.websocket
 
 from butterfly import Route, url, utils
-from butterfly.terminal import Terminal
+from butterfly.terminals.default_terminal import DefaultTerminal
 
 
 def u(s):
@@ -207,7 +207,7 @@ class TermCtlWebSocket(Route, KeptAliveWebSocketHandler):
 
         self.sessions[self.session].append(self)
 
-        terminal = Terminal.sessions.get(self.session)
+        terminal = DefaultTerminal.sessions.get(self.session)
         # Handling terminal session
         if terminal:
             TermWebSocket.last.write_message(terminal.history)
@@ -215,7 +215,7 @@ class TermCtlWebSocket(Route, KeptAliveWebSocketHandler):
             return
 
         # New session, opening terminal
-        terminal = Terminal(
+        terminal = DefaultTerminal(
             user, path, self.session, socket,
             self.request.full_url().replace('/ctl/', '/'), self.render_string,
             TermWebSocket.broadcast)
@@ -240,7 +240,7 @@ class TermCtlWebSocket(Route, KeptAliveWebSocketHandler):
             self.create_terminal()
         else:
             try:
-                Terminal.sessions[self.session].ctl(cmd)
+                DefaultTerminal.sessions[self.session].ctl(cmd)
             except Exception:
                 # FF strange bug
                 pass
@@ -315,7 +315,7 @@ class TermWebSocket(Route, KeptAliveWebSocketHandler):
                 wsocket.close()
 
     def on_message(self, message):
-        Terminal.sessions[self.session].write(message)
+        DefaultTerminal.sessions[self.session].write(message)
 
     def on_close(self):
         super(TermWebSocket, self).on_close()

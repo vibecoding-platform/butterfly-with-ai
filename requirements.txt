@@ -1,1 +1,2 @@
 tornado>=3.2
+dependency-injector>=2.20.1
