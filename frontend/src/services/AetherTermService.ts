@@ -30,6 +30,7 @@ class AetherTermService {
       this.socket.on('connect', () => {
         console.log('AetherTerm Socket.IO connected')
         this.setupVueTermWebSockets()
+
       })
 
       this.socket.on('disconnect', () => {
@@ -41,45 +42,19 @@ class AetherTermService {
   }
 
   private setupVueTermWebSockets(): void {
-    // Create WebSocket connections for VueTerm integration
-    const baseUrl = getSocketUrl().replace(/^http/, 'ws')
-
-    if (!this.shellWs) {
-      this.shellWs = new WebSocket(`${baseUrl}/shell`)
-      this.shellWs.onopen = () => console.log('VueTerm Shell WebSocket connected')
-      this.shellWs.onclose = () => console.log('VueTerm Shell WebSocket disconnected')
-      this.shellWs.onerror = (error) => console.error('VueTerm Shell WebSocket error:', error)
-    }
-
-    if (!this.ctlWs) {
-      this.ctlWs = new WebSocket(`${baseUrl}/ctl`)
-      this.ctlWs.onopen = () => console.log('VueTerm Control WebSocket connected')
-      this.ctlWs.onclose = () => console.log('VueTerm Control WebSocket disconnected')
-      this.ctlWs.onerror = (error) => console.error('VueTerm Control WebSocket error:', error)
-    }
+    // No need to create separate WebSocket connections for VueTerm
+    // VueTerm will use the existing Socket.IO connection
+    console.log('VueTerm using Socket.IO')
   }
 
   private closeVueTermWebSockets(): void {
-    if (this.shellWs) {
-      this.shellWs.close()
-      this.shellWs = null
-    }
-    if (this.ctlWs) {
-      this.ctlWs.close()
-      this.ctlWs = null
-    }
+    // No need to close separate WebSocket connections
   }
 
   getSocket(): Socket | null {
     return this.socket
   }
 
-  getVueTermWebSockets(): VueTermWebSockets {
-    return {
-      shellWs: this.shellWs,
-      ctlWs: this.ctlWs
-    }
-  }
 
   disconnect(): void {
     if (this.socket) {
@@ -90,11 +65,11 @@ class AetherTermService {
   }
 
   // Terminal specific methods (using Socket.IO)
-  onShellOutput(callback: (data: string) => void): void {
-    if (this.socket) {
-      this.socket.on('shell_output', callback)
-    }
-  }
+  // onShellOutput(callback: (data: string) => void): void {
+  //   if (this.socket) {
+  //     this.socket.on('shell_output', callback)
+  //   }
+  // }
 
   onControlOutput(callback: (data: string) => void): void {
     if (this.socket) {
@@ -137,6 +112,7 @@ class AetherTermService {
   // Terminal command methods (using Socket.IO)
   sendCommand(command: string, commandId?: string): void {
     if (this.socket) {
+      console.log('Sending command:', command) // Debug log
       this.socket.emit('terminal_command', {
         command: command,
         commandId: commandId || Date.now().toString()

@@ -6,17 +6,22 @@
         {{ connectionStatusText }}
       </div>
       <div v-if="terminalStore.connectionState.isReconnecting" class="reconnect-info">
-        Reconnection attempt: {{ terminalStore.connectionState.reconnectAttempts }}/{{ terminalStore.connectionState.maxReconnectAttempts }}
+        Reconnection attempt:
+        {{
+          terminalStore.connectionState.reconnectAttempts
+        }}/{{ terminalStore.connectionState.maxReconnectAttempts }}
       </div>
     </div>
 
     <!-- Terminal Blocked Overlay -->
+
     <div v-if="terminalStore.isTerminalBlocked" class="terminal-overlay">
       <div class="overlay-content">
         <div v-if="terminalStore.session.isPaused" class="block-reason">
           <h3>Terminal Paused</h3>
           <p>Terminal has been paused by administrator</p>
         </div>
+
         <div v-else-if="terminalStore.hasPendingCommands" class="block-reason">
           <h3>Commands Pending Review</h3>
           <p>{{ terminalStore.pendingCommands.length }} command(s) awaiting approval</p>
@@ -38,126 +43,174 @@
       </div>
     </div>
 
-    <!-- Terminal Output Buffer -->
-    <div class="terminal-output" ref="outputContainer">
-      <div v-for="(line, index) in terminalStore.outputBuffer" :key="index" class="output-line">
-        {{ line }}
+
+    <!-- Xterm.js Integration -->
+    <div id="terminal" class="xterm-container">
+      <div v-if="isAdministratorLocked" class="admin-lock-warning">
+        Administrator Locked
       </div>
-    </div>
-
-    <!-- Command Input -->
-    <div class="command-input-container">
-      <input
-        v-model="currentCommand"
-        @keyup.enter="submitCommand"
-        :disabled="terminalStore.isTerminalBlocked"
-        class="command-input"
-        placeholder="Enter command..."
-      />
-      <button
-        @click="submitCommand"
-        :disabled="terminalStore.isTerminalBlocked || !currentCommand.trim()"
-        class="submit-button"
-      >
-        Execute
-      </button>
-    </div>
-
-    <!-- VueTerm Integration (if needed) -->
-    <div v-if="showVueTerm" class="vue-term-container">
-      <VueTerm :shell-ws="shellWs" :ctl-ws="ctlWs" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAetherTerminalServiceStore } from '../stores/aetherTerminalServiceStore'
+import { FitAddon } from '@xterm/addon-fit';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Terminal, type ITheme } from '@xterm/xterm';
+import '@xterm/xterm/css/xterm.css';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useAetherTerminalServiceStore } from '../stores/aetherTerminalServiceStore';
 
-const terminalStore = useAetherTerminalServiceStore()
+const terminalEl = ref<HTMLElement | null>(null);
+const terminal = ref<Terminal | null>(null);
+const fitAddon = ref<FitAddon | null>(null);
 
-const shellWs = ref<WebSocket | null>(null)
-const ctlWs = ref<WebSocket | null>(null)
-const currentCommand = ref('')
-const outputContainer = ref<HTMLElement>()
-const showVueTerm = ref(false) // Toggle for VueTerm integration
+const terminalStore = useAetherTerminalServiceStore();
+
+const isAdministratorLocked = computed(() => {
+  return terminalStore.isAdministratorLocked;
+});
 
 // Connection status computed properties
 const connectionStatusClass = computed(() => {
   switch (terminalStore.connectionStatus) {
-    case 'connected': return 'status-connected'
-    case 'connecting': return 'status-connecting'
-    case 'reconnecting': return 'status-reconnecting'
-    default: return 'status-disconnected'
+    case 'connected':
+      return 'status-connected';
+    case 'connecting':
+      return 'status-connecting';
+    case 'reconnecting':
+      return 'status-reconnecting';
+    default:
+      return 'status-disconnected';
   }
-})
+});
 
 const connectionStatusText = computed(() => {
   switch (terminalStore.connectionStatus) {
-    case 'connected': return 'Connected'
-    case 'connecting': return 'Connecting...'
-    case 'reconnecting': return 'Reconnecting...'
-    default: return 'Disconnected'
+    case 'connected':
+      return 'Connected';
+    case 'connecting':
+      return 'Connecting...';
+    case 'reconnecting':
+      return 'Reconnecting...';
+    default:
+      return 'Disconnected';
   }
-})
+});
 
-// Terminal output handlers
-const handleShellOutput = (data: string) => {
-  console.log('Shell Output:', data)
-  // Output is already handled by the store
-}
+const theme: ITheme = {
+  background: '#1e1e1e',
+  foreground: '#ffffff',
+  cursor: '#ffffff',
+  cursorAccent: '#000000',
+  selectionBackground: 'rgba(255, 255, 255, 0.3)',
+  selectionForeground: '#000000',
+  black: '#000000',
+  red: '#cd3131',
+  green: '#0dbc79',
+  yellow: '#e5e510',
+  blue: '#3b78ff',
+  magenta: '#bc3fbc',
+  cyan: '#0dc2c2',
+  white: '#e5e5e5',
+  brightBlack: '#666666',
+  brightRed: '#f14c4c',
+  brightGreen: '#23d18b',
+  brightYellow: '#f5f543',
+  brightBlue: '#3b8eea',
+  brightMagenta: '#d670d6',
+  brightCyan: '#29b8db',
+  brightWhite: '#ffffff'
+};
 
-const handleControlOutput = (data: string) => {
-  console.log('Control Output:', data)
-  // Output is already handled by the store
-}
+onMounted(async () => {
+  await terminalStore.connect();
 
-const handleConnect = () => {
-  console.log('Terminal connected')
-}
+  terminalEl.value = document.getElementById('terminal');
+  if (terminalEl.value) {
+    terminal.value = new Terminal({
+      convertEol: true,
+      cursorBlink: true,
+      disableStdin: false,
+      scrollback: 1000,
+      theme: theme,
+      allowProposedApi: true,
+    });
 
-const handleDisconnect = () => {
-  console.log('Terminal disconnected')
-}
+    fitAddon.value = new FitAddon();
+    terminal.value.loadAddon(fitAddon.value);
 
-const handleError = (error: any) => {
-  console.error('Terminal error:', error)
-}
+    const webLinksAddon = new WebLinksAddon();
+    terminal.value.loadAddon(webLinksAddon);
 
-// Command submission
-const submitCommand = () => {
-  const command = currentCommand.value.trim()
-  if (!command || terminalStore.isTerminalBlocked) return
+    const unicode11Addon = new Unicode11Addon();
+    terminal.value.loadAddon(unicode11Addon);
+    //unicode11Addon.loadWebFont().then(() => {
+    terminal.value?.refresh(0, terminal.value.rows - 1);
+    //});
 
-  const success = terminalStore.submitCommand(command)
-  if (success) {
-    currentCommand.value = ''
+    terminal.value.open(terminalEl.value);
+    fitAddon.value.fit();
+
+    // Connect to the socket and receive data
+    terminalStore.onShellOutput((data: string) => {
+      console.log('onShellOutput called with:', data);
+      terminal.value?.write(data);
+    });
+
+    terminal.value.onKey(e => {
+      const ev = e.domEvent;
+
+      if (isAdministratorLocked.value) {
+        ev.preventDefault();
+        return;
+      }
+
+      const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
+
+      if (terminal.value) {
+        if (ev.keyCode === 13) {
+          // Enter key
+          sendCommand(terminal.value.getSelection() || '');
+          terminal.value.write('\r\n');
+        } else if (ev.keyCode === 8) {
+          // Backspace key
+          // Do not delete if the line is empty
+          if (terminal.value.buffer.active.cursorX > 0) {
+            terminal.value.write('\b \b');
+          }
+        } else if (printable) {
+          terminal.value.write(e.key);
+        }
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      fitAddon.value?.fit();
+    });
   }
-}
-
-// Auto-scroll output
-watch(() => terminalStore.outputBuffer.length, () => {
-  nextTick(() => {
-    if (outputContainer.value) {
-      outputContainer.value.scrollTop = outputContainer.value.scrollHeight
-    }
-  })
-})
-
-onMounted(() => {
-  // Register event handlers with the store
-  terminalStore.onShellOutput(handleShellOutput)
-  terminalStore.onControlOutput(handleControlOutput)
-  terminalStore.onConnect(handleConnect)
-  terminalStore.onDisconnect(handleDisconnect)
-  terminalStore.onError(handleError)
-})
+});
 
 onUnmounted(() => {
-  // Clean up event handlers
-  terminalStore.offShellOutput(handleShellOutput)
-  terminalStore.offControlOutput(handleControlOutput)
-})
+  terminalStore.offShellOutput();
+  terminal.value?.dispose();
+  window.removeEventListener('resize', () => {
+    fitAddon.value?.fit();
+  });
+});
+
+// Send commands to the backend
+const sendCommand = (command: string) => {
+  terminalStore.submitCommand(command);
+};
+
+// Override WebSocket.send to log data
+// const originalSend = WebSocket.prototype.send
+// const originalSend = function(data) {
+//   console.log('Sending data:', data) // Debug log
+//   originalSend.apply(this, [
+// }
 </script>
 
 <style scoped>
@@ -183,10 +236,21 @@ onUnmounted(() => {
   font-weight: bold;
 }
 
-.status-connected { color: #4caf50; }
-.status-connecting { color: #ff9800; }
-.status-reconnecting { color: #ff9800; }
-.status-disconnected { color: #f44336; }
+.status-connected {
+  color: #4caf50;
+}
+
+.status-connecting {
+  color: #ff9800;
+}
+
+.status-reconnecting {
+  color: #ff9800;
+}
+
+.status-disconnected {
+  color: #f44336;
+}
 
 .reconnect-info {
   font-size: 11px;
@@ -246,73 +310,37 @@ onUnmounted(() => {
   font-weight: bold;
 }
 
-.risk-level.low { background-color: #4caf50; }
-.risk-level.medium { background-color: #ff9800; }
-.risk-level.high { background-color: #ff5722; }
-.risk-level.critical { background-color: #f44336; }
-
-.terminal-output {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.output-line {
-  margin: 2px 0;
-  white-space: pre-wrap;
-}
-
-.command-input-container {
-  display: flex;
-  padding: 10px;
-  background-color: #2d2d2d;
-  border-top: 1px solid #444;
-}
-
-.command-input {
-  flex: 1;
-  background-color: #1e1e1e;
-  border: 1px solid #444;
-  color: #ffffff;
-  padding: 8px 12px;
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-}
-
-.command-input:focus {
-  outline: none;
-  border-color: #4caf50;
-}
-
-.command-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.submit-button {
-  margin-left: 10px;
-  padding: 8px 16px;
+.risk-level.low {
   background-color: #4caf50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
 }
 
-.submit-button:hover:not(:disabled) {
-  background-color: #45a049;
+.risk-level.medium {
+  background-color: #ff9800;
 }
 
-.submit-button:disabled {
-  background-color: #666;
-  cursor: not-allowed;
+.risk-level.high {
+  background-color: #ff5722;
 }
 
-.vue-term-container {
-  height: 300px;
+.risk-level.critical {
+  background-color: #f44336;
+}
+
+.xterm-container {
+  flex: 1;
+  /* Take up remaining space */
   border-top: 1px solid #444;
+}
+
+.admin-lock-warning {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: red;
+  color: white;
+  padding: 5px;
+  border-radius: 5px;
+  font-weight: bold;
+  z-index: 20;
 }
 </style>

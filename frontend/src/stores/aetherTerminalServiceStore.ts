@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { Socket } from 'socket.io-client'
 import { computed, ref } from 'vue'
 
 export interface TerminalCommand {
@@ -73,6 +74,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   const commandHistory = ref<TerminalCommand[]>([])
   const outputBuffer = ref<string[]>([])
   const isOutputSuppressed = ref(false)
+  const isAdministratorLocked = ref(false)
 
   // AI Monitoring State
   const aiMonitoring = ref<AIMonitoringState>({
@@ -136,102 +138,245 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   // Connection Actions
   const setSocket = (socketInstance: Socket) => {
     socket.value = socketInstance
-    setupSocketListeners()
+    console.log('Setting socket value:', socketInstance);
   }
+
+  // const setupSocketListeners = () => {
+  //   if (!socket.value) return
+
+  //   socket.value.on('connect', () => {
+  //     console.log('Socket connected, setting up listeners');
+  //     connectionState.value.isConnected = true
+  //     connectionState.value.isConnecting = false
+  //     connectionState.value.isReconnecting = false
+  //     connectionState.value.reconnectAttempts = 0
+  //     connectionState.value.lastConnected = new Date()
+  //     connectionState.value.connectionError = undefined
+
+  //     addToOutput('[SYSTEM] Connected to AetherTerm service')
+  //     eventCallbacks.value.onConnect.forEach(callback => callback())
+  //   })
+
+  //   socket.value.on('disconnect', (reason: string) => {
+  //     connectionState.value.isConnected = false
+  //     connectionState.value.lastDisconnected = new Date()
+  //     connectionState.value.connectionError = reason
+
+  //     addToOutput(`[SYSTEM] Disconnected from AetherTerm service: ${reason}`)
+  //     eventCallbacks.value.onDisconnect.forEach(callback => callback())
+
+  //     // Start reconnection if not intentional
+  //     if (reason !== 'io client disconnect') {
+  //       startReconnection()
+  //     }
+  //   })
+
+  //   socket.value.on('reconnect', (attemptNumber: number) => {
+  //     connectionState.value.isReconnecting = false
+  //     connectionState.value.reconnectAttempts = attemptNumber
+  //     addToOutput(`[SYSTEM] Reconnected after ${attemptNumber} attempts`)
+  //     eventCallbacks.value.onReconnect.forEach(callback => callback())
+  //   })
+
+  //   socket.value.on('reconnect_attempt', (attemptNumber: number) => {
+  //     connectionState.value.reconnectAttempts = attemptNumber
+  //     addToOutput(`[SYSTEM] Reconnection attempt ${attemptNumber}`)
+  //   })
+
+  //   socket.value.on('reconnect_failed', () => {
+  //     connectionState.value.isReconnecting = false
+  //     connectionState.value.connectionError = 'Max reconnection attempts reached'
+  //     addToOutput('[SYSTEM] Failed to reconnect after maximum attempts')
+  //   })
+
+  //   socket.value.on('connect_error', (error: Error) => {
+  //     connectionState.value.connectionError = error.message
+  //     addToOutput(`[SYSTEM] Connection error: ${error.message}`)
+  //     eventCallbacks.value.onError.forEach(callback => callback(error))
+  //   })
+
+  //   socket.value.on('message', (message: { type: string; data: any }) => {
+  //     console.log('Socket is connected:', connectionState.value.isConnected);
+  //     console.log('Received message:', message); // Debug log
+  //     console.log('Message type:', message.type);
+  //     switch (message.type) {
+  //       case 'shell_output':
+  //         console.log('Received shell_output message:', message.data);
+  //         if (!isOutputSuppressed.value) {
+  //           addToOutput(message.data)
+  //         }
+  //         // eventCallbacks.value.onShellOutput.forEach(callback => callback(message.data))
+  //         console.log('eventCallbacks.value.onShellOutput.length:', eventCallbacks.value.onShellOutput.length);
+  //         eventCallbacks.value.onShellOutput.forEach(callback => {
+  //           console.log('onShellOutput callback called with:', message.data);
+  //         });
+  //         break
+  //       case 'ctl_output':
+  //         if (!isOutputSuppressed.value) {
+  //           addToOutput(`[CTL] ${message.data}`)
+  //         }
+  //         eventCallbacks.value.onControlOutput.forEach(callback => callback(message.data))
+  //         break
+  //       case 'chat_message':
+  //         eventCallbacks.value.onChatMessage.forEach(callback => callback(message.data))
+  //         break
+  //       case 'admin_pause_terminal':
+  //         console.log('Received admin_pause_terminal event', message.data);
+  //         pauseTerminal(message.data.reason);
+  //       break
+  //       case 'admin_resume_terminal':
+  //         console.log('Received admin_resume_terminal event');
+  //         resumeTerminal();
+  //         break
+  //       case 'admin_suppress_output':
+  //         suppressOutput(message.data.suppress, message.data.reason)
+  //         break
+  //       case 'command_approval':
+  //         if (message.data.approved) {
+  //           approveCommand(message.data.commandId)
+  //         } else {
+  //           rejectCommand(message.data.commandId, message.data.reason || 'Rejected by admin')
+  //         }
+  //         break
+  //       default:
+  //         console.warn('Unknown message type:', message.type)
+  //     }
+  //   })
+
+  //   socket.value.on('shell_output', (data: string) => {
+  //     console.log('Received shell_output:', data);
+  //     if (!isOutputSuppressed.value) {
+  //       addToOutput(data)
+  //     }
+  //     eventCallbacks.value.onShellOutput.forEach(callback => callback(data))
+  //   });
+  // }
 
   const setupSocketListeners = () => {
     if (!socket.value) return
 
-    socket.value.on('connect', () => {
-      connectionState.value.isConnected = true
-      connectionState.value.isConnecting = false
-      connectionState.value.isReconnecting = false
-      connectionState.value.reconnectAttempts = 0
-      connectionState.value.lastConnected = new Date()
-      connectionState.value.connectionError = undefined
+    if (socket.value) {
+      (socket.value as Socket).on('connect', () => {
+        console.log('Socket connected, setting up listeners');
+        connectionState.value.isConnected = true
+        connectionState.value.isConnecting = false
+        connectionState.value.isReconnecting = false
+        connectionState.value.reconnectAttempts = 0
+        connectionState.value.lastConnected = new Date()
+        connectionState.value.connectionError = undefined
 
-      addToOutput('[SYSTEM] Connected to AetherTerm service')
-      eventCallbacks.value.onConnect.forEach(callback => callback())
-    })
+        addToOutput('[SYSTEM] Connected to AetherTerm service')
+        eventCallbacks.value.onConnect.forEach(callback => callback())
+      })
+    }
 
-    socket.value.on('disconnect', (reason) => {
-      connectionState.value.isConnected = false
-      connectionState.value.lastDisconnected = new Date()
-      connectionState.value.connectionError = reason
+    if (socket.value) {
+      (socket.value as Socket).on('disconnect', (reason: string) => {
+        connectionState.value.isConnected = false
+        connectionState.value.lastDisconnected = new Date()
+        connectionState.value.connectionError = reason
 
-      addToOutput(`[SYSTEM] Disconnected from AetherTerm service: ${reason}`)
-      eventCallbacks.value.onDisconnect.forEach(callback => callback())
+        addToOutput(`[SYSTEM] Disconnected from AetherTerm service: ${reason}`)
+        eventCallbacks.value.onDisconnect.forEach(callback => callback())
 
-      // Start reconnection if not intentional
-      if (reason !== 'io client disconnect') {
-        startReconnection()
-      }
-    })
+        // Start reconnection if not intentional
+        if (reason !== 'io client disconnect') {
+          startReconnection()
+        }
+      })
+    }
 
-    socket.value.on('reconnect', (attemptNumber) => {
-      connectionState.value.isReconnecting = false
-      connectionState.value.reconnectAttempts = attemptNumber
-      addToOutput(`[SYSTEM] Reconnected after ${attemptNumber} attempts`)
-      eventCallbacks.value.onReconnect.forEach(callback => callback())
-    })
+    if (socket.value) {
+      (socket.value as Socket).on('reconnect', (attemptNumber: number) => {
+        connectionState.value.isReconnecting = false
+        connectionState.value.reconnectAttempts = attemptNumber
+        addToOutput(`[SYSTEM] Reconnected after ${attemptNumber} attempts`)
+        eventCallbacks.value.onReconnect.forEach(callback => callback())
+      })
+    }
 
-    socket.value.on('reconnect_attempt', (attemptNumber) => {
-      connectionState.value.reconnectAttempts = attemptNumber
-      addToOutput(`[SYSTEM] Reconnection attempt ${attemptNumber}`)
-    })
+    if (socket.value) {
+      (socket.value as Socket).on('reconnect_attempt', (attemptNumber: number) => {
+        connectionState.value.reconnectAttempts = attemptNumber
+        addToOutput(`[SYSTEM] Reconnection attempt ${attemptNumber}`)
+      })
+    }
 
-    socket.value.on('reconnect_failed', () => {
-      connectionState.value.isReconnecting = false
-      connectionState.value.connectionError = 'Max reconnection attempts reached'
-      addToOutput('[SYSTEM] Failed to reconnect after maximum attempts')
-    })
+    if (socket.value) {
+      (socket.value as Socket).on('reconnect_failed', () => {
+        connectionState.value.isReconnecting = false
+        connectionState.value.connectionError = 'Max reconnection attempts reached'
+        addToOutput('[SYSTEM] Failed to reconnect after maximum attempts')
+      })
+    }
 
-    socket.value.on('connect_error', (error) => {
-      connectionState.value.connectionError = error.message
-      addToOutput(`[SYSTEM] Connection error: ${error.message}`)
-      eventCallbacks.value.onError.forEach(callback => callback(error))
-    })
+    if (socket.value) {
+      (socket.value as Socket).on('connect_error', (error: Error) => {
+        connectionState.value.connectionError = error.message
+        addToOutput(`[SYSTEM] Connection error: ${error.message}`)
+        eventCallbacks.value.onError.forEach(callback => callback(error))
+      })
+    }
 
-    // Terminal specific events
-    socket.value.on('shell_output', (data: string) => {
-      if (!isOutputSuppressed.value) {
-        addToOutput(data)
-      }
-      eventCallbacks.value.onShellOutput.forEach(callback => callback(data))
-    })
+    if (socket.value) {
+      (socket.value as Socket).on('message', (message: { type: string; data: any }) => {
+        console.log('Received message:', message); // Debug log
+        console.log('Message type:', message.type);
+        console.log('Received message with type:', message.type);
+        switch (message.type) {
+          case 'shell_output':
+            console.log('Received shell_output message:', message.data);
+            if (!isOutputSuppressed.value) {
+              addToOutput(message.data)
+            }
+            // eventCallbacks.value.onShellOutput.forEach(callback => callback(message.data))
+            console.log('eventCallbacks.value.onShellOutput.length:', eventCallbacks.value.onShellOutput.length);
+            eventCallbacks.value.onShellOutput.forEach(callback => {
+              console.log('onShellOutput callback called with:', message.data);
+            });
+            break
+          case 'ctl_output':
+            if (!isOutputSuppressed.value) {
+              addToOutput(`[CTL] ${message.data}`)
+            }
+            eventCallbacks.value.onControlOutput.forEach(callback => callback(message.data))
+            break
+          case 'chat_message':
+            eventCallbacks.value.onChatMessage.forEach(callback => callback(message.data))
+            break
+          case 'admin_pause_terminal':
+            console.log('Received admin_pause_terminal event', message.data);
+            pauseTerminal(message.data.reason);
+            break
+          case 'admin_resume_terminal':
+            console.log('Received admin_resume_terminal event');
+            resumeTerminal();
+            break
+          case 'admin_suppress_output':
+            suppressOutput(message.data.suppress, message.data.reason)
+            break
+          case 'command_approval':
+            if (message.data.approved) {
+              approveCommand(message.data.commandId)
+            } else {
+              rejectCommand(message.data.commandId, message.data.reason || 'Rejected by admin')
+            }
+            break
+          default:
+            console.warn('Unknown message type:', message.type)
+        }
+      })
+    }
 
-    socket.value.on('ctl_output', (data: string) => {
-      if (!isOutputSuppressed.value) {
-        addToOutput(`[CTL] ${data}`)
-      }
-      eventCallbacks.value.onControlOutput.forEach(callback => callback(data))
-    })
-
-    // Chat specific events
-    socket.value.on('chat_message', (data: any) => {
-      eventCallbacks.value.onChatMessage.forEach(callback => callback(data))
-    })
-
-    // Admin control events
-    socket.value.on('admin_pause_terminal', (data: { reason: string }) => {
-      pauseTerminal(data.reason)
-    })
-
-    socket.value.on('admin_resume_terminal', () => {
-      resumeTerminal()
-    })
-
-    socket.value.on('admin_suppress_output', (data: { suppress: boolean, reason?: string }) => {
-      suppressOutput(data.suppress, data.reason)
-    })
-
-    socket.value.on('command_approval', (data: { commandId: string, approved: boolean, reason?: string }) => {
-      if (data.approved) {
-        approveCommand(data.commandId)
-      } else {
-        rejectCommand(data.commandId, data.reason || 'Rejected by admin')
-      }
-    })
+    if (socket.value) {
+      (socket.value as Socket).on('shell_output', (data: string) => {
+        console.log('Received shell_output:', data);
+        if (!isOutputSuppressed.value) {
+          addToOutput(data)
+        }
+        eventCallbacks.value.onShellOutput.forEach(callback => callback(data))
+      });
+    }
   }
 
   const startReconnection = () => {
@@ -246,12 +391,96 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const connect = () => {
     if (connectionState.value.isConnected || connectionState.value.isConnecting) {
-      return
+      return;
     }
 
-    connectionState.value.isConnecting = true
+    connectionState.value.isConnecting = true;
     addToOutput('[SYSTEM] Connecting to AetherTerm service...')
-  }
+    console.log('connect function called');
+
+    addToOutput('[SYSTEM] Connecting to AetherTerm service...');
+    console.log('connect function called');
+
+    if (socket.value) {
+      (socket.value as Socket).on('connect', () => {
+        console.log('Socket connected, setting up listeners');
+        connectionState.value.isConnected = true;
+        connectionState.value.isConnecting = false;
+        connectionState.value.isReconnecting = false;
+        connectionState.value.reconnectAttempts = 0;
+        connectionState.value.lastConnected = new Date();
+        connectionState.value.connectionError = undefined;
+      });
+    }
+
+    if (socket.value) {
+      socket.on('connect', () => {
+        console.log('Socket connected, setting up listeners');
+        connectionState.value.isConnected = true;
+        connectionState.value.isConnecting = false;
+        connectionState.value.isReconnecting = false;
+        connectionState.value.reconnectAttempts = 0;
+        connectionState.value.lastConnected = new Date();
+        connectionState.value.connectionError = undefined;
+
+        socket.value.on('message', (message: { type: string; data: any }) => {
+          console.log('Socket is connected:', connectionState.value.isConnected);
+          console.log('Received message:', message); // Debug log
+          console.log('Message type:', message.type);
+          switch (message.type) {
+            case 'shell_output':
+              console.log('Received shell_output message:', message.data);
+              if (!isOutputSuppressed.value) {
+                addToOutput(message.data);
+              }
+              // eventCallbacks.value.onShellOutput.forEach(callback => callback(message.data))
+              console.log('eventCallbacks.value.onShellOutput.length:', eventCallbacks.value.onShellOutput.length);
+              eventCallbacks.value.onShellOutput.forEach(callback => {
+                console.log('onShellOutput callback called with:', message.data);
+              });
+              break;
+            case 'ctl_output':
+              if (!isOutputSuppressed.value) {
+                addToOutput(`[CTL] ${message.data}`);
+              }
+              eventCallbacks.value.onControlOutput.forEach(callback => callback(message.data));
+              break;
+            case 'chat_message':
+              eventCallbacks.value.onChatMessage.forEach(callback => callback(message.data));
+              break;
+            case 'admin_pause_terminal':
+              console.log('Received admin_pause_terminal event', message.data);
+              pauseTerminal(message.data.reason);
+              break;
+            case 'admin_resume_terminal':
+              console.log('Received admin_resume_terminal event');
+              resumeTerminal();
+              break;
+            case 'admin_suppress_output':
+              suppressOutput(message.data.suppress, message.data.reason);
+              break;
+            case 'command_approval':
+              if (message.data.approved) {
+                approveCommand(message.data.commandId);
+              } else {
+                rejectCommand(message.data.commandId, message.data.reason || 'Rejected by admin');
+              }
+              break;
+            default:
+              console.warn('Unknown message type:', message.type);
+          }
+        });
+
+        socket.value.on('shell_output', (data: string) => {
+          console.log('Received shell_output:', data);
+          if (!isOutputSuppressed.value) {
+            addToOutput(data);
+          }
+          eventCallbacks.value.onShellOutput.forEach(callback => callback(data));
+        });
+      });
+    }
+  };
 
   const disconnect = () => {
     if (socket.value) {
@@ -335,11 +564,13 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const pauseTerminal = (reason: string) => {
     session.value.isPaused = true
+    isAdministratorLocked.value = true;
     addToOutput(`[SYSTEM] Terminal paused: ${reason}`)
   }
 
   const resumeTerminal = () => {
     session.value.isPaused = false
+    isAdministratorLocked.value = false;
     addToOutput('[SYSTEM] Terminal resumed')
   }
 
@@ -462,6 +693,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const addToOutput = (text: string) => {
     if (!isOutputSuppressed.value) {
+      console.log('addToOutput called with:', text);
       outputBuffer.value.push(`[${new Date().toLocaleTimeString()}] ${text}`)
       // Keep only last 1000 lines
       if (outputBuffer.value.length > 1000) {
@@ -522,7 +754,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     connectionStatus,
 
     // Connection Actions
-    setSocket,
     connect,
     disconnect,
     startReconnection,
@@ -557,6 +788,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     setAIMonitoring,
     addDangerousCommand,
     removeDangerousCommand,
-    updateAIMonitoring
+    updateAIMonitoring,
+    setSocket
   }
 })

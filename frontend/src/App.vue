@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue';
+import 'normalize.css'; // インストールしたライブラリの場合
+import { onUnmounted, ref, watch } from 'vue';
 import AdminControlPanel from './components/AdminControlPanel.vue';
 import ChatComponent from './components/ChatComponent.vue';
 import TerminalComponent from './components/TerminalComponent.vue';
+import { useChatStore } from './stores/chatStore';
 
-const showAdminPanel = ref(true);
+const chatStore = useChatStore();
+const activeTab = ref('admin'); // 'admin' or 'chat'
 const isAdminPanelFloating = ref(false);
-const showChat = ref(true);
 
 // Dragging functionality for floating panel
 const isDragging = ref(false);
@@ -15,7 +17,7 @@ const panelPosition = ref({ x: 20, y: 60 });
 
 const startDrag = (event: MouseEvent) => {
   if (!isAdminPanelFloating.value) return;
-  
+
   isDragging.value = true;
   const rect = (event.target as HTMLElement).closest('#admin-container')?.getBoundingClientRect();
   if (rect) {
@@ -24,7 +26,7 @@ const startDrag = (event: MouseEvent) => {
       y: event.clientY - rect.top
     };
   }
-  
+
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopDrag);
   event.preventDefault();
@@ -32,14 +34,14 @@ const startDrag = (event: MouseEvent) => {
 
 const onDrag = (event: MouseEvent) => {
   if (!isDragging.value) return;
-  
+
   const newX = event.clientX - dragOffset.value.x;
   const newY = event.clientY - dragOffset.value.y;
-  
+
   // Constrain to viewport
   const maxX = window.innerWidth - 300; // min panel width
   const maxY = window.innerHeight - 400; // min panel height
-  
+
   panelPosition.value = {
     x: Math.max(0, Math.min(newX, maxX)),
     y: Math.max(0, Math.min(newY, maxY))
@@ -56,6 +58,12 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
 });
+
+watch(chatStore.activeMessages, (newMessages) => {
+  if (newMessages.length > 0 && activeTab.value !== 'chat') {
+    activeTab.value = 'chat';
+  }
+});
 </script>
 
 <template>
@@ -67,10 +75,9 @@ onUnmounted(() => {
         <TerminalComponent />
       </div>
     </div>
-    
+
     <!-- Admin Control Panel (Fixed or Floating) -->
     <div
-      v-if="showAdminPanel"
       id="admin-container"
       :class="{
         'admin-floating': isAdminPanelFloating,
@@ -83,71 +90,74 @@ onUnmounted(() => {
         left: panelPosition.x + 'px'
       } : {}"
     >
-      <div
-        class="admin-header"
-        @mousedown="startDrag"
-        :style="{ cursor: isAdminPanelFloating ? 'move' : 'default' }"
-      >
-        <h3>Control Panel</h3>
-        <div class="admin-controls">
-          <button
-            @click="isAdminPanelFloating = !isAdminPanelFloating"
-            class="float-toggle-btn"
-            :title="isAdminPanelFloating ? 'Dock Panel' : 'Float Panel'"
-          >
-            {{ isAdminPanelFloating ? '📌' : '🔓' }}
-          </button>
-          <button @click="showAdminPanel = false" class="close-btn">×</button>
-        </div>
+      <!-- Tab Navigation -->
+      <div class="tab-navigation">
+        <button
+          :class="{ 'active': activeTab === 'admin' }"
+          @click="activeTab = 'admin'"
+        >
+          Admin Control
+        </button>
+        <button
+          :class="{ 'active': activeTab === 'chat' }"
+          @click="activeTab = 'chat'"
+        >
+          Chat
+        </button>
       </div>
-      
-      <!-- Admin Control Panel Content -->
-      <div class="admin-content">
+
+      <!-- Tab Content -->
+      <div v-if="activeTab === 'admin'" class="tab-content">
         <AdminControlPanel />
       </div>
-      
-      <!-- Chat Container (Bottom of Control Panel) -->
-      <div v-if="showChat" id="chat-container">
-        <div class="chat-header">
-          <h3>Chat</h3>
-          <button @click="showChat = false" class="close-btn">×</button>
-        </div>
-        <div class="chat-content">
-          <ChatComponent />
-        </div>
+      <div v-if="activeTab === 'chat'" class="tab-content">
+        <ChatComponent />
       </div>
     </div>
-    
+
     <!-- Control Buttons -->
-    <div class="control-buttons">
-      <button
-        v-if="!showAdminPanel"
-        @click="showAdminPanel = true"
-        class="control-btn admin-btn"
-      >
-        Admin
-      </button>
-      <button
-        v-if="!showChat"
-        @click="showChat = true"
-        class="control-btn chat-btn"
-      >
-        Chat
-      </button>
-    </div>
+    
   </div>
 </template>
 
-<style>
+<style scoped>
+/* Add "scoped" to limit the scope of these styles */
+
+.tab-navigation {
+  display: flex;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #444;
+}
+
+.tab-navigation button {
+  background: none;
+  border: none;
+  color: #ccc;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tab-navigation button.active {
+  background-color: #4caf50;
+  color: white;
+}
+
+.tab-content {
+  padding: 15px;
+  flex: 1;
+  overflow: auto;
+}
+
 html, body, #app {
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
+  height: 100vh;
+  margin: 0 !important;
+  padding: 0 !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 #app-container {
-  height: 100%;
+  height: 100vh;
   position: relative;
   display: flex;
 }
@@ -155,13 +165,13 @@ html, body, #app {
 .main-content {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  height: 100%;
+  flex-direction: row; /* Make main-content a flexbox */
+  height: 100%; /* Ensure full vertical height */
   min-width: 0;
 }
 
 #terminal-container {
-  flex: 1;
+  flex-grow: 1; /* Make terminal-container grow to fill space */
   overflow: hidden;
   background-color: #1e1e1e;
 }
@@ -171,7 +181,13 @@ html, body, #app {
   border-top: 1px solid #444;
   display: flex;
   flex-direction: column;
-  height: 300px;
+  flex-shrink: 0;
+}
+
+.admin-fixed {
+  width: 450px; /* Fix the width of the sidebar */
+  height: 100%;
+  border-left: 1px solid #444;
   flex-shrink: 0;
 }
 
@@ -333,7 +349,7 @@ html, body, #app {
   .admin-fixed {
     width: 300px;
   }
-  
+
   .admin-floating {
     width: 350px;
     right: 10px;
@@ -344,13 +360,13 @@ html, body, #app {
   .main-content {
     flex-direction: column;
   }
-  
+
   #chat-container {
     height: 200px !important;
     border-top: 1px solid #444;
     border-left: none;
   }
-  
+
   .admin-fixed {
     position: fixed;
     top: 0;
@@ -359,19 +375,19 @@ html, body, #app {
     height: 100%;
     z-index: 1001;
   }
-  
+
   .admin-floating {
     width: 90vw;
     height: 80vh;
     top: 10vh;
     right: 5vw;
   }
-  
+
   .control-buttons {
     top: 10px;
     right: 10px;
   }
-  
+
   .control-btn {
     padding: 6px 10px;
     font-size: 11px;
@@ -405,7 +421,6 @@ html, body, #app {
 .admin-floating::-webkit-scrollbar-thumb:hover {
   background: #888;
 }
-</style>
 
 /* Draggable functionality enhancements */
 .admin-floating .admin-header {
@@ -438,3 +453,4 @@ html, body, #app {
 .admin-floating .admin-header {
   border-radius: 8px 8px 0 0;
 }
+</style>

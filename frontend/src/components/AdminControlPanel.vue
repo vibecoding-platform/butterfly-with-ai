@@ -14,29 +14,24 @@
         <div class="status-item">
           <span class="label">Session ID:</span>
           <span class="value">{{ terminalStore.session.id }}</span>
-        </div>
-        <div class="status-item">
-          <span class="label">Last Activity:</span>
-          <span class="value">{{ formatTime(terminalStore.session.lastActivity) }}</span>
+          -------
         </div>
         <div class="status-item">
           <span class="label">Admin Control:</span>
           <span class="value" :class="{ active: terminalStore.session.adminControlled }">
             {{ terminalStore.session.adminControlled ? 'Enabled' : 'Disabled' }}
           </span>
+          -------
         </div>
         <div class="status-item">
-          <span class="label">Connection Attempts:</span>
-          <span class="value">{{ terminalStore.connectionState.reconnectAttempts }}</span>
-        </div>
-        <div class="status-item">
-          <span class="label">AI Risk Level:</span>
+          <span class="label">AIRisk:</span>
           <span class="value" :class="`risk-${terminalStore.aiMonitoring.riskAssessment}`">
             {{ terminalStore.aiMonitoring.riskAssessment.toUpperCase() }}
           </span>
         </div>
+        -------
         <div class="status-item">
-          <span class="label">Procedure Progress:</span>
+          <span class="label">Procedure Status:</span>
           <span class="value">
             {{ terminalStore.aiMonitoring.procedureStep }}/{{ terminalStore.aiMonitoring.totalSteps }}
           </span>
@@ -52,17 +47,16 @@
           <span class="indicator-dot"></span>
           {{ terminalStore.aiMonitoring.isActive ? 'Active' : 'Inactive' }}
         </div>
-        
+
         <div v-if="terminalStore.aiMonitoring.currentProcedure" class="current-procedure">
           <h5>Current Procedure</h5>
           <div class="procedure-info">
             <div class="procedure-name">{{ terminalStore.aiMonitoring.currentProcedure }}</div>
             <div class="procedure-progress">
               <div class="progress-bar">
-                <div
-                  class="progress-fill"
-                  :style="{ width: (terminalStore.aiMonitoring.procedureStep / terminalStore.aiMonitoring.totalSteps * 100) + '%' }"
-                ></div>
+                <div class="progress-fill"
+                  :style="{ width: (terminalStore.aiMonitoring.procedureStep / terminalStore.aiMonitoring.totalSteps * 100) + '%' }">
+                </div>
               </div>
               <span class="progress-text">
                 Step {{ terminalStore.aiMonitoring.procedureStep }} of {{ terminalStore.aiMonitoring.totalSteps }}
@@ -74,11 +68,7 @@
         <div class="monitoring-rules">
           <h5>Active Monitoring Rules</h5>
           <div class="rules-list">
-            <div
-              v-for="rule in terminalStore.aiMonitoring.monitoringRules"
-              :key="rule"
-              class="rule-item"
-            >
+            <div v-for="rule in terminalStore.aiMonitoring.monitoringRules" :key="rule" class="rule-item">
               <span class="rule-indicator">✓</span>
               {{ rule }}
             </div>
@@ -88,11 +78,7 @@
         <div v-if="terminalStore.aiMonitoring.suggestedActions.length > 0" class="suggested-actions">
           <h5>AI Suggestions</h5>
           <div class="suggestions-list">
-            <div
-              v-for="action in terminalStore.aiMonitoring.suggestedActions"
-              :key="action"
-              class="suggestion-item"
-            >
+            <div v-for="action in terminalStore.aiMonitoring.suggestedActions" :key="action" class="suggestion-item">
               <span class="suggestion-icon">💡</span>
               {{ action }}
             </div>
@@ -105,26 +91,17 @@
     <div class="control-section">
       <h4>Terminal Control</h4>
       <div class="control-buttons">
-        <button 
-          @click="toggleTerminalPause"
-          :class="{ active: terminalStore.session.isPaused }"
-          class="control-btn pause-btn"
-        >
+        <button @click="toggleTerminalPause" :class="{ active: terminalStore.session.isPaused }"
+          class="control-btn pause-btn">
           {{ terminalStore.session.isPaused ? 'Resume' : 'Pause' }} Terminal
         </button>
-        
-        <button 
-          @click="toggleOutputSuppression"
-          :class="{ active: terminalStore.isOutputSuppressed }"
-          class="control-btn suppress-btn"
-        >
+
+        <button @click="toggleOutputSuppression" :class="{ active: terminalStore.isOutputSuppressed }"
+          class="control-btn suppress-btn">
           {{ terminalStore.isOutputSuppressed ? 'Restore' : 'Suppress' }} Output
         </button>
-        
-        <button 
-          @click="clearTerminalOutput"
-          class="control-btn clear-btn"
-        >
+
+        <button @click="clearTerminalOutput" class="control-btn clear-btn">
           Clear Output
         </button>
       </div>
@@ -134,11 +111,7 @@
     <div v-if="terminalStore.hasPendingCommands" class="control-section">
       <h4>AI Command Review ({{ terminalStore.pendingCommands.length }})</h4>
       <div class="pending-commands-list">
-        <div
-          v-for="command in terminalStore.pendingCommands"
-          :key="command.id"
-          class="pending-command-item"
-        >
+        <div v-for="command in terminalStore.pendingCommands" :key="command.id" class="pending-command-item">
           <div class="command-info">
             <div class="command-header">
               <div class="command-text">
@@ -153,7 +126,7 @@
                 </span>
               </div>
             </div>
-            
+
             <div v-if="command.aiSuggestion" class="ai-analysis">
               <div class="analysis-header">
                 <span class="ai-icon">🤖</span>
@@ -169,22 +142,13 @@
                 <strong>Do you want to proceed with this command?</strong>
               </div>
               <div class="dialog-options">
-                <button
-                  @click="approveCommand(command.id)"
-                  class="action-btn approve-btn"
-                >
+                <button @click="approveCommand(command.id)" class="action-btn approve-btn">
                   ✓ Yes, Execute
                 </button>
-                <button
-                  @click="showRejectDialog(command)"
-                  class="action-btn reject-btn"
-                >
+                <button @click="showRejectDialog(command)" class="action-btn reject-btn">
                   ✗ No, Block
                 </button>
-                <button
-                  @click="requestAlternative(command)"
-                  class="action-btn alternative-btn"
-                >
+                <button @click="requestAlternative(command)" class="action-btn alternative-btn">
                   💡 Suggest Alternative
                 </button>
               </div>
@@ -198,12 +162,7 @@
     <div class="control-section">
       <h4>Recent Commands</h4>
       <div class="command-history">
-        <div 
-          v-for="command in recentCommands" 
-          :key="command.id"
-          class="history-item"
-          :class="command.status"
-        >
+        <div v-for="command in recentCommands" :key="command.id" class="history-item" :class="command.status">
           <div class="command-text">
             <code>{{ command.command }}</code>
           </div>
@@ -232,11 +191,7 @@
         </div>
         <div class="form-group">
           <label>Rejection Reason:</label>
-          <textarea 
-            v-model="rejectionReason"
-            placeholder="Enter reason for rejection..."
-            rows="3"
-          ></textarea>
+          <textarea v-model="rejectionReason" placeholder="Enter reason for rejection..." rows="3"></textarea>
         </div>
         <div class="modal-actions">
           <button @click="confirmRejectCommand" class="action-btn reject-btn">
@@ -364,10 +319,25 @@ const formatTime = (date: Date) => {
   font-weight: bold;
 }
 
-.status-connected { background-color: #4caf50; color: white; }
-.status-connecting { background-color: #ff9800; color: white; }
-.status-reconnecting { background-color: #ff9800; color: white; }
-.status-disconnected { background-color: #f44336; color: white; }
+.status-connected {
+  background-color: #4caf50;
+  color: white;
+}
+
+.status-connecting {
+  background-color: #ff9800;
+  color: white;
+}
+
+.status-reconnecting {
+  background-color: #ff9800;
+  color: white;
+}
+
+.status-disconnected {
+  background-color: #f44336;
+  color: white;
+}
 
 .control-section {
   margin-bottom: 25px;
@@ -459,10 +429,21 @@ const formatTime = (date: Date) => {
   font-weight: bold;
 }
 
-.risk-level.low { background-color: #4caf50; }
-.risk-level.medium { background-color: #ff9800; }
-.risk-level.high { background-color: #ff5722; }
-.risk-level.critical { background-color: #f44336; }
+.risk-level.low {
+  background-color: #4caf50;
+}
+
+.risk-level.medium {
+  background-color: #ff9800;
+}
+
+.risk-level.high {
+  background-color: #ff5722;
+}
+
+.risk-level.critical {
+  background-color: #f44336;
+}
 
 .timestamp {
   color: #ccc;
@@ -517,13 +498,32 @@ const formatTime = (date: Date) => {
   border-left: 3px solid;
 }
 
-.history-item.approved { border-left-color: #4caf50; background-color: rgba(76, 175, 80, 0.1); }
-.history-item.rejected { border-left-color: #f44336; background-color: rgba(244, 67, 54, 0.1); }
-.history-item.executed { border-left-color: #2196f3; background-color: rgba(33, 150, 243, 0.1); }
+.history-item.approved {
+  border-left-color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
+}
 
-.status .approved { color: #4caf50; }
-.status .rejected { color: #f44336; }
-.status .executed { color: #2196f3; }
+.history-item.rejected {
+  border-left-color: #f44336;
+  background-color: rgba(244, 67, 54, 0.1);
+}
+
+.history-item.executed {
+  border-left-color: #2196f3;
+  background-color: rgba(33, 150, 243, 0.1);
+}
+
+.status .approved {
+  color: #4caf50;
+}
+
+.status .rejected {
+  color: #f44336;
+}
+
+.status .executed {
+  color: #2196f3;
+}
 
 .rejection-reason {
   margin-top: 5px;
@@ -569,11 +569,11 @@ const formatTime = (date: Date) => {
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: #4caf50;
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(26px);
 }
 

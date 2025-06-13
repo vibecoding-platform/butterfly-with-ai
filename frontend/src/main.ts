@@ -24,6 +24,7 @@ const socket = aetherTermService.connect();
 
 // Initialize the store with the socket connection
 const terminalStore = useAetherTerminalServiceStore();
+//terminalStore.setSocket(socket);
 terminalStore.setSocket(socket);
 terminalStore.initializeSession(`session_${Date.now()}`);
 

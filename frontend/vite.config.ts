@@ -32,5 +32,10 @@ export default defineConfig({
         assetFileNames: `assets/[name].[hash].[ext]`
       }
     }
+  },
+  server: {
+    watch: {
+      usePolling: true
+    }
   }
 })
