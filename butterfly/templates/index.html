@@ -33,7 +33,20 @@
   <!-- Butterfly terminal client -->
   <script>
     // Initialize Socket.IO connection
-    const socket = io();
+    // Get the current path to determine if we're under a sub-path
+    const currentPath = window.location.pathname;
+    const pathSegments = currentPath.split('/').filter(segment => segment.length > 0);
+    
+    // If we have path segments, the first one might be our root path
+    let socketPath = '/socket.io';
+    if (pathSegments.length > 0 && pathSegments[0] !== 'session') {
+      // We're likely under a sub-path, so adjust the socket.io path
+      socketPath = '/' + pathSegments[0] + '/socket.io';
+    }
+    
+    const socket = io({
+      path: socketPath
+    });
 
     // Initialize xterm.js terminal
     const term = new Terminal({

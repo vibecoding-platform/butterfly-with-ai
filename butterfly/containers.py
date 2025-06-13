@@ -48,7 +48,13 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     # Combined ASGI application (Socket.IO + FastAPI)
     app = providers.Singleton(
-        socketio.ASGIApp, socketio_server=sio, other_asgi_app=fastapi_app
+        socketio.ASGIApp,
+        socketio_server=sio,
+        other_asgi_app=fastapi_app,
+        socketio_path=providers.Callable(
+            lambda uri_root_path: f"{uri_root_path}/socket.io" if uri_root_path else "/socket.io",
+            uri_root_path=config.uri_root_path
+        )
     )
 
     # AI Assistance Logic Provider
