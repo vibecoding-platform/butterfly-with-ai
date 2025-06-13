@@ -1,12 +1,12 @@
 include Makefile.config
 -include Makefile.custom.config
 
-all: install lint check-outdated run-debug
+all: install lint check-outdated build-frontend run-debug
 
 install:
-	test -d $(VENV) || virtualenv $(VENV) -p $(PYTHON_VERSION)
+	uv sync
 	$(PIP) install --upgrade --no-cache pip setuptools -e .[lint,themes] devcore
-	$(NPM) install
+	cd frontend && $(NPM) install
 
 clean:
 	rm -fr $(NODE_MODULES)
@@ -22,12 +22,17 @@ check-outdated:
 
 ARGS ?= --port=1212 --unsecure --debug
 run-debug:
-	$(PYTHON) ./butterfly.server.py $(ARGS)
+	$(PYTHON) ./src/aetherterm/main.py $(ARGS)
 
-build-coffee:
-	$(NODE_MODULES)/.bin/grunt
 
-release: build-coffee
+build-frontend:
+	cd frontend && $(NPM) install
+	cd frontend && $(NPM) run build
+	mv frontend/dist/index.html src/aetherterm/templates/index.html
+	rm -rf src/aetherterm/static/*
+	cp -r frontend/dist/* src/aetherterm/static/
+
+release: build-frontend
 	git pull
 	$(eval VERSION := $(shell PROJECT_NAME=$(PROJECT_NAME) $(VENV)/bin/devcore bump $(LEVEL)))
 	git commit -am "Bump $(VERSION)"

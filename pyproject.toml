@@ -1,14 +1,13 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61.0.0"] # プロジェクトをビルドするために必要なツール
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "butterfly"
-version = "3.2.5"
+name = "aetherterm"
+version = "0.0.1"
 description = "A sleek web based terminal emulator"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "GPLv3"}
 authors = [
     {name = "Florian Mounier", email = "paradoxxx.zero@gmail.com"}
 ]
@@ -16,7 +15,6 @@ keywords = ["terminal", "web", "emulator", "websocket"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -35,7 +33,7 @@ dependencies = [
     "jinja2",
     "libsass",
     "pyopenssl",
-    "click"
+    "click",
 ]
 
 [project.optional-dependencies]
@@ -49,14 +47,16 @@ Repository = "https://github.com/paradoxxxzero/butterfly"
 Issues = "https://github.com/paradoxxxzero/butterfly/issues"
 
 [project.scripts]
-butterfly = "butterfly.scripts.butterfly:main"
-b = "butterfly.scripts.butterfly:main"
+aetherterm = "aetherterm.scripts.aetherterm:main"
+b = "aetherterm.scripts.aetherterm:main"
 
 [tool.setuptools]
-packages = ["butterfly", "butterfly.scripts", "butterfly.terminals"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
-butterfly = [
+aetherterm = [
     "sass/*.sass",
     "themes/*.*",
     "themes/*/*.*", 
@@ -75,8 +75,14 @@ butterfly = [
 [tool.pytest.ini_options]
 flake8-ignore = [
     "*.py E731 E402",
-    "butterfly/bin/help.py E501"
+    "aetherterm/bin/help.py E501"
 ]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"] # エラーコードの選択
 
 [tool.wheel]
 universal = true
+

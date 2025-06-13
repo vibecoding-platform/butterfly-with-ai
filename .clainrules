@@ -18,6 +18,16 @@
 # - **Security**: OpenSSL certificates, PAM authentication support
 # - **Dependency Injection**: dependency-injector for modular architecture
 
+# ## Documentation
+# - document is under docs/ folder
+# - under docs folder
+#   - technical document is under tech
+#   - user manual  is under manual/user
+#   - admin document is under manual/admin
+
+# ## Tests
+# test scenario is under tests
+
 # Use uv for Python dependency management
 uv pip install -e .  # Install in editable mode
 uv lock  # Generate uv.lock from pyproject.toml
