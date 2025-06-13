@@ -23,6 +23,7 @@ import random
 import signal
 import string
 import struct
+import sys  # Import sys
 import termios
 from logging import getLogger
 
@@ -36,7 +37,7 @@ log = getLogger("butterfly.terminal")
 class AsyncioTerminal(BaseTerminal):
     sessions = {}
 
-    def __init__(self, user, path, session, socket, uri, render_string, broadcast):
+    def __init__(self, user, path, session, socket, uri, render_string, broadcast, login, pam_profile):
         self.sessions[session] = self
         self.history_size = 50000
         self.history = ""
@@ -48,6 +49,7 @@ class AsyncioTerminal(BaseTerminal):
         self.socket = socket
         self.process = None
         self.reader_task = None
+        self.client_sids = set()  # Track multiple clients for this session
 
         log.info(
             "Terminal opening with session: %s and socket %r"
@@ -76,6 +78,8 @@ class AsyncioTerminal(BaseTerminal):
 
         # Default to current user if no specific user
         self.callee = self.callee or utils.User()
+        self.login = login
+        self.pam_profile = pam_profile
 
         log.info("Forking pty for user %r" % self.user)
 
@@ -105,7 +109,7 @@ class AsyncioTerminal(BaseTerminal):
         env = self._setup_environment()
 
         # Determine shell command
-        shell_cmd = self._get_shell_command()
+        shell_cmd = await self._get_shell_command()
 
         try:
             # Fork process manually since asyncio.create_subprocess_exec doesn't work well with PTY
@@ -138,8 +142,8 @@ class AsyncioTerminal(BaseTerminal):
                 # Set master fd to non-blocking
                 fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
 
-                # Send MOTD before starting PTY reader (only for new sessions)
-                if self.session not in self.sessions or len(self.sessions) == 1:
+                # Send MOTD for new sessions (when this is the first client)
+                if len(self.client_sids) == 1:  # This is the first client for this session
                     await self._send_motd_direct()
 
                 # Start reading from PTY
@@ -184,11 +188,33 @@ class AsyncioTerminal(BaseTerminal):
 
         return env
 
-    def _get_shell_command(self):
+    async def _get_shell_command(self):
         """Get the shell command to execute."""
-        # For now, use the user's default shell
-        # TODO: Add support for custom commands and shell options
-        return [self.callee.shell, "-il"]
+        if self.login:
+            # If login is enabled, we need to handle PAM authentication
+            if self.pam_profile:
+                # Use PAM for authentication
+                pam_path = os.path.join(
+                    os.path.dirname(os.path.realpath(__file__)), "..", "pam.py"
+                )
+                return [
+                    sys.executable,
+                    pam_path,
+                    self.callee.name,
+                    self.pam_profile,
+                ]
+            else:
+                # Fallback to su if PAM profile is not specified
+                if os.path.exists("/usr/bin/su"):
+                    args = ["/usr/bin/su"]
+                else:
+                    args = ["/bin/su"]
+                args.append("-l")
+                args.append(self.callee.name)
+                return args
+        else:
+            # If login is not required, use the user's default shell
+            return [self.callee.shell, "-il"]
 
     def _setup_child_process(self):
         """Setup function called in child process before exec."""

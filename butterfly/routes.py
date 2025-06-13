@@ -39,13 +39,13 @@ log = logging.getLogger("butterfly.routes")
 
 
 @router.get("/", response_class=HTMLResponse)
-@router.get("/{session_id}", response_class=HTMLResponse)
 async def index(
     request: Request,
-    session_id: str=None,
 ):
     """Main index route that serves the terminal interface."""
-    session = session_id or str(uuid4())
+    # Check for session parameter in query string, otherwise generate new session
+    query_session = request.query_params.get("session")
+    session = query_session or str(uuid4())
     return templates.TemplateResponse(
         "index.html", {"request": request, "session": session}
     )

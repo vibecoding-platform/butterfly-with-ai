@@ -66,7 +66,8 @@ class ApplicationContainer(containers.DeclarativeContainer):
         ),  # Placeholder for sentence-by-sentence AI service
     )
 
-    terminal = providers.Factory("butterfly.terminals.asyncio_terminal.AsyncioTerminal")
+    # Terminal factory removed - terminals are created directly in socket handlers
+    # to avoid dependency injection complexity with multiple required parameters
 
 
 def configure_container(config=None):

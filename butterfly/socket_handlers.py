@@ -1,8 +1,12 @@
 import logging
 from uuid import uuid4
 
+from dependency_injector.wiring import Provide, inject
+
 from butterfly import utils
+from butterfly.containers import ApplicationContainer
 from butterfly.terminals.asyncio_terminal import AsyncioTerminal
+from butterfly.utils import User
 
 log = logging.getLogger("butterfly.socket_handlers")
 
@@ -26,17 +30,26 @@ async def disconnect(sid):
     """Handle client disconnection."""
     log.info(f"Client disconnected: {sid}")
 
-    # Close any terminal sessions associated with this client
-    # Note: In a full implementation, you'd track which terminals belong to which clients
+    # Remove client from any terminal sessions and close if no clients remain
     for session_id, terminal in list(AsyncioTerminal.sessions.items()):
-        # For now, we'll close terminals when clients disconnect
-        # In production, you might want more sophisticated session management
-        if hasattr(terminal, "client_sid") and terminal.client_sid == sid:
-            await terminal.close()
+        if hasattr(terminal, "client_sids") and sid in terminal.client_sids:
+            terminal.client_sids.discard(sid)
+            log.info(f"Removed client {sid} from terminal session {session_id}")
+            # If no clients remain, close the terminal
+            if not terminal.client_sids:
+                log.info(f"No clients remaining for session {session_id}, closing terminal")
+                await terminal.close()
 
 
-async def create_terminal(sid, data):
-    """Create a new terminal session."""
+@inject
+async def create_terminal(
+    sid,
+    data,
+    config_login: bool=Provide[ApplicationContainer.config.login],
+    config_pam_profile: str=Provide[ApplicationContainer.config.pam_profile],
+    config_uri_root_path: str=Provide[ApplicationContainer.config.uri_root_path],
+):
+    """Handle the creation of a new terminal session."""
     try:
         session_id = data.get("session", str(uuid4()))
         user_name = data.get("user", "")
@@ -44,6 +57,26 @@ async def create_terminal(sid, data):
 
         log.info(f"Creating terminal session {session_id} for client {sid}")
         log.debug(f"Terminal data: user={user_name}, path={path}")
+
+        # Check if session already exists and is still active
+        if session_id in AsyncioTerminal.sessions:
+            existing_terminal = AsyncioTerminal.sessions[session_id]
+            if not existing_terminal.closed:
+                log.info(f"Reusing existing terminal session {session_id}")
+                # Add this client to the existing terminal's client set
+                existing_terminal.client_sids.add(sid)
+                # Send terminal history to new client
+                if existing_terminal.history:
+                    await sio_instance.emit(
+                        "terminal_output",
+                        {"session": session_id, "data": existing_terminal.history},
+                        room=sid
+                    )
+                # Notify client that terminal is ready
+                await sio_instance.emit(
+                    "terminal_ready", {"session": session_id, "status": "ready"}, room=sid
+                )
+                return
 
         # Create connection info for Socket.IO
         # Get environ from Socket.IO if available, otherwise use defaults
@@ -71,35 +104,35 @@ async def create_terminal(sid, data):
         socket = utils.ConnectionInfo(environ, socket_remote_addr)
 
         # Determine user
-        user = None
+        terminal_user = None
         if user_name:
             try:
-                user = utils.User(name=user_name)
-                log.debug(f"Using user: {user}")
+                terminal_user = User(name=user_name)
+                log.debug(f"Using user: {terminal_user}")
             except LookupError:
-                log.warning(f"Invalid user: {user_name}")
-                user = None
+                log.warning(f"Invalid user: {user_name}, falling back to default user.")
+                terminal_user = User()  # Fallback to current user
 
-        # Create terminal instance
+        # Create terminal instance directly (not using factory since it has issues)
         log.debug("Creating AsyncioTerminal instance")
-        terminal = AsyncioTerminal(
-            user=user,
+        terminal_instance = AsyncioTerminal(
+            user=terminal_user,
             path=path,
             session=session_id,
             socket=socket,
-            uri=f"ws://localhost/{session_id}",  # Simplified URI
-            render_string=lambda template, **kwargs: template.encode(
-                "utf-8"
-            ),  # Simplified
-            broadcast=lambda session, message: broadcast_to_session(session, message),
+            uri=f"http://{socket.local_addr}:{socket.local_port}{config_uri_root_path.rstrip('/') if config_uri_root_path else ''}/?session={session_id}",  # Full sharing URL with root path
+            render_string=None,  # Not used in asyncio_terminal directly for MOTD rendering
+            broadcast=lambda s, m: broadcast_to_session(s, m),
+            login=config_login,
+            pam_profile=config_pam_profile
         )
 
-        # Associate terminal with client
-        terminal.client_sid = sid
+        # Associate terminal with client using the new client set
+        terminal_instance.client_sids.add(sid)
 
         # Start the PTY
         log.debug("Starting PTY")
-        await terminal.start_pty()
+        await terminal_instance.start_pty()
         log.info(f"PTY started successfully for session {session_id}")
 
         # Notify client that terminal is ready
@@ -151,19 +184,28 @@ def broadcast_to_session(session_id, message):
     if sio_instance:
         import asyncio
         
-        if message is not None:
-            # Terminal output - broadcast to all clients
-            log.debug(f"Broadcasting terminal output for session {session_id}: {repr(message)}")
-            asyncio.create_task(
-                sio_instance.emit(
-                    "terminal_output", {"session": session_id, "data": message}
-                )
-            )
+        # Get the terminal to find connected clients
+        terminal = AsyncioTerminal.sessions.get(session_id)
+        if terminal and hasattr(terminal, 'client_sids'):
+            client_sids = list(terminal.client_sids)
         else:
-            # Terminal closed
-            log.info(f"Broadcasting terminal closed for session {session_id}")
-            asyncio.create_task(
-                sio_instance.emit("terminal_closed", {"session": session_id})
-            )
+            client_sids = []
+        
+        if message is not None:
+            # Terminal output - broadcast to all clients in this session
+            log.debug(f"Broadcasting terminal output for session {session_id} to {len(client_sids)} clients: {repr(message)}")
+            for client_sid in client_sids:
+                asyncio.create_task(
+                    sio_instance.emit(
+                        "terminal_output", {"session": session_id, "data": message}, room=client_sid
+                    )
+                )
+        else:
+            # Terminal closed - notify all clients in this session
+            log.info(f"Broadcasting terminal closed for session {session_id} to {len(client_sids)} clients")
+            for client_sid in client_sids:
+                asyncio.create_task(
+                    sio_instance.emit("terminal_closed", {"session": session_id}, room=client_sid)
+                )
     else:
         log.warning("sio_instance is None, cannot broadcast message")
