@@ -11,3 +11,6 @@ build/
 .cache/
 .env*
 .pytest_cache
+frontend/dist/
+src/aetherterm/static/assets/
+src/aetherterm/static/index.html
