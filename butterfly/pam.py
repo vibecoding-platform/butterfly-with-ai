@@ -13,23 +13,32 @@
 # Modified by Peter Cai, 2017-02-10
 # interactive login for Butterfly
 
-'''
+"""
 PAM module for python
 Provides an authenticate function that will allow the caller to authenticate
 a user against the Pluggable Authentication Modules (PAM) on the system.
 Implemented using ctypes, so no compilation is necessary.
-'''
+"""
 
 import os
 import sys
 from ctypes import (
-    CDLL, CFUNCTYPE, POINTER, Structure, byref, c_char_p, c_int, c_size_t,
-    c_void_p)
+    CDLL,
+    CFUNCTYPE,
+    POINTER,
+    Structure,
+    byref,
+    c_char_p,
+    c_int,
+    c_size_t,
+    c_void_p,
+)
 from ctypes.util import find_library
 
 
 class PamHandle(Structure):
     """wrapper class for pam_handle_t pointer"""
+
     _fields_ = [("handle", c_void_p)]
 
     def __init__(self):
@@ -39,6 +48,7 @@ class PamHandle(Structure):
 
 class PamMessage(Structure):
     """wrapper class for pam_message structure"""
+
     _fields_ = [("msg_style", c_int), ("msg", c_char_p)]
 
     def __repr__(self):
@@ -47,6 +57,7 @@ class PamMessage(Structure):
 
 class PamResponse(Structure):
     """wrapper class for pam_response structure"""
+
     _fields_ = [("resp", c_char_p), ("resp_retcode", c_int)]
 
     def __repr__(self):
@@ -54,12 +65,13 @@ class PamResponse(Structure):
 
 
 conv_func = CFUNCTYPE(
-    c_int, c_int, POINTER(POINTER(PamMessage)),
-    POINTER(POINTER(PamResponse)), c_void_p)
+    c_int, c_int, POINTER(POINTER(PamMessage)), POINTER(POINTER(PamResponse)), c_void_p
+)
 
 
 class PamConv(Structure):
     """wrapper class for pam_conv structure"""
+
     _fields_ = [("conv", conv_func), ("appdata_ptr", c_void_p)]
 
 
@@ -101,7 +113,7 @@ pam_authenticate.argtypes = [PamHandle, c_int]
 misc_conv = libpam_misc.misc_conv
 
 
-class PAM():
+class PAM:
     code = 0
     reason = None
 
@@ -109,8 +121,8 @@ class PAM():
         pass
 
     def authenticate(
-            self, username,
-            service='login', encoding='utf-8', resetcreds=True):
+        self, username, service="login", encoding="utf-8", resetcreds=True
+    ):
         """PAM authentication through standard input for the given service.
            Returns True for success, or False for failure.
            self.code (integer) and self.reason (string) are always stored
@@ -138,9 +150,9 @@ class PAM():
             if isinstance(service, unicode):  # noqa: F821
                 service = service.encode(encoding)
 
-        if b'\x00' in username or b'\x00' in service:
+        if b"\x00" in username or b"\x00" in service:
             self.code = 4  # PAM_SYSTEM_ERR in Linux-PAM
-            self.reason = 'strings may not contain NUL'
+            self.reason = "strings may not contain NUL"
             return False
 
         handle = PamHandle()
@@ -175,13 +187,13 @@ def login_prompt(username, profile, env):
     pam = PAM()
 
     success = pam.authenticate(username, profile)
-    print('{} {}'.format(pam.code, pam.reason))
+    print("{} {}".format(pam.code, pam.reason))
 
     if success:
-        su = '/usr/bin/su'
+        su = "/usr/bin/su"
         if not os.path.exists(su):
-            su = '/bin/su'
-        os.execvpe(su, [su, '-l', username], env)
+            su = "/bin/su"
+        os.execvpe(su, [su, "-l", username], env)
     return success
 
 

@@ -14,16 +14,15 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from .__about__ import *  # noqa: F401,F403
-
 import os
-import tornado.web
-import tornado.options
-import tornado.web
 from logging import getLogger
 
+import tornado.options
+import tornado.web
 
-log = getLogger('butterfly')
+from .__about__ import *  # noqa: F401,F403
+
+log = getLogger("butterfly")
 
 
 class url(object):
@@ -32,12 +31,11 @@ class url(object):
 
     def __call__(self, cls):
         if tornado.options.options.uri_root_path:
-            url = '/' + tornado.options.options.uri_root_path.strip('/') + self.url
+            url = "/" + tornado.options.options.uri_root_path.strip("/") + self.url
         else:
             url = self.url
         application.add_handlers(
-            r'.*$',
-            (tornado.web.url(url, cls, name=cls.__name__),)
+            r".*$", (tornado.web.url(url, cls, name=cls.__name__),)
         )
 
         return cls
@@ -50,36 +48,34 @@ class Route(tornado.web.RequestHandler):
 
     @property
     def builtin_themes_dir(self):
-        return os.path.join(
-            os.path.dirname(__file__), 'themes')
+        return os.path.join(os.path.dirname(__file__), "themes")
 
     @property
     def themes_dir(self):
-        return os.path.join(
-            self.application.butterfly_dir, 'themes')
+        return os.path.join(self.application.butterfly_dir, "themes")
 
     @property
     def local_js_dir(self):
-        return os.path.join(
-            self.application.butterfly_dir, 'js')
+        return os.path.join(self.application.butterfly_dir, "js")
 
     def get_theme_dir(self, theme):
-        if theme.startswith('built-in-'):
-            return os.path.join(
-                self.builtin_themes_dir, theme[len('built-in-'):])
-        return os.path.join(
-            self.themes_dir, theme)
+        if theme.startswith("built-in-"):
+            return os.path.join(self.builtin_themes_dir, theme[len("built-in-") :])
+        return os.path.join(self.themes_dir, theme)
 
 
 # Imported from executable
-if hasattr(tornado.options.options, 'debug'):
+if hasattr(tornado.options.options, "debug"):
     application = tornado.web.Application(
         static_path=os.path.join(os.path.dirname(__file__), "static"),
         template_path=os.path.join(os.path.dirname(__file__), "templates"),
         debug=tornado.options.options.debug,
-        static_url_prefix='%s/static/' % (
-            '/%s' % tornado.options.options.uri_root_path.strip('/')
-            if tornado.options.options.uri_root_path else '')
+        static_url_prefix="%s/static/"
+        % (
+            "/%s" % tornado.options.options.uri_root_path.strip("/")
+            if tornado.options.options.uri_root_path
+            else ""
+        ),
     )
 
     import butterfly.routes  # noqa: F401

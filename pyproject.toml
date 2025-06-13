@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "butterfly"
+version = "3.2.5"
+description = "A sleek web based terminal emulator"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "GPLv3"}
+authors = [
+    {name = "Florian Mounier", email = "paradoxxx.zero@gmail.com"}
+]
+keywords = ["terminal", "web", "emulator", "websocket"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Terminals"
+]
+
+dependencies = [
+    "dependency-injector>=2.20.1",
+    "python-socketio",
+    "uvicorn",
+    "fastapi",
+    "python-multipart",
+    "jinja2",
+    "libsass",
+    "pyopenssl",
+    "click"
+]
+
+[project.optional-dependencies]
+themes = ["libsass"]
+lint = ["pytest", "pytest-flake8", "pytest-isort"]
+dev = ["ruff"]
+
+[project.urls]
+Homepage = "https://github.com/paradoxxxzero/butterfly"
+Repository = "https://github.com/paradoxxxzero/butterfly"
+Issues = "https://github.com/paradoxxxzero/butterfly/issues"
+
+[project.scripts]
+butterfly = "butterfly.scripts.butterfly:main"
+b = "butterfly.scripts.butterfly:main"
+
+[tool.setuptools]
+packages = ["butterfly", "butterfly.scripts", "butterfly.terminals"]
+
+[tool.setuptools.package-data]
+butterfly = [
+    "sass/*.sass",
+    "themes/*.*",
+    "themes/*/*.*", 
+    "themes/*/*/*.*",
+    "static/fonts/*",
+    "static/images/favicon.png",
+    "static/main.css",
+    "static/html-sanitizer.js",
+    "static/*.min.js",
+    "templates/index.html",
+    "bin/*",
+    "templates/motd.j2",
+    "butterfly.conf.default"
+]
+
+[tool.pytest.ini_options]
+flake8-ignore = [
+    "*.py E731 E402",
+    "butterfly/bin/help.py E501"
+]
+
+[tool.wheel]
+universal = true
