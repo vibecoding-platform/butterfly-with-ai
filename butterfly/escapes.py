@@ -8,38 +8,38 @@ from butterfly.utils import ansi_colors as colors  # noqa: F401
 
 @contextmanager
 def html():
-    sys.stdout.write('\x1bP;HTML|')
+    sys.stdout.write("\x1bP;HTML|")
     yield
-    sys.stdout.write('\x1bP')
+    sys.stdout.write("\x1bP")
     sys.stdout.flush()
 
 
 @contextmanager
-def image(mime='image'):
-    sys.stdout.write('\x1bP;IMAGE|%s;' % mime)
+def image(mime="image"):
+    sys.stdout.write("\x1bP;IMAGE|%s;" % mime)
     yield
-    sys.stdout.write('\x1bP\n')
+    sys.stdout.write("\x1bP\n")
     sys.stdout.flush()
 
 
 @contextmanager
 def prompt():
-    sys.stdout.write('\x1bP;PROMPT|')
+    sys.stdout.write("\x1bP;PROMPT|")
     yield
-    sys.stdout.write('\x1bP')
+    sys.stdout.write("\x1bP")
     sys.stdout.flush()
 
 
 @contextmanager
 def text():
-    sys.stdout.write('\x1bP;TEXT|')
+    sys.stdout.write("\x1bP;TEXT|")
     yield
-    sys.stdout.write('\x1bP')
+    sys.stdout.write("\x1bP")
     sys.stdout.flush()
 
 
 def geolocation():
-    sys.stdout.write('\x1b[?99n')
+    sys.stdout.write("\x1b[?99n")
     sys.stdout.flush()
 
     fd = sys.stdin.fileno()
@@ -47,24 +47,24 @@ def geolocation():
     try:
         tty.setraw(sys.stdin.fileno())
         rv = sys.stdin.read(1)
-        if rv != '\x1b':
+        if rv != "\x1b":
             raise
         rv = sys.stdin.read(1)
-        if rv != '[':
+        if rv != "[":
             raise
         rv = sys.stdin.read(1)
-        if rv != '?':
+        if rv != "?":
             raise
 
-        loc = ''
-        while rv != 'R':
+        loc = ""
+        while rv != "R":
             rv = sys.stdin.read(1)
-            if rv != 'R':
+            if rv != "R":
                 loc += rv
     except Exception:
         return
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    if not loc or ';' not in loc:
+    if not loc or ";" not in loc:
         return
-    return tuple(map(float, loc.split(';')))
+    return tuple(map(float, loc.split(";")))

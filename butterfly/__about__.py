@@ -10,6 +10,12 @@ __license__ = "GPLv3"
 __copyright__ = "Copyright 2017 %s" % __author__
 
 __all__ = [
-    '__title__', '__version__', '__summary__', '__uri__', '__author__',
-    '__email__', '__license__', '__copyright__'
+    "__title__",
+    "__version__",
+    "__summary__",
+    "__uri__",
+    "__author__",
+    "__email__",
+    "__license__",
+    "__copyright__",
 ]

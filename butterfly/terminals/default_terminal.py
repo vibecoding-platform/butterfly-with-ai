@@ -35,10 +35,12 @@ import tornado.websocket
 
 from butterfly import __version__, utils
 
-log = getLogger('butterfly')
+from .base_terminal import BaseTerminal
+
+log = getLogger("butterfly")
 ioloop = tornado.ioloop.IOLoop.instance()
 server = utils.User()
-daemon = utils.User(name='daemon')
+daemon = utils.User(name="daemon")
 
 
 # Python 2 backward compatibility
@@ -48,22 +50,23 @@ except NameError:
     pass
 
 
-class Terminal(object):
+class DefaultTerminal(BaseTerminal):
     sessions = {}
 
-    def __init__(self, user, path, session, socket, uri, render_string,
-                 broadcast):
+    def __init__(self, user, path, session, socket, uri, render_string, broadcast):
         self.sessions[session] = self
         self.history_size = 50000
-        self.history = ''
+        self.history = ""
         self.uri = uri
         self.session = session
         self.broadcast = broadcast
         self.fd = None
         self.closed = False
         self.socket = socket
-        log.info('Terminal opening with session: %s and socket %r' % (
-            self.session, self.socket))
+        log.info(
+            "Terminal opening with session: %s and socket %r"
+            % (self.session, self.socket)
+        )
         self.path = path
         self.user = user if user else None
         self.caller = self.callee = None
@@ -77,8 +80,7 @@ class Terminal(object):
                 try:
                     self.callee = self.user
                 except LookupError:
-                    log.debug(
-                        "Can't switch to user %s" % self.user, exc_info=True)
+                    log.debug("Can't switch to user %s" % self.user, exc_info=True)
                     self.callee = None
 
             # If no user where given and we are local, keep the same
@@ -90,41 +92,47 @@ class Terminal(object):
             # Authed user
             self.callee = self.user
 
-        if tornado.options.options.motd != '':
-            motd = (render_string(
-                tornado.options.options.motd,
-                butterfly=self,
-                version=__version__,
-                opts=tornado.options.options,
-                uri=self.uri,
-                colors=utils.ansi_colors
-            ).decode('utf-8')
-             .replace('\r', '')
-             .replace('\n', '\r\n'))
+        if tornado.options.options.motd != "":
+            motd = (
+                render_string(
+                    tornado.options.options.motd,
+                    butterfly=self,
+                    version=__version__,
+                    opts=tornado.options.options,
+                    uri=self.uri,
+                    colors=utils.ansi_colors,
+                )
+                .decode("utf-8")
+                .replace("\r", "")
+                .replace("\n", "\r\n")
+            )
             self.send(motd)
 
-        log.info('Forking pty for user %r' % self.user)
+        log.info("Forking pty for user %r" % self.user)
 
     def send(self, message):
         if message is not None:
             self.history += message
             if len(self.history) > self.history_size:
-                self.history = self.history[-self.history_size:]
+                self.history = self.history[-self.history_size :]
         self.broadcast(self.session, message)
 
     def pty(self):
         # Make a "unique" id in 4 bytes
-        self.uid = ''.join(
+        self.uid = "".join(
             random.choice(
-                string.ascii_lowercase + string.ascii_uppercase +
-                string.digits)
-            for _ in range(4))
+                string.ascii_lowercase + string.ascii_uppercase + string.digits
+            )
+            for _ in range(4)
+        )
 
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             self.determine_user()
-            log.debug('Pty forked for user %r caller %r callee %r' % (
-                self.user, self.caller, self.callee))
+            log.debug(
+                "Pty forked for user %r caller %r callee %r"
+                % (self.user, self.caller, self.callee)
+            )
             self.shell()
         else:
             self.communicate()
@@ -137,10 +145,10 @@ class Terminal(object):
 
         # If we should login, login
         if tornado.options.options.login:
-            user = ''
-            while user == '':
+            user = ""
+            while user == "":
                 try:
-                    user = input('login: ')
+                    user = input("login: ")
                 except (KeyboardInterrupt, EOFError):
                     log.debug("Error in login input", exc_info=True)
                     pass
@@ -149,7 +157,7 @@ class Terminal(object):
                 self.callee = utils.User(name=user)
             except Exception:
                 log.debug("Can't switch to user %s" % user, exc_info=True)
-                self.callee = utils.User(name='nobody')
+                self.callee = utils.User(name="nobody")
             return
 
         # if login is not required, we will use the same user as
@@ -161,8 +169,8 @@ class Terminal(object):
             os.chdir(self.path or self.callee.dir)
         except Exception:
             log.debug(
-                "Can't chdir to %s" % (self.path or self.callee.dir),
-                exc_info=True)
+                "Can't chdir to %s" % (self.path or self.callee.dir), exc_info=True
+            )
 
         # If local and local user is the same as login user
         # We set the env of the user from the browser
@@ -177,33 +185,31 @@ class Terminal(object):
         env["COLORTERM"] = "butterfly"
         env["HOME"] = self.callee.dir
         env["LOCATION"] = self.uri
-        env['BUTTERFLY_PATH'] = os.path.abspath(os.path.join(
-            os.path.dirname(__file__), 'bin'))
+        env["BUTTERFLY_PATH"] = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "bin")
+        )
 
         try:
-            tty = os.ttyname(0).replace('/dev/', '')
+            tty = os.ttyname(0).replace("/dev/", "")
         except Exception:
             log.debug("Can't get ttyname", exc_info=True)
-            tty = ''
+            tty = ""
         if self.caller != self.callee:
             try:
                 os.chown(os.ttyname(0), self.callee.uid, -1)
             except Exception:
                 log.debug("Can't chown ttyname", exc_info=True)
 
-        utils.add_user_info(
-            self.uid,
-            tty, os.getpid(),
-            self.callee.name, self.uri)
+        utils.add_user_info(self.uid, tty, os.getpid(), self.callee.name, self.uri)
 
         local_login = (
-            self.socket.local and self.caller == self.callee and
-            server == self.callee)
+            self.socket.local and self.caller == self.callee and server == self.callee
+        )
         secure = not tornado.options.options.unsecure
         force_login = tornado.options.options.login
         ignore_security = (
-            tornado.options.options.
-            i_hereby_declare_i_dont_want_any_security_whatsoever)
+            tornado.options.options.i_hereby_declare_i_dont_want_any_security_whatsoever
+        )
 
         if not force_login and (ignore_security or secure or local_login):
             # User has been auth with ssl or is the same user as server
@@ -215,34 +221,43 @@ class Terminal(object):
                     os.setgid(self.callee.gid)
                     os.setuid(self.callee.uid)
                     # Apparently necessary for some cmd
-                    env['LOGNAME'] = env['USER'] = self.callee.name
+                    env["LOGNAME"] = env["USER"] = self.callee.name
                 except Exception:
                     log.error(
-                        'The server must be run as root '
-                        'if you want to log as different user\n',
-                        exc_info=True)
+                        "The server must be run as root "
+                        "if you want to log as different user\n",
+                        exc_info=True,
+                    )
                     sys.exit(1)
 
             if tornado.options.options.cmd:
-                args = tornado.options.options.cmd.split(' ')
+                args = tornado.options.options.cmd.split(" ")
             else:
                 args = [tornado.options.options.shell or self.callee.shell]
-                args.append('-il')
+                args.append("-il")
 
             # In some cases some shells don't export SHELL var
-            env['SHELL'] = args[0]
+            env["SHELL"] = args[0]
             os.execvpe(args[0], args, env)
             # This process has been replaced
 
         if tornado.options.options.pam_profile:
             if not server.root:
-                print('You must be root to use pam_profile option.')
+                print("You must be root to use pam_profile option.")
                 sys.exit(3)
             pam_path = os.path.join(
-                os.path.dirname(os.path.realpath(__file__)), 'pam.py')
-            os.execvpe(sys.executable, [
-                sys.executable, pam_path, self.callee.name,
-                tornado.options.options.pam_profile], env)
+                os.path.dirname(os.path.realpath(__file__)), "pam.py"
+            )
+            os.execvpe(
+                sys.executable,
+                [
+                    sys.executable,
+                    pam_path,
+                    self.callee.name,
+                    tornado.options.options.pam_profile,
+                ],
+                env,
+            )
 
         # Unsecure connection with su
         if server.root:
@@ -258,14 +273,14 @@ class Terminal(object):
                     sys.exit(1)
                 os.setuid(daemon.uid)
 
-        if os.path.exists('/usr/bin/su'):
-            args = ['/usr/bin/su']
+        if os.path.exists("/usr/bin/su"):
+            args = ["/usr/bin/su"]
         else:
-            args = ['/bin/su']
+            args = ["/bin/su"]
 
-        args.append('-l')
-        if sys.platform.startswith('linux') and tornado.options.options.shell:
-            args.append('-s')
+        args.append("-l")
+        if sys.platform.startswith("linux") and tornado.options.options.shell:
+            args.append("-s")
             args.append(tornado.options.options.shell)
         args.append(self.callee.name)
         os.execvpe(args[0], args, env)
@@ -276,53 +291,42 @@ class Terminal(object):
         def utf8_error(e):
             log.error(e)
 
-        self.reader = io.open(
-            self.fd,
-            'rb',
-            buffering=0,
-            closefd=False
-        )
-        self.writer = io.open(
-            self.fd,
-            'wt',
-            encoding='utf-8',
-            closefd=False
-        )
-        ioloop.add_handler(
-            self.fd, self.shell_handler, ioloop.READ | ioloop.ERROR)
+        self.reader = io.open(self.fd, "rb", buffering=0, closefd=False)
+        self.writer = io.open(self.fd, "wt", encoding="utf-8", closefd=False)
+        ioloop.add_handler(self.fd, self.shell_handler, ioloop.READ | ioloop.ERROR)
 
     def write(self, message):
-        if not hasattr(self, 'writer'):
+        if not hasattr(self, "writer"):
             self.on_close()
             self.close()
 
-        log.debug('WRIT<%r' % message)
+        log.debug("WRIT<%r" % message)
         self.writer.write(message)
         self.writer.flush()
 
     def ctl(self, message):
-        if message['cmd'] == 'size':
-            cols = message['cols']
-            rows = message['rows']
+        if message["cmd"] == "size":
+            cols = message["cols"]
+            rows = message["rows"]
             s = struct.pack("HHHH", rows, cols, 0, 0)
             fcntl.ioctl(self.fd, termios.TIOCSWINSZ, s)
-            log.info('SIZE (%d, %d)' % (cols, rows))
+            log.info("SIZE (%d, %d)" % (cols, rows))
 
     def shell_handler(self, fd, events):
         if events & ioloop.READ:
             try:
                 read = self.reader.read()
             except IOError:
-                read = ''
+                read = ""
 
-            log.debug('READ>%r' % read)
+            log.debug("READ>%r" % read)
             if read and len(read) != 0:
-                self.send(read.decode('utf-8', 'replace'))
+                self.send(read.decode("utf-8", "replace"))
             else:
                 events = ioloop.ERROR
 
         if events & ioloop.ERROR:
-            log.info('Error on fd %d, closing' % fd)
+            log.info("Error on fd %d, closing" % fd)
             # Terminated
             self.send(None)  # Close all
             self.close()
@@ -332,10 +336,10 @@ class Terminal(object):
             return
         self.closed = True
         if self.fd is not None:
-            log.info('Closing fd %d' % self.fd)
+            log.info("Closing fd %d" % self.fd)
 
-        if getattr(self, 'pid', 0) == 0:
-            log.info('pid is 0')
+        if getattr(self, "pid", 0) == 0:
+            log.info("pid is 0")
             return
 
         utils.rm_user_info(self.uid, self.pid)
@@ -343,18 +347,18 @@ class Terminal(object):
         try:
             ioloop.remove_handler(self.fd)
         except Exception:
-            log.error('handler removal fail', exc_info=True)
+            log.error("handler removal fail", exc_info=True)
 
         try:
             os.close(self.fd)
         except Exception:
-            log.debug('closing fd fail', exc_info=True)
+            log.debug("closing fd fail", exc_info=True)
 
         try:
             os.kill(self.pid, signal.SIGHUP)
             os.kill(self.pid, signal.SIGCONT)
             os.waitpid(self.pid, 0)
         except Exception:
-            log.debug('waitpid fail', exc_info=True)
+            log.debug("waitpid fail", exc_info=True)
 
         del self.sessions[self.session]

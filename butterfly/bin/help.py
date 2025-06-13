@@ -8,15 +8,16 @@ from butterfly.escapes import image
 from butterfly.utils import ansi_colors
 
 print(ansi_colors.white + "Welcome to the butterfly help." + ansi_colors.reset)
-path = os.getenv('BUTTERFLY_PATH')
+path = os.getenv("BUTTERFLY_PATH")
 if path:
-    path = os.path.join(path, '../static/images/favicon.png')
+    path = os.path.join(path, "../static/images/favicon.png")
 
 if path and os.path.exists(path):
-    with image('image/png'):
-        with open(path, 'rb') as i:
-            print(base64.b64encode(i.read()).decode('ascii'))
-print("""
+    with image("image/png"):
+        with open(path, "rb") as i:
+            print(base64.b64encode(i.read()).decode("ascii"))
+print(
+    """
 Butterfly is a xterm compliant terminal built with python and javascript.
 
 {title}Terminal functionalities:{reset}
@@ -52,12 +53,14 @@ Butterfly is a xterm compliant terminal built with python and javascript.
 
   \x1b[{rcol}G\x1b[3m{dark}butterfly @ 2015 Mounier Florian{reset}\
 """.format(
-    title=ansi_colors.light_blue,
-    dark=ansi_colors.light_black,
-    strong=ansi_colors.white,
-    code=ansi_colors.light_yellow,
-    comment=ansi_colors.light_magenta,
-    reset=ansi_colors.reset,
-    rcol=int(subprocess.check_output(['stty', 'size']).split()[1]) - 31,
-    main=os.path.normpath(os.path.join(
-        os.path.abspath(os.path.dirname(butterfly.__file__)), 'sass'))))
+        title=ansi_colors.light_blue,
+        dark=ansi_colors.light_black,
+        strong=ansi_colors.white,
+        code=ansi_colors.light_yellow,
+        reset=ansi_colors.reset,
+        rcol=int(subprocess.check_output(["stty", "size"]).split()[1]) - 31,
+        main=os.path.normpath(
+            os.path.join(os.path.abspath(os.path.dirname(butterfly.__file__)), "sass")
+        ),
+    )
+)

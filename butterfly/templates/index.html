@@ -1,36 +1,176 @@
 <!DOCTYPE html>
-{% from tornado.options import options %}
-{% from uuid import uuid4 %}
 <html>
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Butterfly - A web terminal based on websocket and tornado">
-    <meta name="author" content="Mounier Florian">
-    <link rel="shortcut icon" href="{{ static_url('images/favicon.png') }}">
 
-    <title>Butterfly</title>
-    <link href="{{ static_url('main.css') }}" rel="stylesheet" id="style">
-  </head>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Butterfly - A web terminal based on websocket and Socket.IO">
+  <meta name="author" content="Mounier Florian">
+  <link rel="shortcut icon" href="/static/images/favicon.png">
 
-  <body spellcheck="false"
-        data-force-unicode-width="{{ 'yes' if options.force_unicode_width else 'no' }}"
-        data-root-path="{{ options.uri_root_path }}"
-        data-session-token={{ session }}>
-    <textarea id="input-helper">
+  <title>Butterfly</title>
+  <link href="/static/main.css" rel="stylesheet" id="style">
+</head>
+
+<body spellcheck="false" data-session-token="{{ session }}">
+  <textarea id="input-helper">
     </textarea>
-    <div id="input-view" class="hidden">
-    </div>
-    <div id="popup" class="hidden">
-    </div>
-    <script src="{{ static_url('html-sanitizer.js') }}"></script>
-    <script src="{{ static_url('main.%sjs' % (
-                 '' if options.unminified else 'min.')) }}"></script>
-    <script src="{{ static_url('ext.%sjs' % (
-                 '' if options.unminified else 'min.')) }}"></script>
-    <script src="{{ reverse_url('LocalJsStatic') }}"></script>
-    <div id="packed"></div>
-    <div id="term"></div>
-  </body>
+  <div id="input-view" class="hidden">
+  </div>
+  <div id="popup" class="hidden">
+  </div>
+
+  <!-- Socket.IO client -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <!-- Terminal emulator -->
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+
+  <div id="term"></div>
+
+  <!-- Butterfly terminal client -->
+  <script>
+    // Initialize Socket.IO connection
+    const socket = io();
+
+    // Initialize xterm.js terminal
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace'
+    });
+
+    const sessionId = document.body.getAttribute('data-session-token');
+    let terminalReady = false;
+
+    // Wait for DOM to be ready before opening terminal
+    document.addEventListener('DOMContentLoaded', function() {
+      const termElement = document.getElementById('term');
+      if (termElement) {
+        term.open(termElement);
+        console.log('Terminal opened in DOM');
+      } else {
+        console.error('Terminal element not found');
+      }
+    });
+
+    // Socket.IO event handlers
+    socket.on('connect', function () {
+      console.log('Connected to server');
+      // Create terminal session
+      socket.emit('create_terminal', {
+        session: sessionId,
+        user: '',
+        path: ''
+      });
+    });
+
+    socket.on('terminal_ready', function (data) {
+      console.log('Terminal ready:', data);
+      terminalReady = true;
+      term.write('Welcome to Butterfly Terminal!\r\n');
+      term.write('Session: ' + sessionId + '\r\n');
+    });
+
+    socket.on('terminal_output', function (data) {
+      if (data.session === sessionId) {
+        term.write(data.data);
+      }
+    });
+
+    socket.on('terminal_closed', function (data) {
+      if (data.session === sessionId) {
+        term.write('\r\nTerminal session closed.\r\n');
+        terminalReady = false;
+      }
+    });
+
+    socket.on('terminal_error', function (data) {
+      console.error('Terminal error:', data.error);
+      term.write('\r\nTerminal error: ' + data.error + '\r\n');
+    });
+
+    socket.on('disconnect', function () {
+      console.log('Disconnected from server');
+      term.write('\r\nDisconnected from server. Attempting to reconnect...\r\n');
+      terminalReady = false;
+    });
+
+    // Handle terminal input
+    term.onData(function (data) {
+      if (terminalReady) {
+        socket.emit('terminal_input', {
+          session: sessionId,
+          data: data
+        });
+      }
+    });
+
+    // Handle terminal resize
+    term.onResize(function (size) {
+      if (terminalReady) {
+        socket.emit('terminal_resize', {
+          session: sessionId,
+          cols: size.cols,
+          rows: size.rows
+        });
+      }
+    });
+
+    // Fit terminal to container
+    function fitTerminal() {
+      const termElement = document.getElementById('term');
+      if (!termElement) return;
+      
+      const rect = termElement.getBoundingClientRect();
+      const cols = Math.floor(rect.width / 9); // Approximate character width
+      const rows = Math.floor(rect.height / 17); // Approximate line height
+      
+      if (cols > 0 && rows > 0) {
+        term.resize(cols, rows);
+      }
+    }
+
+    // Fit terminal on load and resize
+    window.addEventListener('load', function() {
+      setTimeout(fitTerminal, 100);
+    });
+    window.addEventListener('resize', fitTerminal);
+
+    // Initial fit after DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(fitTerminal, 100);
+    });
+  </script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: Monaco, Menlo, "Ubuntu Mono", monospace;
+    }
+
+    #term {
+      width: 100vw;
+      height: 100vh;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #input-helper {
+      position: absolute;
+      left: -9999px;
+      opacity: 0;
+    }
+  </style>
+</body>
+
 </html>

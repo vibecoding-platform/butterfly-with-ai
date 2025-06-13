@@ -8,8 +8,9 @@ from butterfly.escapes import html
 parser = argparse.ArgumentParser(
     description="Butterfly html converter.\n\n"
     "Output in html standard input.\n"
-    "Example: $ echo \"<b>Bold</b>\" | b html",
-    formatter_class=argparse.RawTextHelpFormatter)
+    'Example: $ echo "<b>Bold</b>" | b html',
+    formatter_class=argparse.RawTextHelpFormatter,
+)
 
 parser.parse_known_args()
 

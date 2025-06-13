@@ -13,13 +13,14 @@ Butterfly is a xterm compatible terminal that runs in your browser.
 * xterm compatible (support a lot of unused features!)
 * Native browser scroll and search
 * Theming in css / sass [(20 preset themes)](https://github.com/paradoxxxzero/butterfly-themes) endless possibilities!
-* HTML in your terminal! cat images and use &lt;table&gt;
+* HTML in your terminal! cat images and use <table>
 * Multiple sessions support (à la screen -x) to simultaneously access a terminal from several places on the planet!
 * Secure authentication with X509 certificates!
 * 16,777,216 colors support!
 * Keyboard text selection!
 * Desktop notifications on terminal output!
 * Geolocation from browser!
+* **MOTD (Message of the Day)** - Customizable welcome message with connection info and branding!
 * May work on firefox too!
 
 ## Try it
@@ -138,4 +139,3 @@ Starting with a different port
 
 ``` bash
 docker run -d -p 12345:12345 garland/butterfly --port=12345
-```
