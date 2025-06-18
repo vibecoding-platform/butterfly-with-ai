@@ -1,0 +1,5 @@
+[Unit]
+Description=AetherTerm Terminal Server
+
+[Service]
+ExecStart=/usr/bin/aetherterm

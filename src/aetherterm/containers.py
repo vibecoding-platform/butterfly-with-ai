@@ -7,13 +7,6 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 
-def _create_fastapi_app(static_path):
-    """Create FastAPI app with static files mounted."""
-    app = FastAPI()
-    app.mount("/static", StaticFiles(directory=static_path), name="static")
-    return app
-
-
 class ApplicationContainer(containers.DeclarativeContainer):
     """Root container for the application, focused on Terminal dependency injection."""
 
@@ -40,21 +33,10 @@ class ApplicationContainer(containers.DeclarativeContainer):
         lambda: os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
     )
 
-    # FastAPI application provider for static files and HTTP routes
-    fastapi_app = providers.Singleton(
-        lambda static_path: _create_fastapi_app(static_path),
-        static_path=static_files_path,
-    )
-
-    # Combined ASGI application (Socket.IO + FastAPI)
-    app = providers.Singleton(
-        socketio.ASGIApp,
-        socketio_server=sio,
-        other_asgi_app=fastapi_app,
-        socketio_path=providers.Callable(
-            lambda uri_root_path: f"{uri_root_path}/socket.io" if uri_root_path else "/socket.io",
-            uri_root_path=config.uri_root_path,
-        ),
+    # Socket.IO path provider
+    socketio_path = providers.Callable(
+        lambda uri_root_path: f"{uri_root_path}/socket.io" if uri_root_path else "/socket.io",
+        uri_root_path=config.uri_root_path,
     )
 
     # AI Assistance Logic Provider
@@ -74,15 +56,27 @@ def configure_container(config=None):
     """Configure the dependency injection container."""
     container = ApplicationContainer()
 
+    # Set default values first
+    defaults = {
+        "uri_root_path": "",
+        "unsecure": False,
+        "debug": False,
+        "more": False,
+        "ai_mode": "streaming",
+    }
+
+    # Merge defaults with provided config
+    final_config = defaults.copy()
     if config:
-        container.config.from_dict(config)
+        final_config.update(config)
+
+    container.config.from_dict(final_config)
 
     container.wire(
         modules=[
-            "butterfly.server",
-            "butterfly.terminals",
-            "butterfly.utils",  # Assuming AI assistance might use utils
-            "butterfly.socket_handlers",  # Wire the new socket handlers
+            "aetherterm.routes",
+            "aetherterm.server",
+            "aetherterm.socket_handlers",
         ]
     )
 

@@ -1,13 +1,13 @@
-__title__ = "butterfly"
+__title__ = "aetherterm"
 __version__ = "3.2.5"
 
 __summary__ = "A sleek web based terminal emulator"
-__uri__ = "https://github.com/paradoxxxzero/butterfly"
+__uri__ = "https://github.com/paradoxxxzero/aetherterm"
 __author__ = "Florian Mounier"
 __email__ = "paradoxxx.zero@gmail.com"
 
-__license__ = "GPLv3"
-__copyright__ = "Copyright 2017 %s" % __author__
+__license__ = "Apache 2.0"
+__copyright__ = "Copyright 2025 %s" % __author__
 
 __all__ = [
     "__title__",

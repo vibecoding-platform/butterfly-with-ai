@@ -1,19 +1,19 @@
 # *-* coding: utf-8 *-*
-# This file is part of butterfly
+# This file is part of aetherterm
 #
-# butterfly Copyright(C) 2015-2017 Florian Mounier
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Copyright 2025 Florian Mounier
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import os
 import pwd
@@ -22,7 +22,7 @@ import subprocess
 import sys
 from logging import getLogger
 
-log = getLogger("butterfly")
+log = getLogger("aetherterm")
 
 
 def get_hex_ip_port(remote):
@@ -486,7 +486,11 @@ ansi_colors = AnsiColors()
 
 
 def render_motd(
-    socket, user, uri, unsecure=False, i_hereby_declare_i_dont_want_any_security_whatsoever=False
+    socket,
+    user,
+    uri,
+    unsecure=False,
+    i_hereby_declare_i_dont_want_any_security_whatsoever=False,
 ):
     """
     Render the MOTD (Message of the Day) template with Jinja2.
@@ -505,7 +509,7 @@ def render_motd(
 
     from jinja2 import Environment, FileSystemLoader
 
-    from butterfly.__about__ import __version__
+    from aetherterm.__about__ import __version__
 
     # Get template directory
     template_dir = os.path.join(os.path.dirname(__file__), "templates")
@@ -530,9 +534,9 @@ def render_motd(
         },
     )()
 
-    # Create butterfly object with socket info including proxy_addr
-    butterfly_obj = type(
-        "Butterfly",
+    # Create aetherterm object with socket info including proxy_addr
+    aetherterm_obj = type(
+        "AetherTerm",
         (),
         {
             "socket": type(
@@ -553,7 +557,7 @@ def render_motd(
     context = {
         "colors": ansi_colors,
         "version": __version__,
-        "butterfly": butterfly_obj,
+        "aetherterm": aetherterm_obj,
         "opts": opts,
         "uri": uri,
     }

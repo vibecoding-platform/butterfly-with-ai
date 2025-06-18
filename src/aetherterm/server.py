@@ -22,16 +22,11 @@ import logging
 import os
 import shutil
 import socket
-import ssl
 import stat
 import sys
 import uuid
-import webbrowser
-
-import uvicorn
 
 from aetherterm import socket_handlers
-from aetherterm.containers import ApplicationContainer
 from aetherterm.routes import router
 
 # Default configuration values
@@ -108,6 +103,10 @@ log = logging.getLogger("aetherterm")
 
 def create_app(**kwargs):
     """Create the Butterfly ASGI application with dependency injection."""
+    import socketio
+    from fastapi import FastAPI
+    from fastapi.staticfiles import StaticFiles
+
     # Start with default config
     config = DEFAULT_CONFIG.copy()
 
@@ -118,27 +117,41 @@ def create_app(**kwargs):
     config.update(kwargs)
 
     # Configure the dependency injection container
-    container = ApplicationContainer()
-    container.config.from_dict(config)
-    container.wire(
-        modules=[
-            "aetherterm.server",
-            "aetherterm.terminals",
-            "aetherterm.utils",
-            "aetherterm.socket_handlers",
-            "aetherterm.routes",  # Wire routes module
-        ]
+    from aetherterm.containers import configure_container
+
+    container = configure_container(config)
+
+    # Create FastAPI application and apply wiring
+    fastapi_app = FastAPI()
+    static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    fastapi_app.mount("/static", StaticFiles(directory=static_path), name="static")
+
+    # Note: Wiring is already done in configure_container function
+    # which wires routes, server, and socket_handlers modules
+
+    fastapi_app.include_router(router)
+
+    # Create Socket.IO server
+    sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+
+    # Create combined ASGI application
+    uri_root_path = config.get("uri_root_path", "")
+    socketio_path = f"{uri_root_path}/socket.io" if uri_root_path else "/socket.io"
+
+    asgi_app = socketio.ASGIApp(
+        socketio_server=sio, other_asgi_app=fastapi_app, socketio_path=socketio_path
     )
 
-    return container, config
+    return asgi_app, sio, container, config
 
 
-async def start_server(**kwargs):
-    """Start the Butterfly server with dependency injection."""
-    container, config = create_app(**kwargs)
+def prepare_ssl_certs(**kwargs):
+    """Prepare SSL certificates and handle certificate generation requests."""
+    config = DEFAULT_CONFIG.copy()
+    config = setup_config_paths(config)
+    config.update(kwargs)
 
     host = config["host"]
-    port = config["port"]
     unsecure = config["unsecure"]
     ssl_dir = config["ssl_dir"]
     generate_certs = config["generate_certs"]
@@ -148,18 +161,6 @@ async def start_server(**kwargs):
     i_hereby_declare_i_dont_want_any_security_whatsoever = config[
         "i_hereby_declare_i_dont_want_any_security_whatsoever"
     ]
-    one_shot = config["one_shot"]
-    uri_root_path = config["uri_root_path"]
-
-    # Reconfigure logging based on container config
-    log_level = logging.WARNING
-    if config["debug"]:
-        log_level = logging.INFO
-        if config["more"]:
-            log_level = logging.DEBUG
-
-    for logger_name in ("uvicorn.access", "uvicorn.error", "aetherterm"):
-        logging.getLogger(logger_name).setLevel(log_level)
 
     if i_hereby_declare_i_dont_want_any_security_whatsoever:
         unsecure = True
@@ -348,8 +349,7 @@ async def start_server(**kwargs):
         os.chmod(pkcs12 % user, stat.S_IRUSR | stat.S_IWUSR)  # 0o600 perms
         sys.exit(0)
 
-    # Set up SSL options if not unsecure
-    ssl_args = {}
+    # Check SSL certificates if not unsecure
     if not unsecure:
         if not all(map(os.path.exists, [cert % host, cert_key % host, ca])):
             log.error("Unable to find aetherterm certificate for host %s", host)
@@ -367,22 +367,14 @@ async def start_server(**kwargs):
             )
             sys.exit(1)
 
-        ssl_args["ssl_certfile"] = cert % host
-        ssl_args["ssl_keyfile"] = cert_key % host
-        ssl_args["ssl_ca_certs"] = ca
-        ssl_args["ssl_cert_reqs"] = ssl.CERT_REQUIRED
 
-        if ssl_version is not None:
-            if not hasattr(ssl, f"PROTOCOL_{ssl_version}"):
-                log.error("Unknown SSL protocol %s", ssl_version)
-                sys.exit(1)
-            ssl_args["ssl_version"] = getattr(ssl, f"PROTOCOL_{ssl_version}")
+def setup_app(**kwargs):
+    """Setup the application and prepare it for running."""
+    # Handle certificate generation first
+    prepare_ssl_certs(**kwargs)
 
-    log.info("Starting server")
-
-    # Get the ASGI application from the container
-    app = container.app()
-    sio = container.sio()
+    # Create and return the ASGI app
+    asgi_app, sio, container, config = create_app(**kwargs)
 
     # Set the socket.io instance in handlers module
     socket_handlers.set_sio_instance(sio)
@@ -394,32 +386,41 @@ async def start_server(**kwargs):
     sio.on("terminal_input", socket_handlers.terminal_input)
     sio.on("terminal_resize", socket_handlers.terminal_resize)
 
-    # Mount the FastAPI router onto the main ASGI app
-    app.other_asgi_app.include_router(router, prefix=uri_root_path)
+    log.info("Application setup complete")
 
-    # Start the Uvicorn server
-    log_level_name = logging.getLevelName(log_level).lower()
-    if log_level_name == "warning":
-        log_level_name = "warn"  # uvicorn uses 'warn' instead of 'warning'
+    return asgi_app
 
-    server = uvicorn.Server(
-        uvicorn.Config(
-            app=app,
-            host=host,
-            port=port,
-            log_level=log_level_name,
-            reload=config.get("debug", False),  # Enable reload in debug mode
-            **ssl_args,
-        )
-    )
 
-    # Show URL before starting
-    url = f"http{'s' if not unsecure else ''}://{host}:{port}/{uri_root_path.strip('/') + '/' if uri_root_path else ''}"
+# Factory function for ASGI servers (uvicorn/hypercorn)
+def create_asgi_app():
+    """
+    Factory function for creating the ASGI application.
+    This is called by uvicorn/hypercorn when using:
+    uvicorn aetherterm.server:create_asgi_app --factory
+    """
+    import os
 
-    if not one_shot or not webbrowser.open(url):
-        log.warning("Butterfly is ready, open your browser to: %s", url)
+    # Get configuration from environment variables
+    config = {}
 
-    await server.serve()
+    # Basic settings
+    config["host"] = os.getenv("AETHERTERM_HOST", "localhost")
+    config["port"] = int(os.getenv("AETHERTERM_PORT", "57575"))
+    config["debug"] = os.getenv("AETHERTERM_DEBUG", "").lower() in ("true", "1", "yes")
+    config["more"] = os.getenv("AETHERTERM_MORE", "").lower() in ("true", "1", "yes")
+    config["unsecure"] = os.getenv("AETHERTERM_UNSECURE", "").lower() in ("true", "1", "yes")
+    config["uri_root_path"] = os.getenv("AETHERTERM_URI_ROOT_PATH", "")
+    config["login"] = os.getenv("AETHERTERM_LOGIN", "").lower() in ("true", "1", "yes")
+    config["pam_profile"] = os.getenv("AETHERTERM_PAM_PROFILE", "")
+    config["ai_mode"] = os.getenv("AETHERTERM_AI_MODE", "streaming")
+
+    # Setup and return the app
+    return setup_app(**config)
+
+
+# Alternative: module-level app instance (for simpler usage)
+# Can be used with: uvicorn aetherterm.server:app
+app = None
 
 
 if __name__ == "__main__":

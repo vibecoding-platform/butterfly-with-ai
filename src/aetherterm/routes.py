@@ -42,13 +42,21 @@ if os.path.exists(static_dir) and os.listdir(static_dir):
 
 @router.get("/", response_class=HTMLResponse)
 @inject
-async def index(request: Request, uri_root_path: str=Provide[ApplicationContainer.config.uri_root_path]):
+async def index(
+    request: Request,
+    config = Provide[ApplicationContainer.config],
+):
     """Main index route that serves the terminal interface."""
     # Dynamically find the hashed asset filenames
     assets_dir = os.path.join(os.path.dirname(__file__), "static", "assets")
     js_bundle = ""
     css_bundle = ""
-    root_path = uri_root_path.rstrip('/') if uri_root_path else ''
+
+    # Handle case where uri_root_path might be None or empty
+    uri_root_path = config.get("uri_root_path", "") or ""
+    root_path = ""
+    if uri_root_path:
+        root_path = uri_root_path.rstrip("/")
 
     for filename in os.listdir(assets_dir):
         if filename.startswith("index.") and filename.endswith(".js"):
@@ -66,8 +74,8 @@ async def index(request: Request, uri_root_path: str=Provide[ApplicationContaine
             "js_bundle": js_bundle,
             "css_bundle": css_bundle,
             "favicon_path": f"{root_path}/static/favicon.ico",
-            "uri_root_path": root_path
-        }
+            "uri_root_path": root_path,
+        },
     )
 
 
@@ -161,7 +169,9 @@ async def theme_static(theme: str, filename: str):
 
 @router.get("/sessions/list.json")
 @inject
-async def sessions_list(request: Request, unsecure=Provide[ApplicationContainer.config.unsecure]):
+async def sessions_list(
+    request: Request, config = Provide[ApplicationContainer.config]
+):
     """Get the list of active sessions."""
     # Check if remote authentication is being used
     is_remote_authentication = bool(
@@ -173,6 +183,7 @@ async def sessions_list(request: Request, unsecure=Provide[ApplicationContainer.
     )
 
     # Allow access if not unsecure, or if unsecure but with remote authentication
+    unsecure = config.get("unsecure", False) or False
     if unsecure and not is_remote_authentication:
         raise HTTPException(
             status_code=403, detail="Not available in unsecure mode without remote authentication"

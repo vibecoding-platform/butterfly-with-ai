@@ -9,12 +9,13 @@ description = "A sleek web based terminal emulator"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
-    {name = "Florian Mounier", email = "paradoxxx.zero@gmail.com"}
+    {name = "Kazushige Takeuchi", email = "kaz@re-x.info"}
 ]
 keywords = ["terminal", "web", "emulator", "websocket"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -42,13 +43,14 @@ lint = ["pytest", "pytest-flake8", "pytest-isort"]
 dev = ["ruff"]
 
 [project.urls]
-Homepage = "https://github.com/paradoxxxzero/butterfly"
-Repository = "https://github.com/paradoxxxzero/butterfly"
-Issues = "https://github.com/paradoxxxzero/butterfly/issues"
+Homepage = "https://github.com/paradoxxxzero/aetherterm"
+Repository = "https://github.com/paradoxxxzero/aetherterm"
+Issues = "https://github.com/paradoxxxzero/aetherterm/issues"
 
 [project.scripts]
 aetherterm = "aetherterm.scripts.aetherterm:main"
-b = "aetherterm.scripts.aetherterm:main"
+aether = "aetherterm.scripts.aetherterm:main"
+aetherterm-agentserver = "aetherterm.main:main"
 
 [tool.setuptools]
 
@@ -69,7 +71,8 @@ aetherterm = [
     "templates/index.html",
     "bin/*",
     "templates/motd.j2",
-    "butterfly.conf.default"
+    "butterfly.conf.default",
+    "aetherterm.conf.default"
 ]
 
 [tool.pytest.ini_options]

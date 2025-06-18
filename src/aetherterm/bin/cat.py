@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from butterfly.escapes import image
+from aetherterm.escapes import image
 
 parser = argparse.ArgumentParser(description="Butterfly cat wrapper.")
 parser.add_argument("-o", action="store_true", dest="original", help="Force original cat")

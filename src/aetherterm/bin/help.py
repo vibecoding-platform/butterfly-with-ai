@@ -3,12 +3,12 @@ import base64
 import os
 import subprocess
 
-import butterfly
-from butterfly.escapes import image
-from butterfly.utils import ansi_colors
+import aetherterm
+from aetherterm.escapes import image
+from aetherterm.utils import ansi_colors
 
-print(ansi_colors.white + "Welcome to the butterfly help." + ansi_colors.reset)
-path = os.getenv("BUTTERFLY_PATH")
+print(ansi_colors.white + "Welcome to the aetherterm help." + ansi_colors.reset)
+path = os.getenv("AETHERTERM_PATH")
 if path:
     path = os.path.join(path, "../static/images/favicon.png")
 
@@ -18,7 +18,7 @@ if path and os.path.exists(path):
             print(base64.b64encode(i.read()).decode("ascii"))
 print(
     """
-Butterfly is a xterm compliant terminal built with python and javascript.
+AetherTerm is a xterm compliant terminal built with python and javascript.
 
 {title}Terminal functionalities:{reset}
   {strong}[ScrollLock]            : {reset}Lock the scrolling to the current position. Press again to release.
@@ -32,26 +32,26 @@ Butterfly is a xterm compliant terminal built with python and javascript.
                             Useful for using native search for example. ([Alt] + [z] then [Ctrl] + [f]).
 
 
-{title}Butterfly programs:{reset}
-  {strong}b         : {reset}Alias for {strong}butterfly{reset} executable. Takes a comand in parameter or launch a butterfly server for one shot use (if outside butterfly).
-  {strong}b cat     : {reset}A wrapper around cat allowing to display images as <img> instead of binary.
-  {strong}b open    : {reset}Open a new terminal at specified location.
-  {strong}b session : {reset}Open or rattach a butterfly session. Multiplexing is supported.
-  {strong}b colors  : {reset}Test the terminal colors (16, 256 and 16777216 colors)
-  {strong}b html    : {reset}Output in html standard input.
+{title}AetherTerm programs:{reset}
+  {strong}aether    : {reset}Alias for {strong}aetherterm{reset} executable. Takes a comand in parameter or launch an aetherterm server for one shot use (if outside aetherterm).
+  {strong}aether cat     : {reset}A wrapper around cat allowing to display images as <img> instead of binary.
+  {strong}aether open    : {reset}Open a new terminal at specified location.
+  {strong}aether session : {reset}Open or rattach an aetherterm session. Multiplexing is supported.
+  {strong}aether colors  : {reset}Test the terminal colors (16, 256 and 16777216 colors)
+  {strong}aether html    : {reset}Output in html standard input.
 
-  For more butterfly programs check out: https://github.com/paradoxxxzero/butterfly-demos
+  For more aetherterm programs check out: https://github.com/paradoxxxzero/aetherterm-demos
 
 
-{title}Styling butterfly:{reset}
-  To style butterfly in sass, you need to have the libsass python library installed.
+{title}Styling AetherTerm:{reset}
+  To style aetherterm in sass, you need to have the libsass python library installed.
 
   Theming is done by overriding the default sass files located in {code}{main}{reset} in your theme directory.
   This directory can include images and custom fonts.
-  Please take a look at official themes here:  https://github.com/paradoxxxzero/butterfly-themes
+  Please take a look at official themes here:  https://github.com/paradoxxxzero/aetherterm-themes
   and submit your best themes as pull request!
 
-  \x1b[{rcol}G\x1b[3m{dark}butterfly @ 2015 Mounier Florian{reset}\
+  \x1b[{rcol}G\x1b[3m{dark}aetherterm @ 2025 Mounier Florian{reset}\
 """.format(
         title=ansi_colors.light_blue,
         dark=ansi_colors.light_black,
@@ -60,7 +60,7 @@ Butterfly is a xterm compliant terminal built with python and javascript.
         reset=ansi_colors.reset,
         rcol=int(subprocess.check_output(["stty", "size"]).split()[1]) - 31,
         main=os.path.normpath(
-            os.path.join(os.path.abspath(os.path.dirname(butterfly.__file__)), "sass")
+            os.path.join(os.path.abspath(os.path.dirname(aetherterm.__file__)), "sass")
         ),
     )
 )

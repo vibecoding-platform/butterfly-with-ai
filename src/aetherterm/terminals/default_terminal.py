@@ -1,19 +1,19 @@
 # *-* coding: utf-8 *-*
-# This file is part of butterfly
+# This file is part of aetherterm
 #
-# butterfly Copyright(C) 2015-2017 Florian Mounier
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Copyright 2025 Florian Mounier
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import fcntl
 import io
@@ -33,11 +33,11 @@ import tornado.process
 import tornado.web
 import tornado.websocket
 
-from butterfly import __version__, utils
+from aetherterm import __version__, utils
 
 from .base_terminal import BaseTerminal
 
-log = getLogger("butterfly")
+log = getLogger("aetherterm")
 ioloop = tornado.ioloop.IOLoop.instance()
 server = utils.User()
 daemon = utils.User(name="daemon")
@@ -93,7 +93,7 @@ class DefaultTerminal(BaseTerminal):
             motd = (
                 render_string(
                     tornado.options.options.motd,
-                    butterfly=self,
+                    aetherterm=self,
                     version=__version__,
                     opts=tornado.options.options,
                     uri=self.uri,
@@ -155,7 +155,7 @@ class DefaultTerminal(BaseTerminal):
             return
 
         # if login is not required, we will use the same user as
-        # butterfly is executed
+        # aetherterm is executed
         self.callee = self.callee or utils.User()
 
     def shell(self):
@@ -174,10 +174,10 @@ class DefaultTerminal(BaseTerminal):
             # May need more?
             env = {}
         env["TERM"] = "xterm-256color"
-        env["COLORTERM"] = "butterfly"
+        env["COLORTERM"] = "aetherterm"
         env["HOME"] = self.callee.dir
         env["LOCATION"] = self.uri
-        env["BUTTERFLY_PATH"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "bin"))
+        env["AETHERTERM_PATH"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "bin"))
 
         try:
             tty = os.ttyname(0).replace("/dev/", "")

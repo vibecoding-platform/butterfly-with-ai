@@ -10,18 +10,18 @@
       j888888bd8gf"'   ':'   `"?g8bd888888k
         {{ colors.white }}'Y'{{ colors.blue }}   .8'     d' 'b     '8.   {{ colors.white }}'Y'{{ colors.reset }}
          {{ colors.white }}!{{ colors.blue }}   .8' {{ colors.white }}db{{ colors.blue }}  d'; ;`b  {{ colors.white }}db{{ colors.blue }} '8.   {{ colors.white }}!{{ colors.blue }}
-            d88  {{ colors.white }}`'{{ colors.blue }}  8 ; ; 8  {{ colors.white }}`'{{ colors.blue }}  88b             {{ colors.white }}butterfly {{ colors.yellow }}v {{ version }}{{ colors.blue }}
+            d88  {{ colors.white }}`'{{ colors.blue }}  8 ; ; 8  {{ colors.white }}`'{{ colors.blue }}  88b             {{ colors.white }}aetherterm {{ colors.yellow }}v {{ version }}{{ colors.blue }}
            d888b   .g8 ',' 8g.   d888b
           :888888888Y'     'Y888888888:           {{ colors.light_white }}Connecting to:{{ colors.blue }}
-          '! 8888888'       `8888888 !'              {{ colors.red if opts.unsecure else colors.green }}{{ butterfly.socket.local_addr }}:{{ butterfly.socket.local_port }}{{ colors.blue }}
+          '! 8888888'       `8888888 !'              {{ colors.red if opts.unsecure else colors.green }}{{ aetherterm.socket.local_addr }}:{{ aetherterm.socket.local_port }}{{ colors.blue }}
             '8Y  {{ colors.white }}`Y         Y'{{ colors.blue }}  Y8'
 {{ colors.white }}              Y                   Y               {{ colors.light_white }}From:{{ colors.white }}
-             !                   !                  {{ colors.red if opts.unsecure else colors.green }}{{ butterfly.socket.remote_addr }}:{{ butterfly.socket.remote_port }}{{ colors.reset }}
-{% if butterfly.socket.proxy_addr %}                                 {{ colors.light_white }}Proxy:{{ colors.white }}
-                                                    {{ colors.cyan }}{{ butterfly.socket.proxy_addr }}{{ colors.reset }}
+             !                   !                  {{ colors.red if opts.unsecure else colors.green }}{{ aetherterm.socket.remote_addr }}:{{ aetherterm.socket.remote_port }}{{ colors.reset }}
+{% if aetherterm.socket.proxy_addr %}                                 {{ colors.light_white }}Proxy:{{ colors.white }}
+                                                    {{ colors.cyan }}{{ aetherterm.socket.proxy_addr }}{{ colors.reset }}
 {% endif %}
 
-For more information type: {{ colors.white }}$ {{ colors.green }}butterfly help{{ colors.reset }}
+For more information type: {{ colors.white }}$ {{ colors.green }}aetherterm help{{ colors.reset }}
 {% if opts.unsecure and not opts.i_hereby_declare_i_dont_want_any_security_whatsoever %}{{ colors.light_red + '\x1b[5m' }}/!\{{ colors.reset }} {{ colors.red }}This session is UNSECURE{{ colors.reset }}
 {% else %}{{ colors.white }}Terminal session started{{ colors.reset }}
 {% endif %}

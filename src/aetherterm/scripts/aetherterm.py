@@ -1,19 +1,165 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import asyncio
 import logging
+import os
+import subprocess
+import sys
 
 import click
 
-from aetherterm.server import start_server
+from aetherterm.server import prepare_ssl_certs
 
 # Configure logging for the launcher script
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-log = logging.getLogger("butterfly.launcher")
+log = logging.getLogger("aetherterm.launcher")
+
+
+def set_environment_variables(kwargs):
+    """Set environment variables for the ASGI app factory."""
+    env = os.environ.copy()
+    env["AETHERTERM_HOST"] = kwargs.get("host", "localhost")
+    env["AETHERTERM_PORT"] = str(kwargs.get("port", 57575))
+    env["AETHERTERM_DEBUG"] = "true" if kwargs.get("debug", False) else "false"
+    env["AETHERTERM_MORE"] = "true" if kwargs.get("more", False) else "false"
+    env["AETHERTERM_UNSECURE"] = "true" if kwargs.get("unsecure", False) else "false"
+    env["AETHERTERM_URI_ROOT_PATH"] = kwargs.get("uri_root_path", "")
+    env["AETHERTERM_LOGIN"] = "true" if kwargs.get("login", False) else "false"
+    env["AETHERTERM_PAM_PROFILE"] = kwargs.get("pam_profile", "")
+    env["AETHERTERM_AI_MODE"] = kwargs.get("ai_mode", "streaming")
+    return env
+
+
+def get_ssl_args(kwargs):
+    """Get SSL arguments for the server."""
+    ssl_args = []
+    if not kwargs.get("unsecure", False):
+        ssl_dir = kwargs.get(
+            "ssl_dir", os.path.join(os.path.expanduser("~"), ".config", "aetherterm", "ssl")
+        )
+        host = kwargs.get("host", "localhost")
+        cert = os.path.join(ssl_dir, f"aetherterm_{host}.crt")
+        cert_key = os.path.join(ssl_dir, f"aetherterm_{host}.key")
+        ca = os.path.join(ssl_dir, "aetherterm_ca.crt")
+
+        if os.path.exists(cert) and os.path.exists(cert_key):
+            return {"cert": cert, "cert_key": cert_key, "ca": ca}
+    return None
+
+
+def launch_uvicorn(kwargs):
+    """Launch the application using uvicorn."""
+    env = set_environment_variables(kwargs)
+
+    # Build uvicorn command
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "aetherterm.server:create_asgi_app",
+        "--factory",
+        "--host",
+        env["AETHERTERM_HOST"],
+        "--port",
+        env["AETHERTERM_PORT"],
+    ]
+
+    # Add SSL options
+    ssl_config = get_ssl_args(kwargs)
+    if ssl_config:
+        cmd.extend(
+            [
+                "--ssl-keyfile",
+                ssl_config["cert_key"],
+                "--ssl-certfile",
+                ssl_config["cert"],
+                "--ssl-ca-certs",
+                ssl_config["ca"],
+                "--ssl-cert-reqs",
+                "2",  # ssl.CERT_REQUIRED
+            ]
+        )
+
+    # Configure logging level
+    if kwargs.get("debug", False):
+        if kwargs.get("more", False):
+            cmd.extend(["--log-level", "debug"])
+        else:
+            cmd.extend(["--log-level", "info"])
+        cmd.append("--reload")
+    else:
+        cmd.extend(["--log-level", "warning"])
+
+    log.info(f"Starting uvicorn: {' '.join(cmd)}")
+
+    try:
+        subprocess.run(cmd, env=env)
+    except KeyboardInterrupt:
+        log.info("Server stopped by user")
+    except Exception as e:
+        log.error(f"Error running uvicorn: {e}")
+        sys.exit(1)
+
+
+def launch_hypercorn(kwargs):
+    """Launch the application using hypercorn."""
+    env = set_environment_variables(kwargs)
+
+    # Build hypercorn command
+    cmd = [
+        sys.executable,
+        "-m",
+        "hypercorn",
+        "aetherterm.server:create_asgi_app",
+        "--factory",
+        "--bind",
+        f"{env['AETHERTERM_HOST']}:{env['AETHERTERM_PORT']}",
+    ]
+
+    # Add SSL options
+    ssl_config = get_ssl_args(kwargs)
+    if ssl_config:
+        cmd.extend(
+            [
+                "--keyfile",
+                ssl_config["cert_key"],
+                "--certfile",
+                ssl_config["cert"],
+                "--ca-certs",
+                ssl_config["ca"],
+                "--verify-mode",
+                "CERT_REQUIRED",
+            ]
+        )
+
+    # Configure logging level
+    if kwargs.get("debug", False):
+        if kwargs.get("more", False):
+            cmd.extend(["--log-level", "debug"])
+        else:
+            cmd.extend(["--log-level", "info"])
+        cmd.append("--reload")
+    else:
+        cmd.extend(["--log-level", "warning"])
+
+    log.info(f"Starting hypercorn: {' '.join(cmd)}")
+
+    try:
+        subprocess.run(cmd, env=env)
+    except KeyboardInterrupt:
+        log.info("Server stopped by user")
+    except Exception as e:
+        log.error(f"Error running hypercorn: {e}")
+        sys.exit(1)
 
 
 @click.command()
+@click.option(
+    "--server",
+    type=click.Choice(["uvicorn", "hypercorn"]),
+    default="uvicorn",
+    help="ASGI server to use",
+)
 @click.option("--debug", is_flag=True, help="Debug mode")
 @click.option("--more", is_flag=True, help="Debug mode with more verbosity")
 @click.option("--unminified", is_flag=True, help="Use the unminified js (for development only)")
@@ -61,7 +207,7 @@ log = logging.getLogger("butterfly.launcher")
     "--generate-certs",
     "generate_certs",
     is_flag=True,
-    help="Generate butterfly certificates",
+    help="Generate aetherterm certificates",
 )
 @click.option(
     "--generate-current-user-pkcs",
@@ -73,7 +219,7 @@ log = logging.getLogger("butterfly.launcher")
     "--generate-user-pkcs",
     "generate_user_pkcs",
     default="",
-    help="Generate user pfx for client authentication (Must be root to create for another user)",
+    help="Generate user pkcs for client authentication (Must be root to create for another user)",
 )
 @click.option(
     "--uri-root-path",
@@ -92,8 +238,23 @@ def main(**kwargs):
     """Butterfly - A sleek web based terminal emulator."""
     log.info("Starting Butterfly server...")
 
-    # Run the async server
-    asyncio.run(start_server(**kwargs))
+    # Handle certificate generation if requested
+    prepare_ssl_certs(**kwargs)
+
+    # Show URL
+    protocol = "https" if not kwargs.get("unsecure", False) else "http"
+    host = kwargs.get("host", "localhost")
+    port = kwargs.get("port", 57575)
+    uri_root_path = kwargs.get("uri_root_path", "").strip("/")
+    url = f"{protocol}://{host}:{port}/{uri_root_path + '/' if uri_root_path else ''}"
+    log.info(f"Butterfly is ready, open your browser to: {url}")
+
+    # Launch with selected server
+    server = kwargs.get("server", "uvicorn")
+    if server == "uvicorn":
+        launch_uvicorn(kwargs)
+    else:
+        launch_hypercorn(kwargs)
 
 
 if __name__ == "__main__":

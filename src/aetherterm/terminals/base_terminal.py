@@ -1,8 +1,8 @@
 # *-* coding: utf-8 *-*
-# This file is part of butterfly
+# This file is part of aetherterm
 #
-# butterfly Copyright(C) 2015-2017 Florian Mounier
-# Licensed under the same terms as the original project
+# Copyright 2025 Florian Mounier
+# Licensed under the Apache License, Version 2.0
 
 from typing import Any, Dict, Optional
 

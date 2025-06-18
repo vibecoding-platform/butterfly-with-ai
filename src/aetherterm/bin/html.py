@@ -3,7 +3,7 @@ import argparse
 import fileinput
 import sys
 
-from butterfly.escapes import html
+from aetherterm.escapes import html
 
 parser = argparse.ArgumentParser(
     description="Butterfly html converter.\n\n"

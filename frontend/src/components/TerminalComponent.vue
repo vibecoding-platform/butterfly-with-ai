@@ -167,23 +167,8 @@ onMounted(async () => {
         return;
       }
 
-      const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
-
-      if (terminal.value) {
-        if (ev.keyCode === 13) {
-          // Enter key
-          sendCommand(terminal.value.getSelection() || '');
-          terminal.value.write('\r\n');
-        } else if (ev.keyCode === 8) {
-          // Backspace key
-          // Do not delete if the line is empty
-          if (terminal.value.buffer.active.cursorX > 0) {
-            terminal.value.write('\b \b');
-          }
-        } else if (printable) {
-          terminal.value.write(e.key);
-        }
-      }
+      // Send all key inputs to backend (don't handle locally)
+      sendInput(e.key);
     });
 
     window.addEventListener('resize', () => {
@@ -203,6 +188,12 @@ onUnmounted(() => {
 // Send commands to the backend
 const sendCommand = (command: string) => {
   terminalStore.submitCommand(command);
+};
+
+// Send input to backend for real-time processing
+const sendInput = (input: string) => {
+  console.log('Sending input to backend:', input);
+  terminalStore.sendInput(input);
 };
 
 // Override WebSocket.send to log data

@@ -6,7 +6,7 @@ import webbrowser
 parser = argparse.ArgumentParser(description="Butterfly session opener.")
 parser.add_argument(
     "session",
-    help="Open or rattach a butterfly session. "
+    help="Open or rattach an aetherterm session. "
     "(Only in secure mode or in user unsecure mode (no su login))",
 )
 args = parser.parse_args()

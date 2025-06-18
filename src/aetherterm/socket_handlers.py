@@ -82,12 +82,15 @@ async def disconnect(sid, environ=None):
 async def create_terminal(
     sid,
     data,
-    config_login: bool = Provide[ApplicationContainer.config.login],
-    config_pam_profile: str = Provide[ApplicationContainer.config.pam_profile],
-    config_uri_root_path: str = Provide[ApplicationContainer.config.uri_root_path],
+    config = Provide[ApplicationContainer.config],
 ):
     """Handle the creation of a new terminal session."""
     try:
+        # Get config values from injected config
+        config_login = config.get("login", False) or False
+        config_pam_profile = config.get("pam_profile", "") or ""
+        config_uri_root_path = config.get("uri_root_path", "") or ""
+        
         session_id = data.get("session", str(uuid4()))
         user_name = data.get("user", "")
         path = data.get("path", "")

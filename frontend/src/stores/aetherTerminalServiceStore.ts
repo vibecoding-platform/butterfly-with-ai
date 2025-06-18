@@ -376,6 +376,27 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
         }
         eventCallbacks.value.onShellOutput.forEach(callback => callback(data))
       });
+
+      (socket.value as Socket).on('terminal_output', (data: any) => {
+        console.log('Received terminal_output:', data);
+        if (data && data.data) {
+          if (!isOutputSuppressed.value) {
+            // Don't add to buffer, just pass to callback for xterm
+          }
+          eventCallbacks.value.onShellOutput.forEach(callback => callback(data.data))
+        }
+      });
+
+      (socket.value as Socket).on('terminal_ready', (data: any) => {
+        console.log('Terminal ready:', data);
+        session.value.id = data.session || '';
+        session.value.isActive = true;
+      });
+
+      (socket.value as Socket).on('terminal_error', (data: any) => {
+        console.log('Terminal error:', data);
+        addToOutput(`[ERROR] ${data.error || 'Unknown terminal error'}`);
+      });
     }
   }
 
@@ -414,7 +435,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     }
 
     if (socket.value) {
-      socket.on('connect', () => {
+      (socket.value as Socket).on('connect', () => {
         console.log('Socket connected, setting up listeners');
         connectionState.value.isConnected = true;
         connectionState.value.isConnecting = false;
@@ -423,7 +444,14 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
         connectionState.value.lastConnected = new Date();
         connectionState.value.connectionError = undefined;
 
-        socket.value.on('message', (message: { type: string; data: any }) => {
+        // Create terminal session
+        socket.value?.emit('create_terminal', {
+          session: session.value.id || '',
+          user: '',
+          path: ''
+        });
+
+        (socket.value as Socket).on('message', (message: { type: string; data: any }) => {
           console.log('Socket is connected:', connectionState.value.isConnected);
           console.log('Received message:', message); // Debug log
           console.log('Message type:', message.type);
@@ -471,7 +499,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
           }
         });
 
-        socket.value.on('shell_output', (data: string) => {
+        (socket.value as Socket).on('shell_output', (data: string) => {
           console.log('Received shell_output:', data);
           if (!isOutputSuppressed.value) {
             addToOutput(data);
@@ -650,6 +678,18 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     return true
   }
 
+  // Send raw input to terminal
+  const sendInput = (input: string) => {
+    session.value.lastActivity = new Date()
+    
+    if (socket.value) {
+      socket.value.emit('terminal_input', {
+        session: session.value.id,
+        data: input
+      })
+    }
+  }
+
   const approveCommand = (commandId: string) => {
     const commandIndex = pendingCommands.value.findIndex(cmd => cmd.id === commandId)
     if (commandIndex !== -1) {
@@ -744,6 +784,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     commandHistory,
     outputBuffer,
     isOutputSuppressed,
+    isAdministratorLocked,
     dangerousCommands,
     aiMonitoring,
 
@@ -779,6 +820,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     suppressOutput,
     analyzeCommand,
     submitCommand,
+    sendInput,
     approveCommand,
     rejectCommand,
     sendChatMessage,

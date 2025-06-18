@@ -1,0 +1,58 @@
+INFO: Starting Butterfly server...
+INFO: Butterfly is ready, open your browser to: http://localhost:57575/
+INFO: Starting uvicorn: /mnt/c/workspace/vibecoding-platform/ide/terminal/butterfly-with-ai/.venv/bin/python3 -m uvicorn aetherterm.server:create_asgi_app --factory --host localhost --port 57575 --log-level info --reload
+INFO:     Will watch for changes in these directories: ['/mnt/c/workspace/vibecoding-platform/ide/terminal/butterfly-with-ai']
+INFO:     Uvicorn running on http://localhost:57575 (Press CTRL+C to quit)
+INFO:     Started reloader process [349885] using StatReload
+INFO:     Started server process [349887]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:60578 - "GET /socket.io/?EIO=4&transport=polling&t=ajay4rdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60578 - "POST /socket.io/?EIO=4&transport=polling&t=ajbzpz1a&sid=tU_7M5B755h2yUZ_AAAA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60578 - "GET /socket.io/?EIO=4&transport=polling&t=ajbzt5tf&sid=tU_7M5B755h2yUZ_AAAA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60590 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=tU_7M5B755h2yUZ_AAAA" [accepted]
+INFO:     127.0.0.1:60578 - "GET /socket.io/?EIO=4&transport=polling&t=ajc2mq7p&sid=tU_7M5B755h2yUZ_AAAA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34850 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54458 - "GET /socket.io/?EIO=4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38936 - "GET /socket.io/?EIO=4&transport=polling&t=al1e5c29 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38936 - "POST /socket.io/?EIO=4&transport=polling&t=al1rcc87&sid=Mew5yUnD3t105EGHAAAD HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38936 - "GET /socket.io/?EIO=4&transport=polling&t=al1re42q&sid=Mew5yUnD3t105EGHAAAD HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38952 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=Mew5yUnD3t105EGHAAAD" [accepted]
+INFO:     127.0.0.1:38936 - "GET /socket.io/?EIO=4&transport=polling&t=al1u1476&sid=Mew5yUnD3t105EGHAAAD HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38946 - "GET /socket.io/?EIO=4&transport=polling&t=al81nmi6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38946 - "POST /socket.io/?EIO=4&transport=polling&t=al8bb72k&sid=0d_yvu_9dftfhs8AAAAF HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38964 - "GET /socket.io/?EIO=4&transport=polling&t=al8bce8v&sid=0d_yvu_9dftfhs8AAAAF HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41894 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=0d_yvu_9dftfhs8AAAAF" [accepted]
+INFO:     127.0.0.1:38964 - "GET /socket.io/?EIO=4&transport=polling&t=al8c9hmf&sid=0d_yvu_9dftfhs8AAAAF HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40122 - "GET /socket.io/?EIO=4&transport=polling&t=amijz7mv HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40122 - "POST /socket.io/?EIO=4&transport=polling&t=amiuoj3f&sid=iz4z4pb_4V--aG9pAAAH HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40122 - "GET /socket.io/?EIO=4&transport=polling&t=amiupb6m&sid=iz4z4pb_4V--aG9pAAAH HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40140 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=iz4z4pb_4V--aG9pAAAH" [accepted]
+INFO:     127.0.0.1:40122 - "GET /socket.io/?EIO=4&transport=polling&t=amix8zbi&sid=iz4z4pb_4V--aG9pAAAH HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60340 - "GET /socket.io/?EIO=4&transport=polling&t=aud6ae71 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60340 - "POST /socket.io/?EIO=4&transport=polling&t=audkasd1&sid=VWoCXqmxKWfVxutnAAAJ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60340 - "GET /socket.io/?EIO=4&transport=polling&t=audkdc9s&sid=VWoCXqmxKWfVxutnAAAJ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60358 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=VWoCXqmxKWfVxutnAAAJ" [accepted]
+INFO:     127.0.0.1:60340 - "GET /socket.io/?EIO=4&transport=polling&t=audmtl36&sid=VWoCXqmxKWfVxutnAAAJ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60354 - "GET /socket.io/?EIO=4&transport=polling&t=avbyng2k HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60354 - "POST /socket.io/?EIO=4&transport=polling&t=avc4qxod&sid=IuaJcVMGXgD75UOXAAAL HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60354 - "GET /socket.io/?EIO=4&transport=polling&t=avc4ulfy&sid=IuaJcVMGXgD75UOXAAAL HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34668 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=IuaJcVMGXgD75UOXAAAL" [accepted]
+INFO:     127.0.0.1:60354 - "GET /socket.io/?EIO=4&transport=polling&t=avc652zh&sid=IuaJcVMGXgD75UOXAAAL HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60374 - "GET /socket.io/?EIO=4&transport=polling&t=avmjm7a4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60374 - "POST /socket.io/?EIO=4&transport=polling&t=avmoygzm&sid=fjVqTIE44GFg0fyxAAAN HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60374 - "GET /socket.io/?EIO=4&transport=polling&t=avmpc3fv&sid=fjVqTIE44GFg0fyxAAAN HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33292 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=fjVqTIE44GFg0fyxAAAN" [accepted]
+INFO:     127.0.0.1:60374 - "GET /socket.io/?EIO=4&transport=polling&t=avmqp5dz&sid=fjVqTIE44GFg0fyxAAAN HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39640 - "GET /socket.io/?EIO=4&transport=polling&t=awewpd85 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39640 - "POST /socket.io/?EIO=4&transport=polling&t=awfb06h1&sid=jfzANfeWuaurSudkAAAP HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39640 - "GET /socket.io/?EIO=4&transport=polling&t=awfb3do0&sid=jfzANfeWuaurSudkAAAP HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39642 - "POST /socket.io/?EIO=4&transport=polling&t=awfdunvk&sid=jfzANfeWuaurSudkAAAP HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39640 - "GET /socket.io/?EIO=4&transport=polling&t=awfdlouk&sid=jfzANfeWuaurSudkAAAP HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39644 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=jfzANfeWuaurSudkAAAP" [accepted]
+INFO:     127.0.0.1:39652 - "GET /socket.io/?EIO=4&transport=polling&t=awt4mxbw HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39652 - "POST /socket.io/?EIO=4&transport=polling&t=awt7fmtx&sid=n22KszS5-eMhotAnAAAR HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39664 - "GET /socket.io/?EIO=4&transport=polling&t=awt7gvs0&sid=n22KszS5-eMhotAnAAAR HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39652 - "POST /socket.io/?EIO=4&transport=polling&t=awt8ytss&sid=n22KszS5-eMhotAnAAAR HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39664 - "GET /socket.io/?EIO=4&transport=polling&t=awt7mmt6&sid=n22KszS5-eMhotAnAAAR HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46520 - "WebSocket /socket.io/?EIO=4&transport=websocket&sid=n22KszS5-eMhotAnAAAR" [accepted]
