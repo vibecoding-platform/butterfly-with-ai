@@ -47,8 +47,8 @@ const fitAddon = ref<FitAddon | null>(null);
 
 const terminalStore = useAetherTerminalServiceStore();
 
-const isAdministratorLocked = computed(() => {
-  return terminalStore.isAdministratorLocked;
+const isSupervisorLocked = computed(() => {
+  return terminalStore.isSupervisorLocked;
 });
 
 // Connection status computed properties
@@ -104,7 +104,9 @@ const theme: ITheme = {
 };
 
 onMounted(async () => {
+  console.log('TerminalComponent mounted');
   terminalEl.value = document.getElementById('terminal');
+  console.log('Terminal element found:', terminalEl.value);
   if (terminalEl.value) {
     terminal.value = new Terminal({
       convertEol: true,
@@ -132,13 +134,12 @@ onMounted(async () => {
 
     // Connect to the socket and receive data
     let motdContent = '';
-    let isFirstData = true;
     
     terminalStore.onShellOutput((data: string) => {
-      // Store MOTD content from first data packet
-      if (isFirstData && data.includes('\u001b[')) {
+      // Detect MOTD content (contains multiple color sequences and text)
+      if (data.includes('\u001b[34;1m') && data.includes('\u001b[37;1m') && data.length > 100) {
         motdContent = data;
-        isFirstData = false;
+        console.log('MOTD content detected and stored');
       }
       
       // Check for clear screen sequences that might clear MOTD
@@ -147,6 +148,7 @@ onMounted(async () => {
         if (motdContent) {
           setTimeout(() => {
             terminal.value?.write(motdContent);
+            console.log('MOTD re-displayed after clear screen');
           }, 100);
         }
       }
@@ -157,7 +159,7 @@ onMounted(async () => {
     terminal.value.onKey(e => {
       const ev = e.domEvent;
 
-      if (isAdministratorLocked.value) {
+      if (isSupervisorLocked.value) {
         ev.preventDefault();
         return;
       }
@@ -183,10 +185,6 @@ onUnmounted(() => {
   });
 });
 
-// Send commands to the backend
-const sendCommand = (command: string) => {
-  terminalStore.submitCommand(command);
-};
 
 // Send input to backend for real-time processing
 const sendInput = (input: string) => {
@@ -212,6 +210,7 @@ const sendInput = (input: string) => {
   color: #ffffff;
   font-family: 'Courier New', monospace;
   position: relative;
+  min-height: 400px; /* 最小高さを設定 */
 }
 
 .connection-status {
@@ -332,6 +331,8 @@ const sendInput = (input: string) => {
   flex: 1;
   /* Take up remaining space */
   border-top: 1px solid #444;
+  min-height: 300px; /* 最小高さを設定 */
+  background-color: #1e1e1e; /* 背景色を明示 */
 }
 
 .admin-lock-warning {

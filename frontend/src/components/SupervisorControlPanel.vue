@@ -1,7 +1,7 @@
 <template>
-  <div class="admin-control-panel">
+  <div v-if="userInfo?.isSupervisor" class="supervisor-control-panel">
     <div class="panel-header">
-      <h3>Admin Control Panel</h3>
+      <h3>Supervisor Control Panel</h3>
       <div class="connection-status" :class="connectionStatusClass">
         {{ terminalStore.connectionStatus }}
       </div>
@@ -17,9 +17,9 @@
           -------
         </div>
         <div class="status-item">
-          <span class="label">Admin Control:</span>
-          <span class="value" :class="{ active: terminalStore.session.adminControlled }">
-            {{ terminalStore.session.adminControlled ? 'Enabled' : 'Disabled' }}
+          <span class="label">Supervisor Control:</span>
+          <span class="value" :class="{ active: terminalStore.session.supervisorControlled }">
+            {{ terminalStore.session.supervisorControlled ? 'Enabled' : 'Disabled' }}
           </span>
           -------
         </div>
@@ -96,14 +96,6 @@
           {{ terminalStore.session.isPaused ? 'Resume' : 'Pause' }} Terminal
         </button>
 
-        <button @click="toggleOutputSuppression" :class="{ active: terminalStore.isOutputSuppressed }"
-          class="control-btn suppress-btn">
-          {{ terminalStore.isOutputSuppressed ? 'Restore' : 'Suppress' }} Output
-        </button>
-
-        <button @click="clearTerminalOutput" class="control-btn clear-btn">
-          Clear Output
-        </button>
       </div>
     </div>
 
@@ -147,9 +139,6 @@
                 </button>
                 <button @click="showRejectDialog(command)" class="action-btn reject-btn">
                   ✗ No, Block
-                </button>
-                <button @click="requestAlternative(command)" class="action-btn alternative-btn">
-                  💡 Suggest Alternative
                 </button>
               </div>
             </div>
@@ -204,14 +193,71 @@
       </div>
     </div>
   </div>
+  
+  <!-- Non-Supervisor Message -->
+  <div v-else class="access-denied">
+    <div class="access-denied-content">
+      <!-- JWT not found -->
+      <div v-if="!userInfo" class="auth-error">
+        <h3>🔑 Authentication Required</h3>
+        <p>Please log in to access the Supervisor Control Panel.</p>
+        <div class="auth-details">
+          <p>No valid JWT token found.</p>
+          <small>Token sources checked: localStorage, sessionStorage, URL params, cookies</small>
+        </div>
+      </div>
+      
+      <!-- JWT found but insufficient privileges -->
+      <div v-else class="privilege-error">
+        <h3>🔒 Access Restricted</h3>
+        <p>Supervisor privileges required to access this panel.</p>
+        <div class="user-info">
+          <p><strong>Current user:</strong> {{ userInfo.email || 'Unknown' }}</p>
+          <p><strong>Roles:</strong> {{ userInfo.roles?.join(', ') || 'None' }}</p>
+        </div>
+        <div class="privilege-requirements">
+          <h4>Required privileges (any of):</h4>
+          <ul>
+            <li><code>isSupervisor: true</code></li>
+            <li><code>roles: ["supervisor", "admin"]</code></li>
+            <li><code>permissions: ["terminal:supervise", "admin:all"]</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { TerminalCommand } from '../stores/aetherTerminalServiceStore'
 import { useAetherTerminalServiceStore } from '../stores/aetherTerminalServiceStore'
+import { getCurrentUser, getJWTToken, decodeJWT, isSupervisor } from '../utils/auth'
 
 const terminalStore = useAetherTerminalServiceStore()
+
+// User authentication state
+const userInfo = ref<{ email?: string; roles?: string[]; isSupervisor: boolean } | null>(null)
+
+// Check authentication on mount
+onMounted(() => {
+  userInfo.value = getCurrentUser()
+  
+  // Debug JWT token status
+  console.log('=== JWT Authentication Debug ===')
+  console.log('User info loaded:', userInfo.value)
+  
+  const token = getJWTToken()
+  if (token) {
+    console.log('JWT token found:', token.substring(0, 50) + '...')
+    const payload = decodeJWT(token)
+    console.log('JWT payload:', payload)
+    console.log('Is supervisor?', isSupervisor())
+  } else {
+    console.log('No JWT token found')
+  }
+  console.log('=================================')
+})
 
 // Local state
 const showRejectModal = ref(false)
@@ -237,21 +283,10 @@ const toggleTerminalPause = () => {
   if (terminalStore.session.isPaused) {
     terminalStore.resumeTerminal()
   } else {
-    terminalStore.pauseTerminal('Paused by administrator')
+    terminalStore.pauseTerminal('Paused by supervisor')
   }
 }
 
-const toggleOutputSuppression = () => {
-  if (terminalStore.isOutputSuppressed) {
-    terminalStore.suppressOutput(false)
-  } else {
-    terminalStore.suppressOutput(true, 'Suppressed by administrator')
-  }
-}
-
-const clearTerminalOutput = () => {
-  terminalStore.clearOutput()
-}
 
 const approveCommand = (commandId: string) => {
   terminalStore.approveCommand(commandId)
@@ -276,12 +311,6 @@ const confirmRejectCommand = () => {
   }
 }
 
-const requestAlternative = (command: TerminalCommand) => {
-  // Request AI to suggest alternative command
-  console.log('Requesting alternative for:', command.command)
-  // This would typically emit a socket event to request AI alternatives
-  // terminalStore.requestAlternativeCommand(command.id)
-}
 
 const formatTime = (date: Date) => {
   return new Date(date).toLocaleTimeString()
@@ -289,7 +318,7 @@ const formatTime = (date: Date) => {
 </script>
 
 <style scoped>
-.admin-control-panel {
+.supervisor-control-panel {
   background-color: #2d2d2d;
   color: #ffffff;
   padding: 20px;
@@ -373,19 +402,6 @@ const formatTime = (date: Date) => {
   background-color: #4caf50;
 }
 
-.suppress-btn {
-  background-color: #2196f3;
-  color: white;
-}
-
-.suppress-btn.active {
-  background-color: #f44336;
-}
-
-.clear-btn {
-  background-color: #666;
-  color: white;
-}
 
 .control-btn:hover {
   opacity: 0.8;
@@ -723,5 +739,122 @@ input:checked+.slider:before {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.access-denied {
+  background-color: #2d2d2d;
+  color: #ffffff;
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.access-denied-content {
+  text-align: center;
+  max-width: 400px;
+  padding: 30px;
+  border: 2px solid #444;
+  border-radius: 8px;
+  background-color: #1e1e1e;
+}
+
+.access-denied-content h3 {
+  margin: 0 0 15px 0;
+  color: #ff9800;
+  font-size: 18px;
+}
+
+.access-denied-content p {
+  margin: 10px 0;
+  color: #ccc;
+  line-height: 1.4;
+}
+
+.user-info {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #333;
+  border-radius: 4px;
+  border-left: 3px solid #2196f3;
+}
+
+.user-info p {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+.auth-error {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: rgba(244, 67, 54, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #f44336;
+}
+
+.auth-error p {
+  margin: 0;
+  color: #ff8a80;
+  font-size: 13px;
+}
+
+.auth-details {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #333;
+  border-radius: 4px;
+  border-left: 3px solid #ff9800;
+}
+
+.auth-details p {
+  margin: 5px 0;
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.auth-details small {
+  color: #bbb;
+  font-size: 11px;
+}
+
+.privilege-error {
+  /* Uses same styles as auth-error but with different content */
+}
+
+.privilege-requirements {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #333;
+  border-radius: 4px;
+  border-left: 3px solid #9c27b0;
+}
+
+.privilege-requirements h4 {
+  margin: 0 0 10px 0;
+  color: #e1bee7;
+  font-size: 14px;
+}
+
+.privilege-requirements ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.privilege-requirements li {
+  margin: 5px 0;
+  color: #e0e0e0;
+  font-size: 12px;
+}
+
+.privilege-requirements code {
+  background-color: #444;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #4caf50;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
 }
 </style>

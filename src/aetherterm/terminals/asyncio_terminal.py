@@ -150,12 +150,12 @@ class AsyncioTerminal(BaseTerminal):
                 # Set master fd to non-blocking
                 fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
 
-                # Send MOTD for new sessions (when this is the first client)
-                if len(self.client_sids) == 1:  # This is the first client for this session
-                    await self._send_motd_direct()
-
                 # Start reading from PTY
                 self.reader_task = asyncio.create_task(self._read_from_pty())
+                
+                # Send MOTD for new sessions after a delay to allow shell initialization
+                if len(self.client_sids) == 1:  # This is the first client for this session
+                    asyncio.create_task(self._delayed_motd_send())
 
                 log.info(f"PTY started with PID {pid}")
 
@@ -382,6 +382,15 @@ class AsyncioTerminal(BaseTerminal):
 
         # Notify clients that terminal is closed
         self.send(None)
+
+    async def _delayed_motd_send(self):
+        """Send MOTD after shell initialization is complete."""
+        try:
+            # Wait for shell to initialize (adjust timing as needed)
+            await asyncio.sleep(2.0)
+            await self._send_motd_direct()
+        except Exception as e:
+            log.error(f"Failed to send delayed MOTD: {e}")
 
     async def _send_motd_direct(self):
         """Send MOTD (Message of the Day) directly to socket before shell starts."""

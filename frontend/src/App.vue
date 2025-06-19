@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import 'normalize.css'; // インストールしたライブラリの場合
-import { onUnmounted, ref, watch } from 'vue';
-import AdminControlPanel from './components/AdminControlPanel.vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+import SupervisorControlPanel from './components/SupervisorControlPanel.vue';
 import ChatComponent from './components/ChatComponent.vue';
+import SimpleChatComponent from './components/SimpleChatComponent.vue';
 import TerminalComponent from './components/TerminalComponent.vue';
 import { useChatStore } from './stores/chatStore';
 
 const chatStore = useChatStore();
-const activeTab = ref('admin'); // 'admin' or 'chat'
-const isAdminPanelFloating = ref(false);
+const activeTab = ref('chat'); // 'supervisor' or 'chat'
+const isSupervisorPanelFloating = ref(false);
+
+// Panel width management
+const panelWidth = ref(320); // デフォルト幅
+const isResizing = ref(false);
+const resizeStartX = ref(0);
+const resizeStartWidth = ref(0);
 
 // Dragging functionality for floating panel
 const isDragging = ref(false);
@@ -16,10 +23,10 @@ const dragOffset = ref({ x: 0, y: 0 });
 const panelPosition = ref({ x: 20, y: 60 });
 
 const startDrag = (event: MouseEvent) => {
-  if (!isAdminPanelFloating.value) return;
+  if (!isSupervisorPanelFloating.value) return;
 
   isDragging.value = true;
-  const rect = (event.target as HTMLElement).closest('#admin-container')?.getBoundingClientRect();
+  const rect = (event.target as HTMLElement).closest('#supervisor-container')?.getBoundingClientRect();
   if (rect) {
     dragOffset.value = {
       x: event.clientX - rect.left,
@@ -54,9 +61,68 @@ const stopDrag = () => {
   document.removeEventListener('mouseup', stopDrag);
 };
 
+// Panel resize functionality
+const startResize = (event: MouseEvent) => {
+  if (isSupervisorPanelFloating.value) return; // リサイズはFixed時のみ
+  
+  isResizing.value = true;
+  resizeStartX.value = event.clientX;
+  resizeStartWidth.value = panelWidth.value;
+  
+  document.addEventListener('mousemove', onResize);
+  document.addEventListener('mouseup', stopResize);
+  event.preventDefault();
+};
+
+const onResize = (event: MouseEvent) => {
+  if (!isResizing.value) return;
+  
+  const deltaX = resizeStartX.value - event.clientX; // 左に動かすとプラス
+  const newWidth = resizeStartWidth.value + deltaX;
+  
+  // 最小幅と最大幅を制限
+  const minWidth = 250;
+  const maxWidth = Math.min(600, window.innerWidth * 0.4);
+  
+  panelWidth.value = Math.max(minWidth, Math.min(newWidth, maxWidth));
+};
+
+const stopResize = () => {
+  isResizing.value = false;
+  document.removeEventListener('mousemove', onResize);
+  document.removeEventListener('mouseup', stopResize);
+  
+  // 幅をlocalStorageに保存
+  savePanelWidth();
+};
+
+// LocalStorage関連
+const PANEL_WIDTH_KEY = 'aetherterm-panel-width';
+
+const loadPanelWidth = () => {
+  const saved = localStorage.getItem(PANEL_WIDTH_KEY);
+  if (saved) {
+    const width = parseInt(saved, 10);
+    if (width >= 250 && width <= 600) {
+      panelWidth.value = width;
+    }
+  }
+};
+
+const savePanelWidth = () => {
+  localStorage.setItem(PANEL_WIDTH_KEY, panelWidth.value.toString());
+};
+
+// 初期化時に保存された幅を読み込み
+onMounted(() => {
+  loadPanelWidth();
+});
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', onDrag);
   document.removeEventListener('mouseup', stopDrag);
+  document.removeEventListener('mousemove', onResize);
+  document.removeEventListener('mouseup', stopResize);
 });
 
 watch(chatStore.activeMessages, (newMessages) => {
@@ -76,42 +142,51 @@ watch(chatStore.activeMessages, (newMessages) => {
       </div>
     </div>
 
-    <!-- Admin Control Panel (Fixed or Floating) -->
+    <!-- Supervisor Control Panel (Fixed or Floating) -->
     <div
-      id="admin-container"
+      id="supervisor-container"
       :class="{
-        'admin-floating': isAdminPanelFloating,
-        'admin-fixed': !isAdminPanelFloating,
-        'dragging': isDragging
+        'supervisor-floating': isSupervisorPanelFloating,
+        'supervisor-fixed': !isSupervisorPanelFloating,
+        'dragging': isDragging,
+        'resizing': isResizing
       }"
-      :style="isAdminPanelFloating ? {
+      :style="isSupervisorPanelFloating ? {
         top: panelPosition.y + 'px',
         right: 'auto',
         left: panelPosition.x + 'px'
-      } : {}"
+      } : {
+        width: panelWidth + 'px'
+      }"
     >
+      <!-- Resize Handle (Fixed時のみ表示) -->
+      <div 
+        v-if="!isSupervisorPanelFloating" 
+        class="resize-handle" 
+        @mousedown="startResize"
+      ></div>
       <!-- Tab Navigation -->
       <div class="tab-navigation">
-        <button
-          :class="{ 'active': activeTab === 'admin' }"
-          @click="activeTab = 'admin'"
-        >
-          Admin Control
-        </button>
         <button
           :class="{ 'active': activeTab === 'chat' }"
           @click="activeTab = 'chat'"
         >
           Chat
         </button>
+        <button
+          :class="{ 'active': activeTab === 'supervisor' }"
+          @click="activeTab = 'supervisor'"
+        >
+          Supervisor Control
+        </button>
       </div>
 
       <!-- Tab Content -->
-      <div v-if="activeTab === 'admin'" class="tab-content">
-        <AdminControlPanel />
+      <div v-if="activeTab === 'chat'" class="tab-content chat-tab">
+        <SimpleChatComponent />
       </div>
-      <div v-if="activeTab === 'chat'" class="tab-content">
-        <ChatComponent />
+      <div v-if="activeTab === 'supervisor'" class="tab-content supervisor-tab">
+        <SupervisorControlPanel />
       </div>
     </div>
 
@@ -147,6 +222,17 @@ watch(chatStore.activeMessages, (newMessages) => {
   padding: 15px;
   flex: 1;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* チャット専用のレイアウト調整 */
+.tab-content.chat-tab {
+  padding: 0; /* チャットは独自のパディングを持つ */
+}
+
+.tab-content.supervisor-tab {
+  /* Supervisorタブは通常のパディング */
 }
 
 html, body, #app {
@@ -184,12 +270,6 @@ html, body, #app {
   flex-shrink: 0;
 }
 
-.admin-fixed {
-  width: 450px; /* Fix the width of the sidebar */
-  height: 100%;
-  border-left: 1px solid #444;
-  flex-shrink: 0;
-}
 
 .chat-header {
   display: flex;
@@ -207,8 +287,8 @@ html, body, #app {
   color: #2196f3;
 }
 
-/* Admin Panel Styles */
-#admin-container {
+/* Supervisor Panel Styles */
+#supervisor-container {
   background-color: #2d2d2d;
   display: flex;
   flex-direction: column;
@@ -216,14 +296,16 @@ html, body, #app {
   z-index: 1000;
 }
 
-.admin-fixed {
-  width: 350px;
+.supervisor-fixed {
   height: 100%;
   border-left: 1px solid #444;
   flex-shrink: 0;
+  position: relative;
+  min-width: 250px;
+  max-width: 600px;
 }
 
-.admin-floating {
+.supervisor-floating {
   position: fixed;
   top: 60px;
   right: 20px;
@@ -241,7 +323,7 @@ html, body, #app {
   max-height: 90vh;
 }
 
-.admin-header {
+.supervisor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -252,17 +334,17 @@ html, body, #app {
   cursor: move; /* For floating panel dragging */
 }
 
-.admin-floating .admin-header {
+.supervisor-floating .supervisor-header {
   border-radius: 8px 8px 0 0;
 }
 
-.admin-header h3 {
+.supervisor-header h3 {
   margin: 0;
   font-size: 16px;
   color: #4caf50;
 }
 
-.admin-controls {
+.supervisor-controls {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -346,11 +428,11 @@ html, body, #app {
 
 /* Responsive adjustments */
 @media (max-width: 1200px) {
-  .admin-fixed {
+  .supervisor-fixed {
     width: 300px;
   }
 
-  .admin-floating {
+  .supervisor-floating {
     width: 350px;
     right: 10px;
   }
@@ -367,7 +449,7 @@ html, body, #app {
     border-left: none;
   }
 
-  .admin-fixed {
+  .supervisor-fixed {
     position: fixed;
     top: 0;
     right: 0;
@@ -376,7 +458,7 @@ html, body, #app {
     z-index: 1001;
   }
 
-  .admin-floating {
+  .supervisor-floating {
     width: 90vw;
     height: 80vh;
     top: 10vh;
@@ -395,51 +477,126 @@ html, body, #app {
 }
 
 /* Draggable functionality for floating panel */
-.admin-floating .admin-header {
+.supervisor-floating .supervisor-header {
   user-select: none;
 }
 
 /* Scrollbar styling for admin panel */
-.admin-floating {
+.supervisor-floating {
   scrollbar-width: thin;
   scrollbar-color: #666 #2d2d2d;
 }
 
-.admin-floating::-webkit-scrollbar {
+.supervisor-floating::-webkit-scrollbar {
   width: 8px;
 }
 
-.admin-floating::-webkit-scrollbar-track {
+.supervisor-floating::-webkit-scrollbar-track {
   background: #2d2d2d;
 }
 
-.admin-floating::-webkit-scrollbar-thumb {
+.supervisor-floating::-webkit-scrollbar-thumb {
   background: #666;
   border-radius: 4px;
 }
 
-.admin-floating::-webkit-scrollbar-thumb:hover {
+.supervisor-floating::-webkit-scrollbar-thumb:hover {
   background: #888;
 }
 
 /* Draggable functionality enhancements */
-.admin-floating .admin-header {
+.supervisor-floating .supervisor-header {
   user-select: none;
 }
 
-.admin-container.dragging {
+.supervisor-container.dragging {
   opacity: 0.9;
   transform: scale(1.02);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   z-index: 1001;
 }
 
-.admin-floating.dragging {
+.supervisor-floating.dragging {
   transition: none;
 }
 
+/* Resize handle styles */
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  transition: all 0.2s ease;
+  border-left: 1px solid #333;
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 30px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #666 0px,
+    #666 3px,
+    transparent 3px,
+    transparent 6px
+  );
+  border-radius: 1px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.resize-handle:hover {
+  background-color: rgba(76, 175, 80, 0.1);
+  border-left-color: #4caf50;
+}
+
+.resize-handle:hover::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    #4caf50 0px,
+    #4caf50 3px,
+    transparent 3px,
+    transparent 6px
+  );
+  opacity: 1;
+}
+
+.supervisor-container.resizing .resize-handle {
+  background-color: rgba(76, 175, 80, 0.2);
+  border-left-color: #4caf50;
+}
+
+.supervisor-container.resizing .resize-handle::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    #4caf50 0px,
+    #4caf50 3px,
+    transparent 3px,
+    transparent 6px
+  );
+  opacity: 1;
+}
+
+/* Add visual feedback during resize */
+.supervisor-container.resizing {
+  user-select: none;
+}
+
+.supervisor-container.resizing * {
+  user-select: none;
+}
+
 /* Admin content and chat content styles */
-.admin-content {
+.supervisor-content {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
@@ -450,7 +607,7 @@ html, body, #app {
   overflow: hidden;
 }
 
-.admin-floating .admin-header {
+.supervisor-floating .supervisor-header {
   border-radius: 8px 8px 0 0;
 }
 </style>

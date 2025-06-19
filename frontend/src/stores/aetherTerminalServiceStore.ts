@@ -19,7 +19,7 @@ export interface TerminalSession {
   isPaused: boolean
   isReconnecting: boolean
   lastActivity: Date
-  adminControlled: boolean
+  supervisorControlled: boolean
   aiMonitoring: boolean
 }
 
@@ -66,15 +66,14 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     isPaused: false,
     isReconnecting: false,
     lastActivity: new Date(),
-    adminControlled: false,
+    supervisorControlled: false,
     aiMonitoring: true
   })
 
   const pendingCommands = ref<TerminalCommand[]>([])
   const commandHistory = ref<TerminalCommand[]>([])
   const outputBuffer = ref<string[]>([])
-  const isOutputSuppressed = ref(false)
-  const isAdministratorLocked = ref(false)
+  const isSupervisorLocked = ref(false)
 
   // AI Monitoring State
   const aiMonitoring = ref<AIMonitoringState>({
@@ -100,20 +99,10 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   // Event Callbacks
   const eventCallbacks = ref<{
     onShellOutput: ((data: string) => void)[]
-    onControlOutput: ((data: string) => void)[]
     onChatMessage: ((data: any) => void)[]
-    onConnect: (() => void)[]
-    onDisconnect: (() => void)[]
-    onReconnect: (() => void)[]
-    onError: ((error: any) => void)[]
   }>({
     onShellOutput: [],
-    onControlOutput: [],
-    onChatMessage: [],
-    onConnect: [],
-    onDisconnect: [],
-    onReconnect: [],
-    onError: []
+    onChatMessage: []
   })
 
   // Getters
@@ -121,7 +110,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   const isTerminalBlocked = computed(() =>
     session.value.isPaused ||
     session.value.isReconnecting ||
-    isOutputSuppressed.value ||
     hasPendingCommands.value ||
     !connectionState.value.isConnected
   )
@@ -268,7 +256,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       connectionState.value.connectionError = undefined
 
       addToOutput('[SYSTEM] Connected to AetherTerm service')
-      eventCallbacks.value.onConnect.forEach(callback => callback())
 
       // Create terminal session after connection
       socketInstance.emit('create_terminal', {
@@ -284,7 +271,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       connectionState.value.connectionError = reason
 
       addToOutput(`[SYSTEM] Disconnected from AetherTerm service: ${reason}`)
-      eventCallbacks.value.onDisconnect.forEach(callback => callback())
 
       // Start reconnection if not intentional
       if (reason !== 'io client disconnect') {
@@ -296,7 +282,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       connectionState.value.isReconnecting = false
       connectionState.value.reconnectAttempts = attemptNumber
       addToOutput(`[SYSTEM] Reconnected after ${attemptNumber} attempts`)
-      eventCallbacks.value.onReconnect.forEach(callback => callback())
     })
 
     socketInstance.on('reconnect_attempt', (attemptNumber: number) => {
@@ -313,7 +298,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     socketInstance.on('connect_error', (error: Error) => {
       connectionState.value.connectionError = error.message
       addToOutput(`[SYSTEM] Connection error: ${error.message}`)
-      eventCallbacks.value.onError.forEach(callback => callback(error))
     })
 
     // Terminal events - using the correct event names from server
@@ -359,9 +343,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       resumeTerminal();
     });
 
-    socketInstance.on('admin_suppress_output', (data: any) => {
-      suppressOutput(data.suppress, data.reason)
-    });
 
     socketInstance.on('command_approval', (data: any) => {
       if (data.approved) {
@@ -402,43 +383,20 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     }
   };
 
-  const disconnect = () => {
-    if (socket.value) {
-      socket.value.disconnect()
-    }
-    connectionState.value.isConnected = false
-    connectionState.value.isConnecting = false
-    connectionState.value.isReconnecting = false
-  }
 
   // Event Registration
   const onShellOutput = (callback: (data: string) => void) => {
     eventCallbacks.value.onShellOutput.push(callback)
   }
 
-  const onControlOutput = (callback: (data: string) => void) => {
-    eventCallbacks.value.onControlOutput.push(callback)
-  }
 
   const onChatMessage = (callback: (data: any) => void) => {
     eventCallbacks.value.onChatMessage.push(callback)
   }
 
-  const onConnect = (callback: () => void) => {
-    eventCallbacks.value.onConnect.push(callback)
-  }
 
-  const onDisconnect = (callback: () => void) => {
-    eventCallbacks.value.onDisconnect.push(callback)
-  }
 
-  const onReconnect = (callback: () => void) => {
-    eventCallbacks.value.onReconnect.push(callback)
-  }
 
-  const onError = (callback: (error: any) => void) => {
-    eventCallbacks.value.onError.push(callback)
-  }
 
   // Event Cleanup
   const offShellOutput = (callback?: (data: string) => void) => {
@@ -452,16 +410,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     }
   }
 
-  const offControlOutput = (callback?: (data: string) => void) => {
-    if (callback) {
-      const index = eventCallbacks.value.onControlOutput.indexOf(callback)
-      if (index !== -1) {
-        eventCallbacks.value.onControlOutput.splice(index, 1)
-      }
-    } else {
-      eventCallbacks.value.onControlOutput = []
-    }
-  }
 
   const offChatMessage = (callback?: (data: any) => void) => {
     if (callback) {
@@ -484,24 +432,16 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const pauseTerminal = (reason: string) => {
     session.value.isPaused = true
-    isAdministratorLocked.value = true;
+    isSupervisorLocked.value = true;
     addToOutput(`[SYSTEM] Terminal paused: ${reason}`)
   }
 
   const resumeTerminal = () => {
     session.value.isPaused = false
-    isAdministratorLocked.value = false;
+    isSupervisorLocked.value = false;
     addToOutput('[SYSTEM] Terminal resumed')
   }
 
-  const suppressOutput = (suppress: boolean, reason?: string) => {
-    isOutputSuppressed.value = suppress
-    if (suppress && reason) {
-      addToOutput(`[SYSTEM] Output suppressed: ${reason}`)
-    } else if (!suppress) {
-      addToOutput('[SYSTEM] Output restored')
-    }
-  }
 
   const analyzeCommand = (command: string): TerminalCommand => {
     const commandId = Date.now().toString()
@@ -624,48 +564,19 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   }
 
   const addToOutput = (text: string) => {
-    if (!isOutputSuppressed.value) {
-      console.log('addToOutput called with:', text);
-      outputBuffer.value.push(`[${new Date().toLocaleTimeString()}] ${text}`)
-      // Keep only last 1000 lines
-      if (outputBuffer.value.length > 1000) {
-        outputBuffer.value = outputBuffer.value.slice(-1000)
-      }
+    console.log('addToOutput called with:', text);
+    outputBuffer.value.push(`[${new Date().toLocaleTimeString()}] ${text}`)
+    // Keep only last 1000 lines
+    if (outputBuffer.value.length > 1000) {
+      outputBuffer.value = outputBuffer.value.slice(-1000)
     }
   }
 
-  const clearOutput = () => {
-    outputBuffer.value = []
-  }
 
-  const setAdminControl = (controlled: boolean) => {
-    session.value.adminControlled = controlled
-    addToOutput(`[SYSTEM] Admin control ${controlled ? 'enabled' : 'disabled'}`)
-  }
 
-  const setAIMonitoring = (monitoring: boolean) => {
-    session.value.aiMonitoring = monitoring
-    addToOutput(`[SYSTEM] AI monitoring ${monitoring ? 'enabled' : 'disabled'}`)
-  }
 
-  const addDangerousCommand = (command: string) => {
-    if (!dangerousCommands.value.includes(command)) {
-      dangerousCommands.value.push(command)
-    }
-  }
 
-  const removeDangerousCommand = (command: string) => {
-    const index = dangerousCommands.value.indexOf(command)
-    if (index !== -1) {
-      dangerousCommands.value.splice(index, 1)
-    }
-  }
 
-  // Update AI monitoring state
-  const updateAIMonitoring = (updates: Partial<AIMonitoringState>) => {
-    Object.assign(aiMonitoring.value, updates)
-    addToOutput(`[AI] Monitoring updated: ${JSON.stringify(updates)}`)
-  }
 
   return {
     // State
@@ -675,8 +586,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     pendingCommands,
     commandHistory,
     outputBuffer,
-    isOutputSuppressed,
-    isAdministratorLocked,
+    isSupervisorLocked,
     dangerousCommands,
     aiMonitoring,
 
@@ -688,28 +598,20 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
     // Connection Actions
     connect,
-    disconnect,
     startReconnection,
 
     // Event Registration
     onShellOutput,
-    onControlOutput,
     onChatMessage,
-    onConnect,
-    onDisconnect,
-    onReconnect,
-    onError,
 
     // Event Cleanup
     offShellOutput,
-    offControlOutput,
     offChatMessage,
 
     // Terminal Actions
     initializeSession,
     pauseTerminal,
     resumeTerminal,
-    suppressOutput,
     analyzeCommand,
     submitCommand,
     sendInput,
@@ -717,12 +619,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     rejectCommand,
     sendChatMessage,
     addToOutput,
-    clearOutput,
-    setAdminControl,
-    setAIMonitoring,
-    addDangerousCommand,
-    removeDangerousCommand,
-    updateAIMonitoring,
     setSocket
   }
 })
