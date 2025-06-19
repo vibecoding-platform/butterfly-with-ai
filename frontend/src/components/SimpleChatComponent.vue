@@ -1,7 +1,7 @@
 <template>
   <div class="simple-chat-container">
     <div class="chat-header">
-      <h3>Terminal Chat</h3>
+      <h3>Aether Assistant</h3>
       <div class="connection-status" :class="{ connected: terminalStore.connectionState.isConnected }">
         {{ terminalStore.connectionState.isConnected ? 'Connected' : 'Disconnected' }}
       </div>
@@ -66,9 +66,9 @@ const newMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const messageTextarea = ref<HTMLTextAreaElement | null>(null)
 
-// Add welcome message
 onMounted(() => {
-  addMessage('System AI', 'Welcome to Terminal Chat! I am your System AI assistant. I can help you with terminal operations, troubleshooting, and provide guidance.', 'system')
+  // Add welcome message
+  addMessage('Aether AI', 'Welcome to Aether Assistant! I am your AI assistant for terminal operations, troubleshooting, and guidance.', 'system')
   
   // Listen for chat messages from socket
   terminalStore.onChatMessage((data: any) => {

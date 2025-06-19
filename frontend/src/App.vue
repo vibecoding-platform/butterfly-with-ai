@@ -61,7 +61,9 @@ const stopDrag = () => {
   document.removeEventListener('mouseup', stopDrag);
 };
 
-// Panel resize functionality
+// Panel resize functionality with throttling
+let resizeThrottleId = 0;
+
 const startResize = (event: MouseEvent) => {
   if (isSupervisorPanelFloating.value) return; // リサイズはFixed時のみ
   
@@ -77,14 +79,22 @@ const startResize = (event: MouseEvent) => {
 const onResize = (event: MouseEvent) => {
   if (!isResizing.value) return;
   
-  const deltaX = resizeStartX.value - event.clientX; // 左に動かすとプラス
-  const newWidth = resizeStartWidth.value + deltaX;
+  // スロットル処理でパフォーマンス向上
+  if (resizeThrottleId) {
+    cancelAnimationFrame(resizeThrottleId);
+  }
   
-  // 最小幅と最大幅を制限
-  const minWidth = 250;
-  const maxWidth = Math.min(600, window.innerWidth * 0.4);
-  
-  panelWidth.value = Math.max(minWidth, Math.min(newWidth, maxWidth));
+  resizeThrottleId = requestAnimationFrame(() => {
+    const deltaX = resizeStartX.value - event.clientX; // 左に動かすとプラス
+    const newWidth = resizeStartWidth.value + deltaX;
+    
+    // 最小幅と最大幅を制限
+    const minWidth = 250;
+    const maxWidth = Math.min(600, window.innerWidth * 0.4);
+    
+    panelWidth.value = Math.max(minWidth, Math.min(newWidth, maxWidth));
+    resizeThrottleId = 0;
+  });
 };
 
 const stopResize = () => {
@@ -160,11 +170,13 @@ watch(chatStore.activeMessages, (newMessages) => {
       }"
     >
       <!-- Resize Handle (Fixed時のみ表示) -->
-      <div 
-        v-if="!isSupervisorPanelFloating" 
-        class="resize-handle" 
-        @mousedown="startResize"
-      ></div>
+      <div v-if="!isSupervisorPanelFloating" class="resize-handle-container">
+        <div 
+          class="resize-handle-button" 
+          @mousedown="startResize"
+          :class="{ 'active': isResizing }"
+        ></div>
+      </div>
       <!-- Tab Navigation -->
       <div class="tab-navigation">
         <button
@@ -260,6 +272,7 @@ html, body, #app {
   flex-grow: 1; /* Make terminal-container grow to fill space */
   overflow: hidden;
   background-color: #1e1e1e;
+  transition: width 0.1s ease-out;
 }
 
 #chat-container {
@@ -292,7 +305,7 @@ html, body, #app {
   background-color: #2d2d2d;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease;
+  transition: width 0.1s ease-out;
   z-index: 1000;
 }
 
@@ -521,78 +534,90 @@ html, body, #app {
 }
 
 /* Resize handle styles */
-.resize-handle {
+.resize-handle-container {
   position: absolute;
-  left: 0;
+  left: -8px;
   top: 0;
   bottom: 0;
-  width: 4px;
-  background-color: transparent;
-  cursor: col-resize;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 10;
-  transition: all 0.2s ease;
-  border-left: 1px solid #333;
+  pointer-events: none; /* コンテナ自体はクリックできない */
 }
 
-.resize-handle::before {
+.resize-handle-button {
+  width: 10px;
+  height: 80px;
+  background-color: #666;
+  border-radius: 5px;
+  cursor: col-resize;
+  transition: all 0.2s ease;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  pointer-events: auto; /* ボタンのみクリック可能 */
+}
+
+.resize-handle-button::before {
   content: '';
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 2px;
+  width: 3px;
   height: 30px;
   background: repeating-linear-gradient(
     to bottom,
-    #666 0px,
-    #666 3px,
+    #999 0px,
+    #999 3px,
     transparent 3px,
     transparent 6px
   );
-  border-radius: 1px;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
+  border-radius: 1.5px;
 }
 
-.resize-handle:hover {
-  background-color: rgba(76, 175, 80, 0.1);
-  border-left-color: #4caf50;
+.resize-handle-button:hover {
+  background-color: #777;
+  transform: scaleY(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
-.resize-handle:hover::before {
+.resize-handle-button:hover::before {
   background: repeating-linear-gradient(
     to bottom,
-    #4caf50 0px,
-    #4caf50 3px,
+    #bbb 0px,
+    #bbb 3px,
     transparent 3px,
     transparent 6px
   );
-  opacity: 1;
 }
 
-.supervisor-container.resizing .resize-handle {
-  background-color: rgba(76, 175, 80, 0.2);
-  border-left-color: #4caf50;
+.resize-handle-button.active {
+  background-color: #4caf50;
+  transform: scaleY(1.2);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
 }
 
-.supervisor-container.resizing .resize-handle::before {
+.resize-handle-button.active::before {
   background: repeating-linear-gradient(
     to bottom,
-    #4caf50 0px,
-    #4caf50 3px,
+    #fff 0px,
+    #fff 3px,
     transparent 3px,
     transparent 6px
   );
-  opacity: 1;
 }
 
 /* Add visual feedback during resize */
 .supervisor-container.resizing {
   user-select: none;
+  transition: none; /* リサイズ中はトランジションを無効化 */
 }
 
 .supervisor-container.resizing * {
   user-select: none;
+  pointer-events: none; /* リサイズ中は子要素のイベントを無効化 */
 }
 
 /* Admin content and chat content styles */

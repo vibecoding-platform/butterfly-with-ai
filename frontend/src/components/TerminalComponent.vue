@@ -132,6 +132,19 @@ onMounted(async () => {
     terminal.value.open(terminalEl.value);
     fitAddon.value.fit();
 
+    // Listen for terminal resize events and send to backend
+    terminal.value.onResize((dimensions) => {
+      console.log('Terminal resized:', dimensions);
+      // Send resize event to backend
+      if (terminalStore.socket && terminalStore.session.id) {
+        terminalStore.socket.emit('terminal_resize', {
+          session: terminalStore.session.id,
+          cols: dimensions.cols,
+          rows: dimensions.rows
+        });
+      }
+    });
+
     // Connect to the socket and receive data
     let motdContent = '';
     
@@ -169,12 +182,24 @@ onMounted(async () => {
     });
 
     window.addEventListener('resize', () => {
-      fitAddon.value?.fit();
+      if (fitAddon.value && terminal.value) {
+        fitAddon.value.fit();
+        // Send new terminal size after fit
+        setTimeout(() => {
+          if (terminal.value && terminalStore.socket && terminalStore.session.id) {
+            terminalStore.socket.emit('terminal_resize', {
+              session: terminalStore.session.id,
+              cols: terminal.value.cols,
+              rows: terminal.value.rows
+            });
+          }
+        }, 100);
+      }
     });
   }
 
   // Initialize connection after terminal is setup
-  await terminalStore.connect();
+  terminalStore.connect();
 });
 
 onUnmounted(() => {

@@ -563,6 +563,17 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     }
   }
 
+  const sendResize = (cols: number, rows: number) => {
+    if (socket.value && session.value.id) {
+      console.log(`Sending terminal resize: ${cols}x${rows} for session ${session.value.id}`);
+      socket.value.emit('terminal_resize', {
+        session: session.value.id,
+        cols: cols,
+        rows: rows
+      });
+    }
+  }
+
   const addToOutput = (text: string) => {
     console.log('addToOutput called with:', text);
     outputBuffer.value.push(`[${new Date().toLocaleTimeString()}] ${text}`)
@@ -618,6 +629,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     approveCommand,
     rejectCommand,
     sendChatMessage,
+    sendResize,
     addToOutput,
     setSocket
   }
