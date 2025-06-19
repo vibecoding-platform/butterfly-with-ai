@@ -13,42 +13,21 @@
       </div>
     </div>
 
+    <!-- Terminal Lock Status -->
+    <div v-if="terminalStore.isTerminalBlocked" class="lock-status">
+      <div class="lock-indicator">
+        🔒 Terminal Locked
+      </div>
+    </div>
+
     <!-- Terminal Blocked Overlay -->
 
     <div v-if="terminalStore.isTerminalBlocked" class="terminal-overlay">
-      <div class="overlay-content">
-        <div v-if="terminalStore.session.isPaused" class="block-reason">
-          <h3>Terminal Paused</h3>
-          <p>Terminal has been paused by administrator</p>
-        </div>
-
-        <div v-else-if="terminalStore.hasPendingCommands" class="block-reason">
-          <h3>Commands Pending Review</h3>
-          <p>{{ terminalStore.pendingCommands.length }} command(s) awaiting approval</p>
-          <div class="pending-commands">
-            <div v-for="cmd in terminalStore.pendingCommands" :key="cmd.id" class="pending-command">
-              <code>{{ cmd.command }}</code>
-              <span class="risk-level" :class="cmd.riskLevel">{{ cmd.riskLevel }}</span>
-            </div>
-          </div>
-        </div>
-        <div v-else-if="terminalStore.isOutputSuppressed" class="block-reason">
-          <h3>Output Suppressed</h3>
-          <p>Terminal output is currently suppressed</p>
-        </div>
-        <div v-else-if="!terminalStore.connectionState.isConnected" class="block-reason">
-          <h3>Connection Lost</h3>
-          <p>Reconnecting to terminal service...</p>
-        </div>
-      </div>
     </div>
 
 
     <!-- Xterm.js Integration -->
     <div id="terminal" class="xterm-container">
-      <div v-if="isAdministratorLocked" class="admin-lock-warning">
-        Administrator Locked
-      </div>
     </div>
   </div>
 </template>
@@ -125,8 +104,6 @@ const theme: ITheme = {
 };
 
 onMounted(async () => {
-  await terminalStore.connect();
-
   terminalEl.value = document.getElementById('terminal');
   if (terminalEl.value) {
     terminal.value = new Terminal({
@@ -154,8 +131,26 @@ onMounted(async () => {
     fitAddon.value.fit();
 
     // Connect to the socket and receive data
+    let motdContent = '';
+    let isFirstData = true;
+    
     terminalStore.onShellOutput((data: string) => {
-      console.log('onShellOutput called with:', data);
+      // Store MOTD content from first data packet
+      if (isFirstData && data.includes('\u001b[')) {
+        motdContent = data;
+        isFirstData = false;
+      }
+      
+      // Check for clear screen sequences that might clear MOTD
+      if (data.includes('\u001b[2J') || data.includes('\u001b[H')) {
+        // Re-display MOTD after clear screen
+        if (motdContent) {
+          setTimeout(() => {
+            terminal.value?.write(motdContent);
+          }, 100);
+        }
+      }
+      
       terminal.value?.write(data);
     });
 
@@ -175,6 +170,9 @@ onMounted(async () => {
       fitAddon.value?.fit();
     });
   }
+
+  // Initialize connection after terminal is setup
+  await terminalStore.connect();
 });
 
 onUnmounted(() => {
@@ -249,13 +247,26 @@ const sendInput = (input: string) => {
   margin-top: 4px;
 }
 
+.lock-status {
+  padding: 8px 12px;
+  background-color: #d32f2f;
+  border-bottom: 1px solid #444;
+  text-align: center;
+}
+
+.lock-indicator {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
 .terminal-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;

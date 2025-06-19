@@ -20,9 +20,9 @@ lint:
 check-outdated:
 	$(PIP) list --outdated --format=columns
 
-ARGS ?= --port=1212 --unsecure --debug
+ARGS ?= --host=localhost --port=57575 --unsecure --debug
 run-debug:
-	$(PYTHON) ./src/aetherterm/main.py $(ARGS)
+	uv run aetherterm-agentserver $(ARGS)
 
 
 build-frontend:

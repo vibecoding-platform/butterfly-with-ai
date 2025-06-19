@@ -89,3 +89,8 @@ select = ["E", "F", "W", "I"] # エラーコードの選択
 [tool.wheel]
 universal = true
 
+[dependency-groups]
+dev = [
+    "hypercorn>=0.17.3",
+]
+
