@@ -52,6 +52,9 @@ DEFAULT_CONFIG = {
     "generate_user_pkcs": "",
     "uri_root_path": "",
     "ai_mode": "streaming",  # New option for AI assistance mode
+    "ai_provider": "mock",  # AI provider (anthropic, mock)
+    "ai_api_key": None,  # AI API key (will be read from env)
+    "ai_model": "claude-3-5-sonnet-20241022",  # AI model
     "conf": "",  # Will be set dynamically
     "ssl_dir": "",  # Will be set dynamically
 }
@@ -385,6 +388,11 @@ def setup_app(**kwargs):
     sio.on("create_terminal", socket_handlers.create_terminal)
     sio.on("terminal_input", socket_handlers.terminal_input)
     sio.on("terminal_resize", socket_handlers.terminal_resize)
+    
+    # Register AI-related event handlers
+    sio.on("ai_chat_message", socket_handlers.ai_chat_message)
+    sio.on("ai_terminal_analysis", socket_handlers.ai_terminal_analysis)
+    sio.on("ai_get_info", socket_handlers.ai_get_info)
 
     log.info("Application setup complete")
 
@@ -413,6 +421,9 @@ def create_asgi_app():
     config["login"] = os.getenv("AETHERTERM_LOGIN", "").lower() in ("true", "1", "yes")
     config["pam_profile"] = os.getenv("AETHERTERM_PAM_PROFILE", "")
     config["ai_mode"] = os.getenv("AETHERTERM_AI_MODE", "streaming")
+    config["ai_provider"] = os.getenv("AETHERTERM_AI_PROVIDER", "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock")
+    config["ai_api_key"] = os.getenv("ANTHROPIC_API_KEY")
+    config["ai_model"] = os.getenv("AETHERTERM_AI_MODEL", "claude-3-5-sonnet-20241022")
 
     # Setup and return the app
     return setup_app(**config)

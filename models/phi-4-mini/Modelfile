@@ -1,0 +1,3 @@
+FROM hf.co/jelawless/Phi-4-mini-instruct-Q4_0-GGUF:latest
+# コンテキストウィンドウサイズ（保持する文脈サイズ）を4096に設定
+PARAMETER num_ctx 32000

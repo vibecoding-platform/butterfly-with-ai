@@ -2,8 +2,14 @@
   <div class="simple-chat-container">
     <div class="chat-header">
       <h3>Aether Assistant</h3>
-      <div class="connection-status" :class="{ connected: terminalStore.connectionState.isConnected }">
-        {{ terminalStore.connectionState.isConnected ? 'Connected' : 'Disconnected' }}
+      <div class="status-info">
+        <div class="ai-info" v-if="aiInfo.provider && aiInfo.provider !== 'unknown'">
+          <span class="provider">{{ aiInfo.provider }}</span>
+          <span class="model" v-if="aiInfo.model && aiInfo.model !== 'unknown'">{{ aiInfo.model }}</span>
+        </div>
+        <div class="connection-status" :class="{ connected: terminalStore.connectionState.isConnected && aiInfo.available }">
+          {{ getConnectionStatus() }}
+        </div>
       </div>
     </div>
 
@@ -80,6 +86,21 @@ const messages = ref<ChatMessage[]>([])
 const newMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const messageTextarea = ref<HTMLTextAreaElement | null>(null)
+
+interface AIInfo {
+  provider: string
+  model: string
+  available: boolean
+  status: string
+  error?: string
+}
+
+const aiInfo = ref<AIInfo>({
+  provider: 'unknown',
+  model: 'unknown',
+  available: false,
+  status: 'disconnected'
+})
 
 const addMessage = (username: string, content: string, type: 'user' | 'system' | 'ai' = 'user'): ChatMessage => {
   const message: ChatMessage = {
@@ -169,6 +190,7 @@ onMounted(() => {
     terminalStore.socket.off('ai_chat_chunk')
     terminalStore.socket.off('ai_chat_complete')
     terminalStore.socket.off('ai_chat_error')
+    terminalStore.socket.off('ai_info_response')
     
     // AI typing indicator
     terminalStore.socket.on('ai_chat_typing', (data: any) => {
@@ -226,6 +248,19 @@ onMounted(() => {
       isAITyping.value = false
       currentAIMessageId.value = ''
     })
+    
+    // AI info response
+    terminalStore.socket.on('ai_info_response', (data: any) => {
+      aiInfo.value = {
+        provider: data.provider || 'unknown',
+        model: data.model || 'unknown',
+        available: data.available || false,
+        status: data.status || 'disconnected',
+        error: data.error
+      }
+      
+      console.log('AI Info received:', aiInfo.value)
+    })
   }
   
   // Try to setup listeners immediately
@@ -236,6 +271,7 @@ onMounted(() => {
   const watchConnection = () => {
     if (terminalStore.connectionState.isConnected && terminalStore.socket && !isListenersSetup) {
       setupAIListeners()
+      requestAIInfo()  // Request AI info when connection is established
       isListenersSetup = true
     }
   }
@@ -254,12 +290,29 @@ onMounted(() => {
       terminalStore.socket.off('ai_chat_chunk')
       terminalStore.socket.off('ai_chat_complete')
       terminalStore.socket.off('ai_chat_error')
+      terminalStore.socket.off('ai_info_response')
     }
   })
 })
 
 const formatTime = (date: Date) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+const getConnectionStatus = () => {
+  if (!terminalStore.connectionState.isConnected) {
+    return 'Terminal Disconnected'
+  }
+  if (!aiInfo.value.available) {
+    return 'AI Unavailable'
+  }
+  return 'Connected'
+}
+
+const requestAIInfo = () => {
+  if (terminalStore.socket && terminalStore.connectionState.isConnected) {
+    terminalStore.socket.emit('ai_get_info', {})
+  }
 }
 </script>
 
@@ -285,6 +338,35 @@ const formatTime = (date: Date) => {
   margin: 0;
   color: #4caf50;
   font-size: 16px;
+}
+
+.status-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.ai-info {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: #888;
+}
+
+.ai-info .provider {
+  background-color: #424242;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.ai-info .model {
+  background-color: #616161;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
 }
 
 .connection-status {
