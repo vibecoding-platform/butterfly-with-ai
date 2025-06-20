@@ -26,6 +26,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.staticfiles import StaticFiles
 
 from aetherterm.agentserver.containers import ApplicationContainer
+from aetherterm.config import get_config_manager
 
 # Initialize FastAPI router
 router = APIRouter()
@@ -240,3 +241,79 @@ async def local_js():
                 log.warning(f"Could not read {file_path}: {e}")
 
     return Response(content=js_content, media_type="application/javascript")
+
+
+@router.get("/api/config")
+@inject
+async def get_config(
+    request: Request,
+    config=Provide[ApplicationContainer.config],
+):
+    """Get configuration for frontend."""
+    try:
+        config_manager = get_config_manager()
+        
+        # フロントエンドに送信する設定を準備
+        frontend_config = {
+            "version": {
+                "schema": config_manager.get_schema_version(),
+                "product": "0.1.0"
+            },
+            "features": {
+                "ai_enabled": config_manager.is_feature_enabled("ai_enabled"),
+                "multi_tab_enabled": config_manager.is_feature_enabled("multi_tab_enabled"),
+                "supervisor_panel_enabled": config_manager.is_feature_enabled("supervisor_panel_enabled"),
+                "dev_tools_enabled": config_manager.is_feature_enabled("dev_tools_enabled"),
+            },
+            "ui": {
+                "theme": config_manager.get_value("ui.theme", "dark"),
+                "panel_position": config_manager.get_value("ui.panel_position", "right"),
+                "panel_width": config_manager.get_value("ui.panel_width", 320),
+                "remember_layout": config_manager.get_value("ui.remember_layout", True),
+            },
+            "ai": {
+                "provider": config_manager.get_value("ai.chat.provider", "anthropic"),
+                "model": config_manager.get_value("ai.chat.model", "claude-3-5-sonnet-20241022"),
+                "max_messages": config_manager.get_value("ai.chat.max_messages", 100),
+                "auto_context": config_manager.get_value("ai.chat.auto_context", True),
+            },
+            "terminal": {
+                "shell": config_manager.get_value("terminal.shell", "auto"),
+                "force_unicode_width": config_manager.get_value("terminal.force_unicode_width", False),
+            },
+            "server": {
+                "host": config_manager.get_value("server.host", "localhost"),
+                "port": config_manager.get_value("server.port", 57575),
+                "debug": config_manager.get_value("server.debug", False),
+            }
+        }
+        
+        return JSONResponse(frontend_config)
+        
+    except Exception as e:
+        log.error(f"Error getting config for frontend: {e}")
+        return JSONResponse(
+            {"error": "Failed to load configuration", "details": str(e)},
+            status_code=500
+        )
+
+
+@router.get("/api/config/summary")
+@inject 
+async def get_config_summary(
+    request: Request,
+    config=Provide[ApplicationContainer.config],
+):
+    """Get configuration summary for admin/debug purposes."""
+    try:
+        config_manager = get_config_manager()
+        summary = config_manager.get_config_summary()
+        
+        return JSONResponse(summary)
+        
+    except Exception as e:
+        log.error(f"Error getting config summary: {e}")
+        return JSONResponse(
+            {"error": "Failed to load configuration summary", "details": str(e)},
+            status_code=500
+        )

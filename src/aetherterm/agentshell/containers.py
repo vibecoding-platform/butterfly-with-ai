@@ -267,67 +267,79 @@ class WrapperApplication:
         logger.info("ラッパーアプリケーションの終了が完了しました")
 
     async def _load_configuration(self) -> None:
-        """設定を読み込み"""
+        """設定を読み込み（共通設定 + AgentShell固有設定）"""
         try:
-            # 設定ファイルから読み込み
-            wrapper_config = WrapperConfig.load_from_file(self.config_path)
+            # 共通設定を読み込み
+            config_manager = get_config_manager()
+            common_config = config_manager.get_config_data()
+            
+            # AgentShell固有設定を読み込み（存在する場合）
+            wrapper_config = None
+            if self.config_path.exists():
+                wrapper_config = WrapperConfig.load_from_file(self.config_path)
+                wrapper_config.apply_environment_overrides()
 
-            # 環境変数による上書き
-            wrapper_config.apply_environment_overrides()
-
-            # コンテナに設定を注入
-            self.container.config.from_dict(
-                {
-                    "debug": wrapper_config.debug,
-                    "enable_ai": wrapper_config.enable_ai,
-                    "wrapper_socket_path": wrapper_config.wrapper_socket_path,
-                    "ai_service": {
-                        "endpoint": wrapper_config.ai_service.endpoint,
-                        "api_key": wrapper_config.ai_service.api_key,
-                        "timeout": wrapper_config.ai_service.timeout,
-                        "max_retries": wrapper_config.ai_service.max_retries,
-                        "model": wrapper_config.ai_service.model,
-                    },
-                    "monitor": {
-                        "buffer_size": wrapper_config.monitor.buffer_size,
-                        "poll_interval": wrapper_config.monitor.poll_interval,
-                        "max_history": wrapper_config.monitor.max_history,
-                        "enable_output_capture": wrapper_config.monitor.enable_output_capture,
-                        "enable_input_capture": wrapper_config.monitor.enable_input_capture,
-                    },
-                    "session": {
-                        "session_timeout": wrapper_config.session.session_timeout,
-                        "max_sessions": wrapper_config.session.max_sessions,
-                        "cleanup_interval": wrapper_config.session.cleanup_interval,
-                        "enable_persistence": wrapper_config.session.enable_persistence,
-                    },
-                    "logging": {
-                        "level": wrapper_config.logging.level,
-                        "format": wrapper_config.logging.format,
-                        "file_path": wrapper_config.logging.file_path,
-                        "max_file_size": wrapper_config.logging.max_file_size,
-                        "backup_count": wrapper_config.logging.backup_count,
-                    },
-                    "telemetry": {
-                        "service_name": wrapper_config.telemetry.service_name,
-                        "service_version": wrapper_config.telemetry.service_version,
-                        "environment": wrapper_config.telemetry.environment,
-                        "otlp_endpoint": wrapper_config.telemetry.otlp_endpoint,
-                        "enable_tracing": wrapper_config.telemetry.enable_tracing,
-                        "enable_metrics": wrapper_config.telemetry.enable_metrics,
-                        "enable_log_instrumentation": wrapper_config.telemetry.enable_log_instrumentation,
-                        "trace_sample_rate": wrapper_config.telemetry.trace_sample_rate,
-                        "metrics_export_interval": wrapper_config.telemetry.metrics_export_interval,
-                    },
-                    "aetherterm_sync": {
-                        "server_url": wrapper_config.aetherterm_sync.server_url,
-                        "enable_sync": wrapper_config.aetherterm_sync.enable_sync,
-                        "sync_interval": wrapper_config.aetherterm_sync.sync_interval,
-                        "reconnection_attempts": wrapper_config.aetherterm_sync.reconnection_attempts,
-                        "reconnection_delay": wrapper_config.aetherterm_sync.reconnection_delay,
-                    },
-                }
-            )
+            # コンテナに設定を注入（共通設定 + AgentShell固有設定）
+            ai_config = common_config.get("ai", {}).get("chat", {})
+            config_dict = {
+                # 共通設定から取得
+                "debug": common_config.get("development", {}).get("verbose_logging", False),
+                "enable_ai": common_config.get("features", {}).get("ai_enabled", True),
+                "ai_service": {
+                    "endpoint": ai_config.get("api_endpoint", ""),
+                    "api_key": ai_config.get("api_key", ""),
+                    "timeout": ai_config.get("timeout", 30),
+                    "max_retries": ai_config.get("max_retries", 3),
+                    "model": ai_config.get("model", "claude-3-5-sonnet-20241022"),
+                },
+                "monitor": {
+                    "buffer_size": wrapper_config.monitor.buffer_size if wrapper_config else 1024,
+                    "poll_interval": wrapper_config.monitor.poll_interval if wrapper_config else 0.1,
+                    "max_history": wrapper_config.monitor.max_history if wrapper_config else 1000,
+                    "enable_output_capture": wrapper_config.monitor.enable_output_capture if wrapper_config else True,
+                    "enable_input_capture": wrapper_config.monitor.enable_input_capture if wrapper_config else True,
+                },
+                "session": {
+                    "session_timeout": wrapper_config.session.session_timeout if wrapper_config else 3600,
+                    "max_sessions": wrapper_config.session.max_sessions if wrapper_config else 10,
+                    "cleanup_interval": wrapper_config.session.cleanup_interval if wrapper_config else 300,
+                    "enable_persistence": wrapper_config.session.enable_persistence if wrapper_config else True,
+                },
+                "logging": {
+                    "level": common_config.get("logging", {}).get("level", "info"),
+                    "format": wrapper_config.logging.format if wrapper_config else "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    "file_path": common_config.get("logging", {}).get("file_path", "logs/agentshell.log"),
+                    "max_file_size": common_config.get("logging", {}).get("max_file_size", "10MB"),
+                    "backup_count": common_config.get("logging", {}).get("backup_count", 5),
+                },
+                "telemetry": {
+                    "service_name": wrapper_config.telemetry.service_name if wrapper_config else "aetherterm-agentshell",
+                    "service_version": wrapper_config.telemetry.service_version if wrapper_config else "0.1.0",
+                    "environment": wrapper_config.telemetry.environment if wrapper_config else "development",
+                    "otlp_endpoint": wrapper_config.telemetry.otlp_endpoint if wrapper_config else "",
+                    "enable_tracing": wrapper_config.telemetry.enable_tracing if wrapper_config else False,
+                    "enable_metrics": wrapper_config.telemetry.enable_metrics if wrapper_config else False,
+                    "enable_log_instrumentation": wrapper_config.telemetry.enable_log_instrumentation if wrapper_config else False,
+                    "trace_sample_rate": wrapper_config.telemetry.trace_sample_rate if wrapper_config else 1.0,
+                    "metrics_export_interval": wrapper_config.telemetry.metrics_export_interval if wrapper_config else 60,
+                },
+                "aetherterm_sync": {
+                    "server_url": common_config.get("server", {}).get("host", "localhost") + ":" + str(common_config.get("server", {}).get("port", 57575)),
+                    "enable_sync": wrapper_config.aetherterm_sync.enable_sync if wrapper_config else True,
+                    "sync_interval": wrapper_config.aetherterm_sync.sync_interval if wrapper_config else 30,
+                    "reconnection_attempts": wrapper_config.aetherterm_sync.reconnection_attempts if wrapper_config else 5,
+                    "reconnection_delay": wrapper_config.aetherterm_sync.reconnection_delay if wrapper_config else 5,
+                },
+                # AgentShell固有設定
+                "wrapper_socket_path": wrapper_config.wrapper_socket_path if wrapper_config else "/tmp/agentshell.sock",
+            }
+            
+            # AgentShell固有設定で上書き（存在する場合）
+            if wrapper_config:
+                # 固有設定で上書きしたい項目があれば追加
+                pass
+                
+            self.container.config.from_dict(config_dict)
 
             # 設定パスも注入
             self.container.config_path.from_value(str(self.config_path))

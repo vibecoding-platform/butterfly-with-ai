@@ -188,6 +188,46 @@ class AetherTermService {
       this.socket.off('connect_error', callback)
     }
   }
+
+  // Configuration API methods
+  async getConfig(): Promise<any> {
+    try {
+      const response = await fetch('/api/config')
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      return await response.json()
+    } catch (error) {
+      console.error('Failed to fetch configuration:', error)
+      throw error
+    }
+  }
+
+  async getConfigSummary(): Promise<any> {
+    try {
+      const response = await fetch('/api/config/summary')
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      return await response.json()
+    } catch (error) {
+      console.error('Failed to fetch configuration summary:', error)
+      throw error
+    }
+  }
+
+  // Configuration change listener
+  onConfigUpdate(callback: (config: any) => void): void {
+    if (this.socket) {
+      this.socket.on('config_update', callback)
+    }
+  }
+
+  offConfigUpdate(callback?: (config: any) => void): void {
+    if (this.socket) {
+      this.socket.off('config_update', callback)
+    }
+  }
 }
 
 export default AetherTermService
