@@ -56,3 +56,45 @@
 # SSL version defaults to auto
 #
 #ssl_version=None
+
+
+# AI Features Configuration
+# Enable or disable AI-powered features
+#
+#ai_enabled=True
+
+# Enable AI chat functionality
+#
+#ai_chat_enabled=True
+
+# Enable AI session management (automatic tab creation)
+#
+#ai_session_management_enabled=True
+
+# Enable AI agent shell integration
+#
+#ai_agent_shell_enabled=True
+
+# Enable AI command execution monitoring
+#
+#ai_command_monitoring_enabled=True
+
+# AI provider configuration
+#
+#ai_provider='anthropic'  # 'anthropic', 'openai', 'mock'
+
+# AI model configuration
+#
+#ai_model='claude-3-5-sonnet-20241022'
+
+# AI API key (can also be set via environment variable ANTHROPIC_API_KEY)
+#
+#ai_api_key=None
+
+# Maximum number of AI sessions
+#
+#ai_max_sessions=5
+
+# AI session timeout (seconds)
+#
+#ai_session_timeout=3600

@@ -1,0 +1,121 @@
+# AetherTerm Configuration File (TOML format)
+# This is the default configuration file for AetherTerm
+# Copy to aetherterm.toml and modify as needed
+
+[server]
+# Server configuration
+host = "localhost"                    # Server host ('localhost', '0.0.0.0', or specific IP)
+port = 57575                         # Server port
+debug = false                        # Enable debug mode
+more = false                         # Verbose debug output
+unminified = false                   # Use unminified JS files for development
+
+[security]
+# Security settings
+unsecure = false                     # Use HTTP instead of HTTPS (NOT RECOMMENDED)
+login = false                        # Force user login in unsecure mode
+ssl_version = "auto"                 # SSL version ("auto", "TLSv1.2", "TLSv1.3")
+
+[terminal]
+# Terminal settings
+shell = "auto"                       # Shell to launch ("auto", "/bin/bash", "/bin/zsh", etc.)
+motd = "motd"                        # Message of the day file path
+cmd = ""                             # Command to run instead of shell
+force_unicode_width = false          # Force unicode character width
+
+[features]
+# Feature toggles - master controls for major functionality
+ai_enabled = true                    # Master AI features toggle
+multi_tab_enabled = true             # Multiple terminal tabs support
+supervisor_panel_enabled = true      # Supervisor control panel
+dev_tools_enabled = false            # Development tools (auto-enabled in dev mode)
+
+[ai]
+# AI functionality configuration
+enabled = true                       # AI features master toggle (overridden by features.ai_enabled)
+
+[ai.chat]
+# AI Chat functionality
+enabled = true                       # Enable AI chat in sidebar
+provider = "anthropic"               # AI provider ("anthropic", "openai", "mock")
+model = "claude-3-5-sonnet-20241022" # AI model
+api_key = ""                         # API key (prefer environment variable)
+max_messages = 100                   # Maximum messages in chat history
+auto_context = true                  # Automatically include terminal context
+
+[ai.sessions]
+# AI Session Management (automatic tab creation/management)
+enabled = true                       # Enable AI-driven session management
+max_sessions = 5                     # Maximum concurrent AI sessions
+timeout = 3600                       # Session timeout in seconds
+auto_cleanup = true                  # Automatically cleanup terminated sessions
+hierarchy_display = true             # Show sessions in hierarchical tree view
+
+[ai.agent_shell]
+# AI Agent Shell Integration
+enabled = true                       # Enable AgentShell integration
+max_concurrent_agents = 3            # Maximum concurrent agent processes
+execution_timeout = 1800             # Agent execution timeout in seconds
+command_monitoring = true            # Monitor agent command execution
+auto_retry = false                   # Automatically retry failed agent commands
+log_level = "info"                   # Agent logging level ("debug", "info", "warn", "error")
+
+[ai.monitoring]
+# AI Command Monitoring
+enabled = true                       # Enable command execution monitoring
+log_commands = true                  # Log all executed commands
+analyze_output = true                # AI analysis of command output
+real_time_feedback = true            # Real-time AI feedback on commands
+security_checks = true               # AI-powered security command checking
+
+[ui]
+# User Interface settings
+theme = "dark"                       # UI theme ("dark", "light", "auto")
+panel_position = "right"             # Panel position ("left", "right", "floating")
+panel_width = 320                    # Default panel width in pixels
+remember_layout = true               # Remember panel layout between sessions
+
+[ui.tabs]
+# Tab management settings
+max_user_tabs = 10                   # Maximum user-created tabs
+enable_tab_reordering = true         # Allow drag-and-drop tab reordering
+enable_tab_context_menu = true       # Right-click context menu on tabs
+auto_save_sessions = true            # Automatically save tab sessions
+
+[ui.ai_sessions]
+# AI Sessions UI configuration
+show_hierarchy = true                # Show AI sessions in hierarchical view
+expand_by_default = false            # Expand session groups by default
+show_timestamps = true               # Show creation timestamps
+show_status_indicators = true        # Show real-time status indicators
+group_by_purpose = true              # Group sessions by detected purpose
+
+[logging]
+# Logging configuration
+level = "info"                       # Log level ("debug", "info", "warn", "error")
+file_path = "logs/aetherterm.log"    # Log file path
+max_file_size = "10MB"               # Maximum log file size
+backup_count = 5                     # Number of backup log files
+console_output = true                # Also output logs to console
+
+[performance]
+# Performance optimization settings
+max_buffer_size = 1024               # Terminal buffer size in KB
+connection_timeout = 30              # WebSocket connection timeout in seconds
+heartbeat_interval = 30              # WebSocket heartbeat interval in seconds
+cleanup_interval = 300               # Resource cleanup interval in seconds
+
+[integrations]
+# External integrations
+control_server_enabled = false       # Enable ControlServer integration
+control_server_url = ""              # ControlServer URL for multi-user management
+langchain_enabled = false            # Enable LangChain memory integration
+langchain_provider = "local"         # LangChain provider ("local", "remote")
+
+# Development-specific settings (automatically set in dev mode)
+[development]
+auto_reload = true                   # Auto-reload on file changes
+mock_ai = false                      # Use mock AI responses
+verbose_logging = true               # Enable verbose logging
+dev_auth_enabled = true              # Enable development authentication
+disable_ssl_verification = false     # Disable SSL verification (for testing)
