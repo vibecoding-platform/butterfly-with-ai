@@ -82,7 +82,7 @@ async def disconnect(sid, environ=None):
 async def create_terminal(
     sid,
     data,
-    config = Provide[ApplicationContainer.config],
+    config=Provide[ApplicationContainer.config],
 ):
     """Handle the creation of a new terminal session."""
     try:
@@ -90,7 +90,7 @@ async def create_terminal(
         config_login = config.get("login", False) or False
         config_pam_profile = config.get("pam_profile", "") or ""
         config_uri_root_path = config.get("uri_root_path", "") or ""
-        
+
         session_id = data.get("session", str(uuid4()))
         user_name = data.get("user", "")
         path = data.get("path", "")

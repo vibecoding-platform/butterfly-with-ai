@@ -44,7 +44,7 @@ if os.path.exists(static_dir) and os.listdir(static_dir):
 @inject
 async def index(
     request: Request,
-    config = Provide[ApplicationContainer.config],
+    config=Provide[ApplicationContainer.config],
 ):
     """Main index route that serves the terminal interface."""
     # Dynamically find the hashed asset filenames
@@ -169,9 +169,7 @@ async def theme_static(theme: str, filename: str):
 
 @router.get("/sessions/list.json")
 @inject
-async def sessions_list(
-    request: Request, config = Provide[ApplicationContainer.config]
-):
+async def sessions_list(request: Request, config=Provide[ApplicationContainer.config]):
     """Get the list of active sessions."""
     # Check if remote authentication is being used
     is_remote_authentication = bool(
