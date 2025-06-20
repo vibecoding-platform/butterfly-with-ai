@@ -2,6 +2,9 @@
 # This is the default configuration file for AetherTerm
 # Copy to aetherterm.toml and modify as needed
 
+# Configuration schema version - DO NOT MODIFY
+schema_version = "1.0.0"  # Compatible with AetherTerm v0.1.x
+
 [server]
 # Server configuration
 host = "localhost"                    # Server host ('localhost', '0.0.0.0', or specific IP)

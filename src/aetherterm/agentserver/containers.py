@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from aetherterm.agentserver.ai_services import create_ai_service, set_ai_service
+from aetherterm.config import ConfigManager, create_config_manager
 
 
 def _create_fastapi_app(static_path):
@@ -19,6 +20,10 @@ def _create_fastapi_app(static_path):
 class ApplicationContainer(containers.DeclarativeContainer):
     """Root container for the application, focused on Terminal dependency injection."""
 
+    # Configuration Manager
+    config_manager = providers.Singleton(create_config_manager)
+    
+    # DI Configuration from ConfigManager
     config = providers.Configuration()
 
     # Logging configuration
@@ -75,24 +80,17 @@ def configure_container(config=None):
     """Configure the dependency injection container."""
     container = ApplicationContainer()
 
-    # Set default values first
-    defaults = {
-        "uri_root_path": "",
-        "unsecure": False,
-        "debug": False,
-        "more": False,
-        "ai_mode": "streaming",
-        "ai_provider": "mock",  # Default to mock for testing
-        "ai_api_key": os.getenv("ANTHROPIC_API_KEY"),
-        "ai_model": "claude-3-5-sonnet-20241022",
-    }
+    # Initialize ConfigManager and load TOML configuration
+    config_manager = container.config_manager()
     
-    # Merge defaults with provided config
-    final_config = defaults.copy()
+    # Get configuration from ConfigManager
+    di_config = config_manager.create_dependency_injector_config()
+    
+    # Override with any provided config
     if config:
-        final_config.update(config)
+        di_config.update(config)
     
-    container.config.from_dict(final_config)
+    container.config.from_dict(di_config)
 
     container.wire(
         modules=[
@@ -106,10 +104,15 @@ def configure_container(config=None):
     try:
         ai_service_instance = container.ai_service()
         set_ai_service(ai_service_instance)
-        logging.getLogger("aetherterm.agentserver.containers").info(f"AI service initialized with provider: {final_config.get('ai_provider', 'unknown')}")
+        logging.getLogger("aetherterm.agentserver.containers").info(f"AI service initialized with provider: {di_config.get('ai_provider', 'unknown')}")
     except Exception as e:
         logging.getLogger("aetherterm.agentserver.containers").error(f"Failed to initialize AI service: {e}")
         # Fallback to mock service
         from aetherterm.agentserver.ai_services import MockAIService
         set_ai_service(MockAIService())
+    
+    # Log configuration summary
+    config_summary = config_manager.get_config_summary()
+    logging.getLogger("aetherterm.agentserver.containers").info(f"Configuration loaded: {config_summary['config_file']} (schema: {config_summary['schema_version']})")
+    
     return container

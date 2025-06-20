@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional, Type
 from dependency_injector import containers, providers
 
 from .config import WrapperConfig
+from aetherterm.config import ConfigManager, get_config_manager
 from .controller.terminal_controller import TerminalController
 from .observability import DistributedTracer, StructuredLogger, TelemetryManager
 from .service.ai_service import AIService

@@ -289,10 +289,18 @@ The frontend must be built and deployed to the AgentServer static directory:
 - Session isolation and ownership
 
 ### Configuration
-- **AgentServer Config**: `src/aetherterm/agentserver/aetherterm.conf.default`
+- **Shared Config**: `src/aetherterm/config/aetherterm.toml.default` (AgentServer, AgentShell共通)
 - **Frontend Config**: `frontend/src/config/environment.ts`
 - **Build Config**: `frontend/vite.config.ts`
 - **LangChain Config**: `src/aetherterm/langchain/config/`
+
+### Configuration Schema Management
+⚠️ **CRITICAL**: When modifying configuration files (`aetherterm.toml.default` or related TOML structures), you **MUST** update the schema version:
+1. Update `schema_version = "X.X.X"` in `src/aetherterm/config/aetherterm.toml.default`
+2. Update compatibility mapping in `src/aetherterm/config/version_manager.py`
+3. Document changes in release notes and migration guides
+
+This ensures configuration compatibility tracking between product versions and prevents runtime configuration errors.
 
 ### Deployment Options
 - Direct Python execution
