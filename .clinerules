@@ -1,0 +1,231 @@
+# Butterfly with AI (AetherTerm) - プロジェクトルール
+
+## プロジェクト概要
+- **プロジェクト名**: Butterfly with AI (AetherTerm)
+- **説明**: ブラウザで動作するxterm互換ターミナルエミュレータ + AI機能
+- **メインディレクトリ**: `/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai`
+
+## アーキテクチャ
+
+### バックエンド (Python)
+- **メインパッケージ**: `src/aetherterm/`
+- **AgentServer**: `src/aetherterm/agentserver/` - AIエージェント統合Webサーバー
+- **AgentShell**: `src/aetherterm/agentshell/` - AIエージェント統合シェル機能
+- **ControlServer**: `src/aetherterm/controlserver/` - システム制御・管理サーバー（開発予定）
+- **フレームワーク**: FastAPI + python-socketio + uvicorn
+- **依存性注入**: dependency-injector
+- **パッケージ管理**: uv (pyproject.toml)
+- **Python バージョン**: >=3.9
+
+### フロントエンド (Vue.js)
+- **ディレクトリ**: `frontend/`
+- **フレームワーク**: Vue 3 + TypeScript + Vite
+- **ターミナル**: @xterm/xterm
+- **状態管理**: Pinia
+- **リアルタイム通信**: socket.io-client
+
+### AI連携アーキテクチャ (新設計)
+- **ラッパープログラム**: `wrapper/` - Bash起動時に実行されるAI連携プログラム
+- **動作方式**: ターミナル内容を読み取り、既存のBash動作を邪魔しない
+- **セッション管理**: セッションIDによるオペレーション識別
+- **通信方式**: ターミナル出力の監視とAIサービスとの連携
+
+### その他のコンポーネント
+- **CoffeeScript**: `coffees/` (レガシーコード)
+- **テーマ**: `butterfly/themes/` (SASS)
+- **ドキュメント**: `docs/`
+- **テスト**: `tests/`
+
+## 主要ファイル
+
+### Python バックエンド
+
+#### AgentServer (AIエージェント統合Webサーバー)
+- `src/aetherterm/agentserver/main.py` - エントリーポイント (Click CLI)
+- `src/aetherterm/agentserver/server.py` - FastAPI + SocketIO サーバー
+- `src/aetherterm/agentserver/socket_handlers.py` - WebSocket イベントハンドラー
+- `src/aetherterm/agentserver/containers.py` - 依存性注入コンテナ
+- `src/aetherterm/agentserver/terminals/` - ターミナル実装
+- `src/aetherterm/agentserver/routes.py` - HTTP ルート
+- `src/aetherterm/agentserver/utils.py` - ユーティリティ関数
+
+#### AgentShell (AIエージェント統合シェル機能)
+- `src/aetherterm/agentshell/main.py` - シェルラッパーエントリーポイント
+- `src/aetherterm/agentshell/controller/` - ターミナル制御
+- `src/aetherterm/agentshell/service/` - AI連携サービス
+- `src/aetherterm/agentshell/pty/` - PTY制御
+- `src/aetherterm/agentshell/observability/` - 監視・テレメトリー
+
+#### ControlServer (システム制御・管理サーバー - 開発予定)
+- `src/aetherterm/controlserver/` - システム全体の制御・管理
+
+### フロントエンド
+- `frontend/src/App.vue` - メインアプリケーション
+- `frontend/src/components/TerminalComponent.vue` - ターミナルコンポーネント
+- `frontend/src/components/ChatComponent.vue` - AI チャット
+- `frontend/src/components/AdminControlPanel.vue` - 管理パネル
+- `frontend/src/stores/` - Pinia ストア
+
+### AI連携ラッパープログラム
+- `wrapper/main.py` - ラッパープログラムのエントリーポイント
+- `wrapper/terminal_monitor.py` - ターミナル出力監視
+- `wrapper/session_manager.py` - セッション管理
+- `wrapper/ai_connector.py` - AI サービス連携
+- `wrapper/config.py` - ラッパー設定管理
+
+### 設定ファイル
+- `pyproject.toml` - Python プロジェクト設定
+- `frontend/package.json` - Node.js 依存関係
+- `frontend/vite.config.ts` - Vite 設定
+- `wrapper/wrapper.toml` - ラッパープログラム設定
+
+## 開発ルール
+
+### コーディング規約
+- **Python**: PEP 8準拠、ruff使用、行長100文字
+- **TypeScript/Vue**: Prettier使用、ESLint準拠
+- **SASS**: インデント2スペース
+
+### ファイル命名規則
+- **Python**: snake_case
+- **Vue/TypeScript**: PascalCase (コンポーネント), camelCase (変数)
+- **設定ファイル**: kebab-case
+
+### 依存関係管理
+- **Python**: `uv` を使用、`pyproject.toml` で管理
+- **Node.js**: `pnpm` 推奨、`package.json` で管理
+
+## 機能
+
+### 実装済み機能
+- ✅ xterm互換ターミナルエミュレータ
+- ✅ WebSocket経由のリアルタイム通信
+- ✅ テーマシステム (20+ プリセット)
+- ✅ MOTD (Message of the Day)
+- ✅ セキュア認証 (X509証明書)
+- ✅ HTML表示対応
+- ✅ AI チャット機能
+- ✅ 管理コントロールパネル
+
+### 現在の制限事項
+- ⚠️ **単一セッション制限**: 現在は1セッションしか受け付けられない
+- ⚠️ **複数ターミナル未対応**: 複数のターミナルを開けるように設計し直す必要がある
+- ⚠️ **セッション管理**: 複数セッション対応のためのアーキテクチャ改善が必要
+
+### AI機能 (新アーキテクチャ)
+- **ラッパープログラム方式**: Bash起動時にAI連携プログラムを起動
+- **非侵入型設計**: 既存のBash動作を邪魔しない
+- **セッション識別**: セッションIDによるオペレーション管理
+- **ターミナル監視**: リアルタイムでターミナル内容を読み取り
+- **AI統合**: ターミナル出力に基づくAI支援機能
+
+## 開発コマンド
+
+### バックエンド
+```bash
+# AgentServer開発サーバー起動
+uv run aetherterm --debug --host localhost --port 57575
+
+# AgentShell単体実行
+uv run aetherterm-shell
+
+# AgentShellラッパー実行
+uv run aetherterm-wrapper
+
+# 依存関係インストール
+uv pip install -e .
+
+# テスト実行
+uv run pytest
+```
+
+### フロントエンド
+```bash
+cd frontend
+pnpm install
+pnpm run dev     # 開発サーバー
+pnpm run build   # ビルド
+pnpm run format  # コード整形
+```
+
+## ディレクトリ構造の重要性
+
+### 編集可能ファイル
+- `src/aetherterm/agentserver/**/*.py` - AIエージェント統合Webサーバー
+- `src/aetherterm/agentshell/**/*.py` - AIエージェント統合シェル機能
+- `src/aetherterm/controlserver/**/*.py` - システム制御・管理サーバー（開発予定）
+- `frontend/src/**/*` - Vue.js フロントエンド
+- `wrapper/**/*.py` - AI連携ラッパープログラム（レガシー）
+- `docs/**/*.md` - ドキュメント
+- `tests/**/*.py` - テストファイル
+- `*.toml`, `*.json`, `*.yaml` - 設定ファイル
+
+### 新規プロジェクト構造
+```
+wrapper/
+├── __init__.py
+├── main.py              # エントリーポイント
+├── terminal_monitor.py  # ターミナル出力監視
+├── session_manager.py   # セッション管理
+├── ai_connector.py      # AI サービス連携
+├── config.py           # 設定管理
+├── utils.py            # ユーティリティ
+├── wrapper.toml        # 設定ファイル
+└── tests/              # ラッパー用テスト
+    ├── test_monitor.py
+    ├── test_session.py
+    └── test_ai_connector.py
+```
+
+### 注意が必要なファイル
+- `butterfly/themes/` - Git submodule
+- `coffees/` - レガシーCoffeeScript (段階的移行中)
+- `assets/` - デプロイメント関連
+
+## セキュリティ考慮事項
+- SSL/TLS証明書の適切な管理
+- PAM認証対応
+- セッション共有のセキュリティ
+- XSS対策 (HTML表示機能)
+
+## パフォーマンス
+- 非同期処理 (asyncio)
+- WebSocket最適化
+- 静的ファイル配信効率化
+- ターミナル描画最適化
+
+## デバッグ
+- `--debug` フラグでデバッグモード
+- `--more` フラグで詳細ログ
+- ブラウザ開発者ツール活用
+- Socket.IO デバッグ機能
+
+## 今後の開発方針
+
+### 短期目標 (新アーキテクチャ実装)
+1. **ラッパープログラムの実装**
+   - Bash起動時のAI連携プログラム開発
+   - ターミナル出力監視機能の実装
+   - セッション管理システムの構築
+
+2. **複数セッション対応**
+   - 現在の単一セッション制限の解除
+   - 複数ターミナル同時実行の実現
+   - セッション間の独立性確保
+
+3. **非侵入型AI統合**
+   - 既存Bash動作への影響を最小化
+   - リアルタイムターミナル監視
+   - AI支援機能の透明な統合
+
+### 中長期目標
+4. CoffeeScriptからTypeScriptへの完全移行
+5. テストカバレッジの向上
+6. パフォーマンス最適化
+7. モバイル対応の改善
+
+### アーキテクチャ改善項目
+- セッション管理の抜本的見直し
+- ターミナル多重化対応
+- AI連携の効率化
+- リアルタイム処理の最適化

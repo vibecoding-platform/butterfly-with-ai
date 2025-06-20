@@ -67,7 +67,9 @@ Issues = "https://github.com/paradoxxxzero/aetherterm/issues"
 [project.scripts]
 aetherterm = "aetherterm.scripts.aetherterm:main"
 aether = "aetherterm.scripts.aetherterm:main"
-aetherterm-agentserver = "aetherterm.main:main"
+aetherterm-agentserver = "aetherterm.agentserver.main:main"
+aetherterm-agentshell = "aetherterm.agentshell.main:main"
+aetherterm-controlserver = "aetherterm.controlserver.main:main"
 aetherterm-shell-monitor = "aetherterm.agentshell.pty_monitor.main:main"
 aetherterm-dummy-ai = "aetherterm.agentshell.pty_monitor.dummy_ai_server:main"
 
@@ -78,19 +80,20 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 aetherterm = [
-    "sass/*.sass",
-    "themes/*.*",
-    "themes/*/*.*", 
-    "themes/*/*/*.*",
-    "static/fonts/*",
-    "static/images/favicon.png",
-    "static/main.css",
-    "static/html-sanitizer.js",
-    "static/*.min.js",
-    "templates/index.html",
-    "bin/*",
-    "templates/motd.j2",
-    "butterfly.conf.default",
+    "agentserver/sass/*.sass",
+    "agentserver/themes/*.*",
+    "agentserver/themes/*/*.*", 
+    "agentserver/themes/*/*/*.*",
+    "agentserver/static/fonts/*",
+    "agentserver/static/images/favicon.png",
+    "agentserver/static/main.css",
+    "agentserver/static/html-sanitizer.js",
+    "agentserver/static/*.min.js",
+    "agentserver/static/assets/*",
+    "agentserver/templates/index.html",
+    "agentserver/templates/motd.j2",
+    "agentserver/bin/*",
+    "agentserver/terminals/*.py",
     "aetherterm.conf.default"
 ]
 

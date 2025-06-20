@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--headless"
+      ]
+    },
+    "mcpadvisor": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@xiaohui-wang/mcpadvisor"
+      ]
+    }
+  }
+}

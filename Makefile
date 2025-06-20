@@ -1,7 +1,7 @@
 include Makefile.config
 -include Makefile.custom.config
 
-all: install lint check-outdated build-frontend run-debug
+all: install lint check-outdated build-frontend run-agentserver
 
 install:
 	uv sync
@@ -20,17 +20,30 @@ lint:
 check-outdated:
 	$(PIP) list --outdated --format=columns
 
-ARGS ?= --host=localhost --port=57575 --unsecure --debug
-run-debug:
-	uv run aetherterm-agentserver $(ARGS)
+# AgentServer (Web Terminal) - default args
+AGENTSERVER_ARGS ?= --host=localhost --port=57575 --unsecure --debug
+run-agentserver:
+	uv run aetherterm-agentserver $(AGENTSERVER_ARGS)
 
+# AgentShell (AI Terminal Wrapper)
+AGENTSHELL_ARGS ?=
+run-agentshell:
+	uv run aetherterm-agentshell $(AGENTSHELL_ARGS)
+
+# ControlServer (Central Management)
+CONTROLSERVER_ARGS ?= --port=8765
+run-controlserver:
+	uv run aetherterm-controlserver $(CONTROLSERVER_ARGS)
+
+# Legacy alias for backward compatibility
+run-debug: run-agentserver
 
 build-frontend:
 	cd frontend && $(NPM) install
 	cd frontend && $(NPM) run build
-	mv frontend/dist/index.html src/aetherterm/templates/index.html
-	rm -rf src/aetherterm/static/*
-	cp -r frontend/dist/* src/aetherterm/static/
+	mv frontend/dist/index.html src/aetherterm/agentserver/templates/index.html
+	rm -rf src/aetherterm/agentserver/static/*
+	cp -r frontend/dist/* src/aetherterm/agentserver/static/
 
 release: build-frontend
 	git pull
