@@ -352,7 +352,6 @@ def broadcast_to_session(session_id, message):
         log.warning("sio_instance is None, cannot broadcast message")
 
 
-<<<<<<< HEAD:src/aetherterm/agentserver/socket_handlers.py
 async def wrapper_session_sync(sid, data):
     """Handle session synchronization from wrapper programs."""
     try:
@@ -508,7 +507,8 @@ async def get_block_status(sid, data):
         await sio_instance.emit(
             "block_status_response", {"status": "error", "error": str(e)}, room=sid
         )
-=======
+
+
 def get_terminal_context(session_id):
     """Extract terminal context for AI assistance."""
     if session_id and session_id in AsyncioTerminal.sessions:
@@ -717,4 +717,3 @@ async def ai_get_info(sid, data):
             'status': 'error',
             'error': str(e)
         }, room=sid)
->>>>>>> origin/main:src/aetherterm/socket_handlers.py

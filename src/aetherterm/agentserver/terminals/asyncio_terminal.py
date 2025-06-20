@@ -27,7 +27,7 @@ import sys  # Import sys
 import termios
 from logging import getLogger
 
-from aetherterm import utils
+from aetherterm.agentserver import utils
 
 from .base_terminal import BaseTerminal
 

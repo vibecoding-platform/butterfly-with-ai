@@ -329,6 +329,32 @@ This ensures configuration compatibility tracking between product versions and p
 - Build: `Makefile`, `Makefile.config`
 
 ## Testing
+
+### Configuration System Testing
+```bash
+# Test ConfigManager functionality
+uv run python -c "
+import sys; sys.path.insert(0, 'src')
+from aetherterm.config import get_config_manager
+config_manager = get_config_manager()
+print('✅ Config loaded:', config_manager.get_schema_version())
+print('✅ AI enabled:', config_manager.is_feature_enabled('ai_enabled'))
+print('✅ Server port:', config_manager.get_value('server.port'))
+"
+
+# Test AgentServer DI integration
+uv run python -c "
+import sys; sys.path.insert(0, 'src')
+from aetherterm.agentserver.containers import configure_container
+container = configure_container()
+config = container.config()
+print('✅ DI integration successful')
+print('✅ Host:', config['host'])
+print('✅ Port:', config['port'])
+"
+```
+
+### Python Tests
 ```bash
 # Run Python tests
 pytest
