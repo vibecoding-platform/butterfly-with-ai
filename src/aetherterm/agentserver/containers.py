@@ -6,6 +6,8 @@ from dependency_injector import containers, providers
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from aetherterm.agentserver.ai_services import create_ai_service, set_ai_service
+
 
 def _create_fastapi_app(static_path):
     """Create FastAPI app with static files mounted."""
@@ -57,13 +59,12 @@ class ApplicationContainer(containers.DeclarativeContainer):
         ),
     )
 
-    # AI Assistance Logic Provider
-    ai_assistance_service = providers.Selector(
-        config.ai_mode,
-        streaming=providers.Factory(object),  # Placeholder for streaming AI service
-        sentence_by_sentence=providers.Factory(
-            object
-        ),  # Placeholder for sentence-by-sentence AI service
+    # AI Service Provider
+    ai_service = providers.Factory(
+        create_ai_service,
+        provider=config.ai_provider,
+        api_key=config.ai_api_key,
+        model=config.ai_model,
     )
 
     # Terminal factory removed - terminals are created directly in socket handlers
@@ -81,6 +82,9 @@ def configure_container(config=None):
         "debug": False,
         "more": False,
         "ai_mode": "streaming",
+        "ai_provider": "mock",  # Default to mock for testing
+        "ai_api_key": os.getenv("ANTHROPIC_API_KEY"),
+        "ai_model": "claude-3-5-sonnet-20241022",
     }
     
     # Merge defaults with provided config
@@ -90,9 +94,22 @@ def configure_container(config=None):
     
     container.config.from_dict(final_config)
 
-    # Note: Wiring is handled in server.py create_app function
-    # The following modules should be wired:
-    # - aetherterm.agentserver.routes
-    # - aetherterm.agentserver.server
-    # - aetherterm.agentserver.socket_handlers
+    container.wire(
+        modules=[
+            "aetherterm.agentserver.routes",
+            "aetherterm.agentserver.server",
+            "aetherterm.agentserver.socket_handlers",
+        ]
+    )
+
+    # Initialize AI service
+    try:
+        ai_service_instance = container.ai_service()
+        set_ai_service(ai_service_instance)
+        logging.getLogger("aetherterm.agentserver.containers").info(f"AI service initialized with provider: {final_config.get('ai_provider', 'unknown')}")
+    except Exception as e:
+        logging.getLogger("aetherterm.agentserver.containers").error(f"Failed to initialize AI service: {e}")
+        # Fallback to mock service
+        from aetherterm.agentserver.ai_services import MockAIService
+        set_ai_service(MockAIService())
     return container
