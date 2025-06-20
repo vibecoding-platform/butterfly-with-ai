@@ -5,7 +5,9 @@ import SupervisorControlPanel from './components/SupervisorControlPanel.vue';
 import ChatComponent from './components/ChatComponent.vue';
 import SimpleChatComponent from './components/SimpleChatComponent.vue';
 import TerminalComponent from './components/TerminalComponent.vue';
+import DevJWTRegister from './components/DevJWTRegister.vue';
 import { useChatStore } from './stores/chatStore';
+import { enableJWTDevRegister } from './config/environment';
 
 const chatStore = useChatStore();
 const activeTab = ref('chat'); // 'supervisor' or 'chat'
@@ -198,6 +200,9 @@ watch(chatStore.activeMessages, (newMessages) => {
         <SimpleChatComponent />
       </div>
       <div v-if="activeTab === 'supervisor'" class="tab-content supervisor-tab">
+        <!-- Development JWT Registration (only in dev mode) -->
+        <DevJWTRegister v-if="enableJWTDevRegister" />
+        
         <SupervisorControlPanel />
       </div>
     </div>

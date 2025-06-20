@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client'
-import { getSocketPath, getSocketUrl } from '../config/environment'
+import { socketUrl } from '../config/environment'
 
 interface VueTermWebSockets {
   shellWs: WebSocket | null
@@ -23,8 +23,8 @@ class AetherTermService {
 
   connect(): Socket {
     if (!this.socket) {
-      this.socket = io(getSocketUrl(), {
-        path: getSocketPath()
+      this.socket = io(socketUrl || window.location.origin, {
+        path: '/socket.io'
       })
 
       this.socket.on('connect', () => {

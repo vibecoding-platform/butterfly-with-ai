@@ -1,55 +1,55 @@
-// Environment configuration for backend connection
-export interface BackendConfig {
-  host: string
-  port: number
-  protocol: 'http' | 'https'
-  socketPath: string
+/**
+ * Environment configuration for AetherTerm frontend
+ */
+
+export interface EnvironmentConfig {
+  isDevelopment: boolean;
+  isProduction: boolean;
+  enableDevTools: boolean;
+  enableJWTDevRegister: boolean;
+  apiBaseUrl: string;
+  socketUrl: string;
 }
 
-// Development configuration (can be overridden)
-const developmentConfig: BackendConfig = {
-  host: import.meta.env.VITE_BACKEND_HOST || 'localhost',
-  port: parseInt(import.meta.env.VITE_BACKEND_PORT || '57575') || 57575,
-  protocol: (import.meta.env.VITE_BACKEND_PROTOCOL as 'http' | 'https') || 'http',
-  socketPath: import.meta.env.VITE_SOCKET_PATH || '/socket.io/'
-}
+// Detect development environment
+const isDev = import.meta.env.DEV || 
+             import.meta.env.MODE === 'development' ||
+             window.location.hostname === 'localhost' ||
+             window.location.hostname === '127.0.0.1' ||
+             window.location.hostname.includes('dev') ||
+             window.location.port !== '';
 
-// Production configuration (derived from current location)
-const productionConfig: BackendConfig = {
-  host: window.location.hostname,
-  port: parseInt(window.location.port) || (window.location.protocol === 'https:' ? 443 : 80),
-  protocol: window.location.protocol.replace(':', '') as 'http' | 'https',
-  socketPath: window.location.pathname + 'socket.io/'
-}
+export const environment: EnvironmentConfig = {
+  isDevelopment: isDev,
+  isProduction: !isDev,
+  enableDevTools: isDev,
+  enableJWTDevRegister: isDev, // Only enable JWT dev registration in development
+  apiBaseUrl: isDev ? 'http://localhost:57575' : '',
+  socketUrl: isDev ? 'http://localhost:57575' : ''
+};
 
-// Determine if we're in development mode
-const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development'
+// Export individual flags for convenience
+export const {
+  isDevelopment,
+  isProduction,
+  enableDevTools,
+  enableJWTDevRegister,
+  apiBaseUrl,
+  socketUrl
+} = environment;
 
-// Export the appropriate configuration
-export const backendConfig: BackendConfig = isDevelopment ? developmentConfig : productionConfig
-
-// Helper function to get the full backend URL
-export const getBackendUrl = (): string => {
-  return `${backendConfig.protocol}://${backendConfig.host}:${backendConfig.port}`
-}
-
-// Helper function to get the socket.io URL
-export const getSocketUrl = (): string => {
-  return getBackendUrl()
-}
-
-// Helper function to get the socket.io path
-export const getSocketPath = (): string => {
-  return backendConfig.socketPath
-}
-
-// Debug information
-export const getConnectionInfo = () => {
-  return {
-    mode: isDevelopment ? 'development' : 'production',
-    backendUrl: getBackendUrl(),
-    socketUrl: getSocketUrl(),
-    socketPath: getSocketPath(),
-    config: backendConfig
-  }
+// Debug logging in development
+if (isDevelopment) {
+  console.log('🔧 AetherTerm Environment Configuration:', environment);
+  console.log('🌍 Current location:', {
+    hostname: window.location.hostname,
+    port: window.location.port,
+    protocol: window.location.protocol,
+    href: window.location.href
+  });
+  console.log('⚡ Vite Environment:', {
+    DEV: import.meta.env.DEV,
+    PROD: import.meta.env.PROD,
+    MODE: import.meta.env.MODE
+  });
 }
