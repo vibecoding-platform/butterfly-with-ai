@@ -2,16 +2,95 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Project Context & Overview
 
-AetherTerm is a modular terminal system with AI integration capabilities, consisting of multiple components:
+### Project Aether
+AetherTerm is a **product within Project Aether** - a comprehensive platform for AI-enhanced terminal operations, system management, and intelligent automation. Project Aether aims to revolutionize how organizations interact with their systems through AI-powered tools and interfaces.
 
-- **AgentServer**: Modern web-based terminal emulator (formerly Butterfly) with xterm-compatible functionality through browsers
-- **AgentShell**: AI-integrated terminal wrapper with PTY monitoring and threat detection
+### AetherTerm Product
+AetherTerm is a **modular terminal system** that provides:
+- Web-based terminal emulation with AI assistance
+- Intelligent session management and automation  
+- Advanced monitoring, audit, and compliance capabilities
+- Multi-component architecture for enterprise scalability
+
+## Business Context & Value Proposition
+
+**For comprehensive business understanding, see**: [📊 Business Documentation](./docs/users/business/)
+
+### Target Market
+- **Enterprise IT departments** requiring secure, auditable terminal access
+- **Financial institutions** needing compliance and risk management
+- **Manufacturing/Construction** requiring supervised operations and workflow management
+- **Technology companies** seeking AI-enhanced development and operations
+- **Educational institutions** providing safe, monitored programming and system administration learning environments
+
+### Key Business Value
+- **Operational Efficiency**: 30-50% reduction in manual terminal operations
+- **Risk Mitigation**: Complete audit trails and intelligent threat detection
+- **Compliance**: Built-in regulatory reporting and approval workflows
+- **Innovation**: AI-assisted operations and predictive automation
+- **Educational Safety**: Supervised learning environments with real-time guidance and intervention
+
+### Business Users
+- **🏢 Executive Level**: Strategic value, ROI analysis, competitive advantage
+- **🛡️ IT Management**: Security, compliance, governance, risk management
+- **👨‍💻 Technical Users**: Implementation, configuration, daily operations
+- **🎓 Educational**: Instructors, students, IT administrators in academic settings
+
+### Educational Use Cases
+- **Computer Science Education**: Safe terminal access for programming courses
+- **System Administration Training**: Supervised learning with guidance
+- **Cybersecurity Education**: Controlled environments for security training
+- **Research Computing**: Monitored access to research systems and clusters
+
+## Technical Architecture
+
+AetherTerm consists of multiple integrated components:
+
+- **AgentServer**: Control AI Agents and Shells, with browser-based xterm-compatible terminal
+- **AgentShell**: AI-Assisted Terminal that can be directed by AgentServer and accepts user auxiliary operations, enabling automated task execution with human oversight
 - **ControlServer**: Central management system for coordinating multiple terminal sessions
 - **LangChain Integration**: Advanced AI memory and retrieval system for enhanced terminal intelligence
 
 Built with Python (FastAPI/Socket.IO) backend and Vue.js 3 + TypeScript frontend.
+
+## System Functions & Capabilities
+
+**For detailed specifications, see**: [🔧 Component Functions](./docs/developers/COMPONENT_FUNCTIONS.md) | [📋 System Capabilities](./docs/developers/SYSTEM_CAPABILITIES.md)
+
+### AgentServer Functions
+- **🌐 Web Terminal**: Browser-based xterm-compatible terminal interface
+- **🤖 AI Integration**: Chat interface, session management, AI-driven automation
+- **🔌 Agent Control**: Command and control interface for AgentShell instances  
+- **📊 Session Management**: Multi-tab terminals, session persistence, user management
+- **🛡️ Security & Audit**: Complete operation logging, access control, compliance reporting
+- **⚙️ Configuration**: TOML-based settings, feature toggles, permission management
+
+### AgentShell Functions  
+- **🖥️ Terminal Execution**: Native shell command execution with PTY control
+- **📡 Remote Control**: Accepts commands from AgentServer for automated execution
+- **👤 User Interaction**: Manual user input for auxiliary operations and oversight
+- **📋 Command Monitoring**: Real-time command tracking and result reporting
+- **🔄 Session Bridging**: Seamless integration between automated and manual operations
+
+### ControlServer Functions
+- **🎛️ Central Coordination**: Multi-instance AgentServer management
+- **📈 System Monitoring**: Resource usage, performance metrics, health checks
+- **🚨 Alert Management**: System-wide notifications and incident response
+- **📊 Reporting**: Aggregate statistics, compliance reports, audit summaries
+
+### LangChain Integration Functions
+- **🧠 AI Memory**: Conversation history, context retention, learning from interactions
+- **🔍 Intelligent Search**: Vector-based retrieval, semantic search, knowledge base
+- **📝 Log Analysis**: AI-powered log summarization, pattern detection, anomaly identification
+- **🎯 Predictive Assistance**: Proactive suggestions, workflow optimization, error prevention
+
+### Cross-Component Functions
+- **🔐 Authentication & Authorization**: User roles, permission enforcement, session security
+- **📡 Real-time Communication**: WebSocket-based messaging, live updates, synchronization
+- **📁 Data Persistence**: Session storage, configuration management, audit trails
+- **🔄 Integration APIs**: REST endpoints, WebSocket events, plugin interfaces
 
 ## Development Commands
 
@@ -127,7 +206,7 @@ make check-outdated
 └─────────────────────┘
 ```
 
-### AgentServer (Web Terminal Server)
+### AgentServer (AI Control Center with Web Terminal)
 - **Entry Point**: `src/aetherterm/agentserver/main.py` - CLI interface with click
 - **ASGI Server**: `src/aetherterm/agentserver/server.py` - FastAPI + Socket.IO integration
 - **Routes**: `src/aetherterm/agentserver/routes.py` - HTTP endpoints
@@ -137,7 +216,7 @@ make check-outdated
 - **Auto Blocker**: `src/aetherterm/agentserver/auto_blocker.py` - Automatic threat blocking
 - **Log Analyzer**: `src/aetherterm/agentserver/log_analyzer.py` - Log analysis features
 
-### AgentShell (AI Terminal Wrapper)
+### AgentShell (AI-Assisted Terminal)
 - **Entry Points**: 
   - `src/aetherterm/agentshell/main.py` - Primary entry point
   - `src/aetherterm/agentshell/main_new.py` - New implementation
