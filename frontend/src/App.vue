@@ -10,8 +10,9 @@ import { useChatStore } from './stores/chatStore';
 import { enableJWTDevRegister } from './config/environment';
 
 const chatStore = useChatStore();
-const activeTab = ref('chat'); // 'supervisor' or 'chat'
+const activeTab = ref('chat'); // 'supervisor', 'chat', or 'dev-auth'
 const isSupervisorPanelFloating = ref(false);
+const isSupervisorPanelVisible = ref(true);
 
 // Panel width management
 const panelWidth = ref(320); // デフォルト幅
@@ -125,9 +126,29 @@ const savePanelWidth = () => {
   localStorage.setItem(PANEL_WIDTH_KEY, panelWidth.value.toString());
 };
 
-// 初期化時に保存された幅を読み込み
+// Panel visibility management
+const PANEL_VISIBILITY_KEY = 'aetherterm-panel-visible';
+
+const loadPanelVisibility = () => {
+  const saved = localStorage.getItem(PANEL_VISIBILITY_KEY);
+  if (saved !== null) {
+    isSupervisorPanelVisible.value = saved === 'true';
+  }
+};
+
+const savePanelVisibility = () => {
+  localStorage.setItem(PANEL_VISIBILITY_KEY, isSupervisorPanelVisible.value.toString());
+};
+
+const togglePanelVisibility = () => {
+  isSupervisorPanelVisible.value = !isSupervisorPanelVisible.value;
+  savePanelVisibility();
+};
+
+// 初期化時に保存された設定を読み込み
 onMounted(() => {
   loadPanelWidth();
+  loadPanelVisibility();
 });
 
 onUnmounted(() => {
@@ -156,6 +177,7 @@ watch(chatStore.activeMessages, (newMessages) => {
 
     <!-- Supervisor Control Panel (Fixed or Floating) -->
     <div
+      v-if="isSupervisorPanelVisible"
       id="supervisor-container"
       :class="{
         'supervisor-floating': isSupervisorPanelFloating,
@@ -193,6 +215,14 @@ watch(chatStore.activeMessages, (newMessages) => {
         >
           Supervisor Control
         </button>
+        <button
+          v-if="enableJWTDevRegister"
+          :class="{ 'active': activeTab === 'dev-auth' }"
+          @click="activeTab = 'dev-auth'"
+          class="dev-tab"
+        >
+          🔧 Dev Auth
+        </button>
       </div>
 
       <!-- Tab Content -->
@@ -200,14 +230,29 @@ watch(chatStore.activeMessages, (newMessages) => {
         <SimpleChatComponent />
       </div>
       <div v-if="activeTab === 'supervisor'" class="tab-content supervisor-tab">
-        <!-- Development JWT Registration (only in dev mode) -->
-        <DevJWTRegister v-if="enableJWTDevRegister" />
-        
         <SupervisorControlPanel />
+      </div>
+      <div v-if="activeTab === 'dev-auth'" class="tab-content dev-auth-tab">
+        <DevJWTRegister />
       </div>
     </div>
 
-    <!-- Control Buttons -->
+    <!-- Panel Toggle Button -->
+    <div 
+      class="panel-toggle-container"
+      :style="{
+        right: isSupervisorPanelVisible && !isSupervisorPanelFloating ? (panelWidth + 'px') : '0px'
+      }"
+    >
+      <button 
+        @click="togglePanelVisibility" 
+        class="panel-toggle-btn"
+        :class="{ 'panel-hidden': !isSupervisorPanelVisible }"
+        :title="isSupervisorPanelVisible ? 'Hide Chat Panel' : 'Show Chat Panel'"
+      >
+        {{ isSupervisorPanelVisible ? '→' : '←' }}
+      </button>
+    </div>
     
   </div>
 </template>
@@ -235,6 +280,23 @@ watch(chatStore.activeMessages, (newMessages) => {
   color: white;
 }
 
+.tab-navigation button.dev-tab {
+  border-left: 1px solid #444;
+  border-right: 1px solid #444;
+  background-color: #2a2a2a;
+  color: #ff9800;
+  font-size: 12px;
+}
+
+.tab-navigation button.dev-tab:hover {
+  background-color: #333;
+}
+
+.tab-navigation button.dev-tab.active {
+  background-color: #ff9800;
+  color: white;
+}
+
 .tab-content {
   padding: 15px;
   flex: 1;
@@ -250,6 +312,11 @@ watch(chatStore.activeMessages, (newMessages) => {
 
 .tab-content.supervisor-tab {
   /* Supervisorタブは通常のパディング */
+}
+
+.tab-content.dev-auth-tab {
+  /* Development Authタブは通常のパディング */
+  padding: 0; /* DevJWTRegisterコンポーネントが独自のパディングを持つ */
 }
 
 html, body, #app {
@@ -639,5 +706,71 @@ html, body, #app {
 
 .supervisor-floating .supervisor-header {
   border-radius: 8px 8px 0 0;
+}
+
+/* Panel Toggle Button */
+.panel-toggle-container {
+  position: fixed;
+  top: 20px;
+  transform: none;
+  z-index: 1001;
+  transition: right 0.3s ease;
+}
+
+.panel-toggle-btn {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  width: 60px;
+  height: 30px;
+  border-radius: 0 0 0 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  transform: translateY(0);
+  writing-mode: initial;
+  text-orientation: initial;
+}
+
+.panel-toggle-btn:hover {
+  background-color: #45a049;
+  transform: translateY(3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.panel-toggle-btn.panel-hidden {
+  background-color: #2196f3;
+  border-radius: 0 0 6px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.panel-toggle-btn.panel-hidden:hover {
+  background-color: #1976d2;
+  transform: translateY(3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* モバイル画面での調整 */
+@media (max-width: 900px) {
+  .panel-toggle-container {
+    top: 10px;
+    right: 10px !important;
+  }
+  
+  .panel-toggle-btn {
+    width: 50px;
+    height: 35px;
+    border-radius: 0 0 6px 6px;
+    font-size: 16px;
+  }
+  
+  .panel-toggle-btn.panel-hidden {
+    border-radius: 0 0 6px 6px;
+  }
 }
 </style>
