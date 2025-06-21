@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 import logging
 import os
@@ -8,7 +7,7 @@ import sys
 
 import click
 
-from aetherterm.server import prepare_ssl_certs
+from aetherterm.agentserver.utils import prepare_ssl_certs
 
 # Configure logging for the launcher script
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -56,7 +55,7 @@ def launch_uvicorn(kwargs):
         sys.executable,
         "-m",
         "uvicorn",
-        "aetherterm.server:create_asgi_app",
+        "aetherterm.agentserver.server:create_asgi_app",
         "--factory",
         "--host",
         env["AETHERTERM_HOST"],
@@ -110,7 +109,7 @@ def launch_hypercorn(kwargs):
         sys.executable,
         "-m",
         "hypercorn",
-        "aetherterm.server:create_asgi_app",
+        "aetherterm.agentserver.server:create_asgi_app",
         "--factory",
         "--bind",
         f"{env['AETHERTERM_HOST']}:{env['AETHERTERM_PORT']}",

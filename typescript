@@ -1,13 +1,0 @@
-Script started on 2025-06-17 18:06:58+09:00 [TERM="xterm-256color" TTY="/dev/pts/9" COLUMNS="129" LINES="26"]
-[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ 
-[?2004l[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ 
-[?2004l[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ 
-[?2004l[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ 
-[?2004l[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ 
-[?2004l[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ 
-[?2004l[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ echo test
-[?2004ltest
-[?2004h]0;kaz@LNV-L14A-078: /mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[01;32mkaz@LNV-L14A-078[00m:[01;34m/mnt/c/workspaces/vibecoding-platform/ide/terminal/butterfly-with-ai[00m$ echo testcat ~/.ssh/id_ed25519.pub [17Pecho test[K[?2004l
-exit
-
-Script done on 2025-06-17 18:07:04+09:00 [COMMAND_EXIT_CODE="0"]

@@ -10,7 +10,7 @@ AetherTerm is a **product within Project Aether** - a comprehensive platform for
 ### AetherTerm Product
 AetherTerm is a **modular terminal system** that provides:
 - Web-based terminal emulation with AI assistance
-- Intelligent session management and automation  
+- Intelligent session management and automation
 - Advanced monitoring, audit, and compliance capabilities
 - Multi-component architecture for enterprise scalability
 
@@ -62,12 +62,12 @@ Built with Python (FastAPI/Socket.IO) backend and Vue.js 3 + TypeScript frontend
 ### AgentServer Functions
 - **🌐 Web Terminal**: Browser-based xterm-compatible terminal interface
 - **🤖 AI Integration**: Chat interface, session management, AI-driven automation
-- **🔌 Agent Control**: Command and control interface for AgentShell instances  
+- **🔌 Agent Control**: Command and control interface for AgentShell instances
 - **📊 Session Management**: Multi-tab terminals, session persistence, user management
 - **🛡️ Security & Audit**: Complete operation logging, access control, compliance reporting
 - **⚙️ Configuration**: TOML-based settings, feature toggles, permission management
 
-### AgentShell Functions  
+### AgentShell Functions
 - **🖥️ Terminal Execution**: Native shell command execution with PTY control
 - **📡 Remote Control**: Accepts commands from AgentServer for automated execution
 - **👤 User Interaction**: Manual user input for auxiliary operations and oversight
@@ -215,9 +215,19 @@ make check-outdated
 - **Terminal Management**: `src/aetherterm/agentserver/terminals/` - PTY control with asyncio
 - **Auto Blocker**: `src/aetherterm/agentserver/auto_blocker.py` - Automatic threat blocking
 - **Log Analyzer**: `src/aetherterm/agentserver/log_analyzer.py` - Log analysis features
+- **Authentication Module**: `src/aetherterm/agentserver/auth/` - Authentication & authorization
+  - `jwt_auth.py` - JWT authentication processing
+  - `idp_connector.py` - IdP integration processing
+  - `rbac.py` - Role-based authorization
+- **Utilities**: `src/aetherterm/agentserver/utils/` - Utility functions
+  - `motd.py` - Message of the Day functionality
+  - `socket_utils.py` - Socket utility functions
+  - `ssl_certs.py` - SSL certificate management
+  - `system_utils.py` - System utility functions
+  - `user_management.py` - User management utilities
 
 ### AgentShell (AI-Assisted Terminal)
-- **Entry Points**: 
+- **Entry Points**:
   - `src/aetherterm/agentshell/main.py` - Primary entry point
   - `src/aetherterm/agentshell/main_new.py` - New implementation
   - `src/aetherterm/agentshell/main_sync.py` - Synchronous version
@@ -286,7 +296,12 @@ The frontend must be built and deployed to the AgentServer static directory:
 - SSL/TLS encryption by default
 - X.509 certificate authentication
 - Optional PAM integration for system auth
+- **IdP Integration**: OIDC/SAML2.0 support for external authentication providers
+- **JWT Authentication**: Token-based authentication for stateless session management
+- **Multi-Factor Authentication**: MFA support via IdP integration
+- **RBAC**: Role-Based Access Control implementation
 - Session isolation and ownership
+- XSS protection for HTML display features
 
 ### Configuration
 - **AgentServer Config**: `src/aetherterm/agentserver/aetherterm.conf.default`
@@ -319,6 +334,42 @@ The frontend must be built and deployed to the AgentServer static directory:
 - Python: `pyproject.toml`
 - Frontend: `frontend/package.json`, `frontend/vite.config.ts`
 - Build: `Makefile`, `Makefile.config`
+
+## Development Rules & Conventions
+
+### Coding Standards
+- **Python**: PEP 8 compliant, use ruff, 100 character line length
+- **TypeScript/Vue**: Use Prettier, ESLint compliant
+- **SASS**: 2-space indentation
+
+### File Naming Conventions
+- **Python**: snake_case
+- **Vue/TypeScript**: PascalCase (components), camelCase (variables)
+- **Configuration files**: kebab-case
+
+### Dependency Management
+- **Python**: Use `uv` package manager, manage in `pyproject.toml`
+- **Node.js**: `pnpm` preferred, manage in `package.json`
+
+### Modern Python Development
+- Use `uv` for Python dependency management
+- Modern packaging with `pyproject.toml` (migrated from setup.py, setup.cfg, requirements.txt)
+- Use `[project.scripts]` for console entry points
+- Use `[tool.setuptools.package-data]` for non-Python files
+- Use Click for CLI interfaces instead of argparse
+- Use dependency-injector for IoC container pattern
+
+### Architecture Patterns
+- Use asyncio for all async operations including PTY communication
+- FastAPI for HTTP routes, python-socketio for WebSocket/real-time communication
+- Socket.IO event handlers should be simple async functions
+- Use `os.fork()` with asyncio for terminal process management
+- Create ASGI app factory functions for better testability
+
+### Current Limitations
+- ⚠️ **Single Session Limitation**: Currently accepts only 1 session
+- ⚠️ **Multiple Terminal Support**: Needs architectural redesign for multiple terminals
+- ⚠️ **Session Management**: Requires architecture improvements for multi-session support
 
 ## Testing
 ```bash
@@ -380,3 +431,45 @@ make lint
 - AgentShell: Real-time PTY monitoring and threat detection
 - LangChain: Can be integrated into any component for memory/retrieval
 - ControlServer: Centralized AI decision making (planned)
+
+## Development Roadmap
+
+### Short-term Goals (New Architecture Implementation)
+1. **Wrapper Program Implementation**
+   - Develop AI integration program launched with Bash startup
+   - Implement terminal output monitoring functionality
+   - Build session management system
+
+2. **Multi-session Support**
+   - Remove current single session limitation
+   - Enable simultaneous multiple terminal execution
+   - Ensure independence between sessions
+
+3. **Non-intrusive AI Integration**
+   - Minimize impact on existing Bash operations
+   - Real-time terminal monitoring
+   - Transparent integration of AI assistance features
+
+### Medium to Long-term Goals
+4. Complete migration from CoffeeScript to TypeScript
+5. Improve test coverage
+6. Performance optimization
+7. Mobile support improvements
+
+### Architecture Improvement Items
+- Fundamental session management overhaul
+- Terminal multiplexing support
+- AI integration efficiency improvements
+- Real-time processing optimization
+
+## Performance Considerations
+- Asynchronous processing (asyncio)
+- WebSocket optimization
+- Static file serving efficiency
+- Terminal rendering optimization
+
+## Debug and Development
+- Use `--debug` flag for debug mode
+- Use `--more` flag for detailed logging
+- Utilize browser developer tools
+- Socket.IO debug functionality

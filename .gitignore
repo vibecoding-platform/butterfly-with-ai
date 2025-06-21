@@ -14,4 +14,8 @@ build/
 frontend/dist/
 src/aetherterm/static/assets/
 src/aetherterm/static/index.html
+src/aetherterm/agentserver/static/assets/
+src/aetherterm/agentserver/static/index.html
 butterfly/themes/
+logs/*.log
+*.log

@@ -57,7 +57,7 @@ dependencies = [
 [project.optional-dependencies]
 themes = ["libsass"]
 lint = ["pytest", "pytest-flake8", "pytest-isort"]
-dev = ["ruff"]
+dev = ["ruff", "pre-commit", "mypy"]
 
 [project.urls]
 Homepage = "https://github.com/paradoxxxzero/aetherterm"
@@ -72,6 +72,7 @@ aetherterm-agentshell = "aetherterm.agentshell.main:main"
 aetherterm-controlserver = "aetherterm.controlserver.main:main"
 aetherterm-shell-monitor = "aetherterm.agentshell.pty_monitor.main:main"
 aetherterm-dummy-ai = "aetherterm.agentshell.pty_monitor.dummy_ai_server:main"
+aetherterm-generate-ssl = "aetherterm.scripts.generate_ssl_certs:main"
 
 [tool.setuptools]
 
@@ -82,7 +83,7 @@ where = ["src"]
 aetherterm = [
     "agentserver/sass/*.sass",
     "agentserver/themes/*.*",
-    "agentserver/themes/*/*.*", 
+    "agentserver/themes/*/*.*",
     "agentserver/themes/*/*/*.*",
     "agentserver/static/fonts/*",
     "agentserver/static/images/favicon.png",
@@ -105,8 +106,40 @@ flake8-ignore = [
 
 [tool.ruff]
 line-length = 100
+target-version = "py39"
+
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"] # エラーコードの選択
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by formatter
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.9"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_unimported = true
 
 [tool.wheel]
 universal = true
@@ -115,4 +148,3 @@ universal = true
 dev = [
     "hypercorn>=0.17.3",
 ]
-
