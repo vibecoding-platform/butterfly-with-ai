@@ -38,6 +38,32 @@ run-controlserver:
 # Legacy alias for backward compatibility
 run-debug: run-agentserver
 
+# Process management with supervisord
+run-supervisor:
+	supervisord -c supervisord.conf
+
+stop-supervisor:
+	supervisorctl -c supervisord.conf shutdown
+
+status-supervisor:
+	supervisorctl -c supervisord.conf status
+
+restart-supervisor:
+	supervisorctl -c supervisord.conf restart all
+
+# Log retrieval using supervisord-mcp
+logs-agentserver:
+	uv run supervisord-mcp logs agentserver
+
+logs-agentserver-stderr:
+	uv run supervisord-mcp logs agentserver --stderr
+
+logs-frontend:
+	uv run supervisord-mcp logs frontend
+
+logs-frontend-stderr:
+	uv run supervisord-mcp logs frontend --stderr
+
 build-frontend:
 	cd frontend && $(NPM) install
 	cd frontend && $(NPM) run build
