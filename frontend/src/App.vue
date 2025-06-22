@@ -5,12 +5,22 @@ import SupervisorControlPanel from './components/SupervisorControlPanel.vue';
 import ChatComponent from './components/ChatComponent.vue';
 import SimpleChatComponent from './components/SimpleChatComponent.vue';
 import TerminalComponent from './components/TerminalComponent.vue';
+import WorkspaceManager from './components/WorkspaceManager.vue';
+import WorkspaceDebugInfo from './components/WorkspaceDebugInfo.vue';
 import DevJWTRegister from './components/DevJWTRegister.vue';
+import SocketTrackingMonitor from './components/SocketTrackingMonitor.vue';
 import { useChatStore } from './stores/chatStore';
 import { enableJWTDevRegister } from './config/environment';
+import { openTelemetryService } from './services/OpenTelemetryService';
 
 const chatStore = useChatStore();
-const activeTab = ref('chat'); // 'supervisor', 'chat', or 'dev-auth'
+
+// Utility function to get current user ID
+const getCurrentUserId = (): string => {
+  // For now, return a default user ID - this would be replaced with actual user management
+  return localStorage.getItem('aetherterm-user-id') || 'anonymous-user';
+};
+const activeTab = ref('chat'); // 'supervisor', 'chat', 'debug', or 'dev-auth'
 const isSupervisorPanelFloating = ref(false);
 const isSupervisorPanelVisible = ref(true);
 
@@ -146,9 +156,50 @@ const togglePanelVisibility = () => {
 };
 
 // 初期化時に保存された設定を読み込み
-onMounted(() => {
+onMounted(async () => {
   loadPanelWidth();
   loadPanelVisibility();
+  
+  // Initialize OpenTelemetry service
+  try {
+    console.log('🔍 Initializing OpenTelemetry...')
+    await openTelemetryService.initialize()
+    console.log('✅ OpenTelemetry initialized successfully')
+    
+    // Set initial context
+    openTelemetryService.updateContext({
+      userId: getCurrentUserId(),
+      componentName: 'App'
+    })
+    
+    // Log application startup
+    openTelemetryService.logInfo('application_startup', {
+      version: process.env.VUE_APP_VERSION || 'unknown',
+      environment: process.env.NODE_ENV || 'unknown',
+      user_agent: navigator.userAgent,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      }
+    })
+    
+    // Create test trace for OpenObserve verification
+    const testSpan = openTelemetryService.createSpan('app_initialization', {
+      'app.version': process.env.VUE_APP_VERSION || '1.0.0',
+      'app.environment': process.env.NODE_ENV || 'development',
+      'test.trace': true
+    })
+    
+    if (testSpan) {
+      testSpan.addEvent('Application started successfully')
+      testSpan.end()
+      console.log('🧪 Test trace sent to OpenObserve')
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize OpenTelemetry:', error)
+    // Don't block app startup if telemetry fails
+  }
 });
 
 onUnmounted(() => {
@@ -169,9 +220,9 @@ watch(chatStore.activeMessages, (newMessages) => {
   <div id="app-container">
     <!-- Main Content Area -->
     <div class="main-content">
-      <!-- Terminal Container (Full Width) -->
-      <div id="terminal-container">
-        <TerminalComponent />
+      <!-- Session Manager Container (Full Width) -->
+      <div id="workspace-container">
+        <WorkspaceManager />
       </div>
     </div>
 
@@ -216,6 +267,19 @@ watch(chatStore.activeMessages, (newMessages) => {
           Supervisor Control
         </button>
         <button
+          :class="{ 'active': activeTab === 'debug' }"
+          @click="activeTab = 'debug'"
+        >
+          Debug Info
+        </button>
+        <button
+          :class="{ 'active': activeTab === 'socket-monitor' }"
+          @click="activeTab = 'socket-monitor'"
+          class="monitor-tab"
+        >
+          🔗 Socket Monitor
+        </button>
+        <button
           v-if="enableJWTDevRegister"
           :class="{ 'active': activeTab === 'dev-auth' }"
           @click="activeTab = 'dev-auth'"
@@ -231,6 +295,12 @@ watch(chatStore.activeMessages, (newMessages) => {
       </div>
       <div v-if="activeTab === 'supervisor'" class="tab-content supervisor-tab">
         <SupervisorControlPanel />
+      </div>
+      <div v-if="activeTab === 'debug'" class="tab-content debug-tab">
+        <WorkspaceDebugInfo />
+      </div>
+      <div v-if="activeTab === 'socket-monitor'" class="tab-content socket-monitor-tab">
+        <SocketTrackingMonitor />
       </div>
       <div v-if="activeTab === 'dev-auth'" class="tab-content dev-auth-tab">
         <DevJWTRegister />
@@ -319,6 +389,26 @@ watch(chatStore.activeMessages, (newMessages) => {
   padding: 0; /* DevJWTRegisterコンポーネントが独自のパディングを持つ */
 }
 
+.tab-content.socket-monitor-tab {
+  /* Socket Monitorタブはカスタムパディング */
+  padding: 0; /* SocketTrackingMonitorコンポーネントが独自のパディングを持つ */
+}
+
+.tab-navigation button.monitor-tab {
+  background-color: #2a2a2a;
+  color: #00d4aa;
+  font-size: 12px;
+}
+
+.tab-navigation button.monitor-tab:hover {
+  background-color: #333;
+}
+
+.tab-navigation button.monitor-tab.active {
+  background-color: #00d4aa;
+  color: white;
+}
+
 html, body, #app {
   height: 100vh;
   margin: 0 !important;
@@ -338,13 +428,16 @@ html, body, #app {
   flex-direction: row; /* Make main-content a flexbox */
   height: 100%; /* Ensure full vertical height */
   min-width: 0;
+  position: relative;
 }
 
-#terminal-container {
-  flex-grow: 1; /* Make terminal-container grow to fill space */
+#workspace-container {
+  flex-grow: 1; /* Make workspace-container grow to fill space */
   overflow: hidden;
   background-color: #1e1e1e;
   transition: width 0.1s ease-out;
+  width: 100%;
+  height: 100%;
 }
 
 #chat-container {
