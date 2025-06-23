@@ -86,12 +86,12 @@ def configure_container(config=None):
         "ai_api_key": os.getenv("ANTHROPIC_API_KEY"),
         "ai_model": "claude-3-5-sonnet-20241022",
     }
-    
+
     # Merge defaults with provided config
     final_config = defaults.copy()
     if config:
         final_config.update(config)
-    
+
     container.config.from_dict(final_config)
 
     container.wire(
@@ -104,12 +104,30 @@ def configure_container(config=None):
 
     # Initialize AI service
     try:
-        ai_service_instance = container.ai_service()
-        set_ai_service(ai_service_instance)
-        logging.getLogger("aetherterm.agentserver.containers").info(f"AI service initialized with provider: {final_config.get('ai_provider', 'unknown')}")
+        # Check if AI dependencies are available
+        from aetherterm.agentserver.ai_services import _AI_AVAILABLE, _MISSING_DEPENDENCIES
+        
+        if not _AI_AVAILABLE or _MISSING_DEPENDENCIES:
+            logging.getLogger("aetherterm.agentserver.containers").info(
+                f"AI dependencies not available: {_MISSING_DEPENDENCIES}. Using NoOp service."
+            )
+            from aetherterm.agentserver.ai_services import NoOpAIService
+            set_ai_service(NoOpAIService())
+        else:
+            ai_service_instance = container.ai_service()
+            set_ai_service(ai_service_instance)
+            logging.getLogger("aetherterm.agentserver.containers").info(
+                f"AI service initialized with provider: {final_config.get('ai_provider', 'unknown')}"
+            )
     except Exception as e:
-        logging.getLogger("aetherterm.agentserver.containers").error(f"Failed to initialize AI service: {e}")
-        # Fallback to mock service
-        from aetherterm.agentserver.ai_services import MockAIService
-        set_ai_service(MockAIService())
+        logging.getLogger("aetherterm.agentserver.containers").error(
+            f"Failed to initialize AI service: {e}"
+        )
+        # Fallback to mock service if AI is available but configuration failed
+        from aetherterm.agentserver.ai_services import _AI_AVAILABLE, NoOpAIService, MockAIService
+        
+        if not _AI_AVAILABLE:
+            set_ai_service(NoOpAIService())
+        else:
+            set_ai_service(MockAIService())
     return container

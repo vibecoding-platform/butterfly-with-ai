@@ -21,16 +21,17 @@ class AetherTermService {
     return AetherTermService.instance
   }
 
+
   connect(): Socket {
     if (!this.socket) {
       this.socket = io(socketUrl || window.location.origin, {
         path: '/socket.io'
       })
 
+
       this.socket.on('connect', () => {
         console.log('AetherTerm Socket.IO connected')
         this.setupVueTermWebSockets()
-
       })
 
       this.socket.on('disconnect', () => {
@@ -113,6 +114,7 @@ class AetherTermService {
   sendCommand(command: string, commandId?: string): void {
     if (this.socket) {
       console.log('Sending command:', command) // Debug log
+      
       this.socket.emit('terminal_command', {
         command: command,
         commandId: commandId || Date.now().toString()

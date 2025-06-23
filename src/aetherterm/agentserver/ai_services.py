@@ -3,6 +3,11 @@ AI Services for AetherTerm Assistant
 
 This module provides AI chat functionality with support for multiple AI providers.
 Currently supports Anthropic Claude with streaming responses.
+
+Note: AI functionality requires optional dependencies. Install with:
+  uv sync --extra ai         # Basic AI functionality
+  uv sync --extra langchain  # LangChain only
+  uv sync --extra ml-full    # Full ML stack
 """
 
 import asyncio
@@ -14,16 +19,32 @@ import logging
 
 log = logging.getLogger(__name__)
 
+# Check for AI dependencies
+_AI_AVAILABLE = True
+_MISSING_DEPENDENCIES = []
+
+try:
+    import anthropic
+except ImportError:
+    _AI_AVAILABLE = False
+    _MISSING_DEPENDENCIES.append("anthropic")
+
+try:
+    import openai
+except ImportError:
+    if "openai" not in _MISSING_DEPENDENCIES:
+        _MISSING_DEPENDENCIES.append("openai")
+
 
 class AIService(ABC):
     """Abstract base class for AI services."""
-    
+
     @abstractmethod
     async def chat_completion(
-        self, 
-        messages: List[Dict[str, str]], 
+        self,
+        messages: List[Dict[str, str]],
         terminal_context: Optional[str] = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncGenerator[str, None]:
         """Generate AI chat completion."""
         pass
@@ -34,19 +55,51 @@ class AIService(ABC):
         pass
 
 
+class NoOpAIService(AIService):
+    """No-operation AI service for when AI dependencies are not available."""
+
+    def __init__(self):
+        log.warning(
+            "🤖 AI functionality disabled - missing dependencies: %s. "
+            "Install with: uv sync --extra ai",
+            ", ".join(_MISSING_DEPENDENCIES) if _MISSING_DEPENDENCIES else "unknown"
+        )
+
+    async def chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        terminal_context: Optional[str] = None,
+        stream: bool = True,
+    ) -> AsyncGenerator[str, None]:
+        """Return a helpful message about missing AI functionality."""
+        message = (
+            "AI functionality is not available. "
+            f"Missing dependencies: {', '.join(_MISSING_DEPENDENCIES)}. "
+            "To enable AI features, install with: uv sync --extra ai"
+        )
+        yield message
+
+    async def is_available(self) -> bool:
+        """Always returns False for NoOp service."""
+        return False
+
+
 class AnthropicService(AIService):
     """Anthropic Claude AI service with streaming support."""
-    
+
     def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20241022"):
         self.api_key = api_key
         self.model = model
         self._client = None
-        
+
     async def _get_client(self):
         """Lazy initialization of Anthropic client."""
         if self._client is None:
             try:
+                if not _AI_AVAILABLE or "anthropic" in _MISSING_DEPENDENCIES:
+                    raise ImportError("Anthropic dependency not available")
                 import anthropic
+
                 self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
                 log.info(f"Initialized Anthropic client with model: {self.model}")
             except ImportError:
@@ -56,37 +109,35 @@ class AnthropicService(AIService):
                 log.error(f"Failed to initialize Anthropic client: {e}")
                 raise
         return self._client
-    
+
     async def is_available(self) -> bool:
         """Check if Anthropic service is available."""
         if not self.api_key:
             log.warning("Anthropic API key not configured")
             return False
-        
+
         try:
             client = await self._get_client()
             # Test with a minimal request
             await client.messages.create(
-                model=self.model,
-                max_tokens=1,
-                messages=[{"role": "user", "content": "test"}]
+                model=self.model, max_tokens=1, messages=[{"role": "user", "content": "test"}]
             )
             return True
         except Exception as e:
             log.error(f"Anthropic service not available: {e}")
             return False
-    
+
     async def chat_completion(
-        self, 
-        messages: List[Dict[str, str]], 
+        self,
+        messages: List[Dict[str, str]],
         terminal_context: Optional[str] = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncGenerator[str, None]:
         """Generate streaming chat completion using Anthropic Claude."""
-        
+
         try:
             client = await self._get_client()
-            
+
             # Build system message with terminal context
             system_content = """You are Aether AI, an intelligent terminal assistant. You help users with:
 - Terminal operations and command-line tasks
@@ -99,40 +150,41 @@ Be concise, helpful, and practical in your responses. When suggesting commands, 
 
             if terminal_context:
                 system_content += f"\n\nCurrent terminal context:\n```\n{terminal_context}\n```"
-            
+
             # Convert messages to Anthropic format
             anthropic_messages = []
             for msg in messages:
                 if msg.get("role") in ["user", "assistant"]:
-                    anthropic_messages.append({
-                        "role": msg["role"],
-                        "content": msg["content"]
-                    })
-            
+                    anthropic_messages.append({"role": msg["role"], "content": msg["content"]})
+
             if stream:
-                log.info(f"Starting streaming chat completion with {len(anthropic_messages)} messages")
-                
+                log.info(
+                    f"Starting streaming chat completion with {len(anthropic_messages)} messages"
+                )
+
                 async with client.messages.stream(
                     model=self.model,
                     max_tokens=4096,
                     system=system_content,
-                    messages=anthropic_messages
+                    messages=anthropic_messages,
                 ) as stream:
                     async for text in stream.text_stream:
                         yield text
-                        
+
             else:
-                log.info(f"Starting non-streaming chat completion with {len(anthropic_messages)} messages")
-                
+                log.info(
+                    f"Starting non-streaming chat completion with {len(anthropic_messages)} messages"
+                )
+
                 response = await client.messages.create(
                     model=self.model,
                     max_tokens=4096,
                     system=system_content,
-                    messages=anthropic_messages
+                    messages=anthropic_messages,
                 )
-                
+
                 yield response.content[0].text
-                
+
         except Exception as e:
             log.error(f"Error in Anthropic chat completion: {e}")
             yield f"Sorry, I encountered an error: {str(e)}"
@@ -140,20 +192,20 @@ Be concise, helpful, and practical in your responses. When suggesting commands, 
 
 class MockAIService(AIService):
     """Mock AI service for testing and development."""
-    
+
     async def is_available(self) -> bool:
         return True
-    
+
     async def chat_completion(
-        self, 
-        messages: List[Dict[str, str]], 
+        self,
+        messages: List[Dict[str, str]],
         terminal_context: Optional[str] = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncGenerator[str, None]:
         """Generate mock responses for testing."""
-        
+
         user_message = messages[-1].get("content", "") if messages else ""
-        
+
         # Generate contextual mock responses
         if "error" in user_message.lower():
             response = "I see you're encountering an error. Let me help you troubleshoot this issue. Could you share more details about when this error occurs?"
@@ -163,7 +215,7 @@ class MockAIService(AIService):
             response = f"I can see you're currently in a directory. Based on your terminal context, you might want to explore the current files with 'ls -la'."
         else:
             response = f"Thanks for your message: '{user_message}'. I'm here to help with terminal operations, troubleshooting, and development tasks. What would you like assistance with?"
-        
+
         if stream:
             # Simulate streaming by yielding word by word
             words = response.split()
@@ -175,24 +227,22 @@ class MockAIService(AIService):
 
 
 def create_ai_service(
-    provider: str = "mock",
-    api_key: Optional[str] = None,
-    model: Optional[str] = None
+    provider: str = "mock", api_key: Optional[str] = None, model: Optional[str] = None
 ) -> AIService:
     """Factory function to create AI service instances."""
-    
+
     if provider == "anthropic":
         api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             log.warning("Anthropic API key not found, falling back to mock service")
             return MockAIService()
-        
+
         model = model or "claude-3-5-sonnet-20241022"
         return AnthropicService(api_key=api_key, model=model)
-    
+
     elif provider == "mock":
         return MockAIService()
-    
+
     else:
         log.warning(f"Unknown AI provider: {provider}, falling back to mock service")
         return MockAIService()
@@ -206,8 +256,13 @@ def get_ai_service() -> AIService:
     """Get the current AI service instance."""
     global _ai_service
     if _ai_service is None:
-        # Fallback to mock service if none configured
-        _ai_service = MockAIService()
+        # Check if AI dependencies are available
+        if not _AI_AVAILABLE or _MISSING_DEPENDENCIES:
+            log.info("🤖 AI dependencies not available, using NoOp service")
+            _ai_service = NoOpAIService()
+        else:
+            # Fallback to mock service if AI is available but none configured
+            _ai_service = MockAIService()
     return _ai_service
 
 

@@ -100,9 +100,11 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   const eventCallbacks = ref<{
     onShellOutput: ((data: string) => void)[]
     onChatMessage: ((data: any) => void)[]
+    onBufferRestore: ((data: string, metadata: any) => void)[]
   }>({
     onShellOutput: [],
-    onChatMessage: []
+    onChatMessage: [],
+    onBufferRestore: []
   })
 
   // Getters
@@ -257,12 +259,8 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
       addToOutput('[SYSTEM] Connected to AetherTerm service')
 
-      // Create terminal session after connection
-      socketInstance.emit('create_terminal', {
-        session: session.value.id || '',
-        user: '',
-        path: ''
-      });
+      // NOTE: Do NOT immediately create terminal here
+      // Terminal creation should be handled by session management after workspace restoration
     })
 
     socketInstance.on('disconnect', (reason: string) => {
@@ -306,6 +304,19 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       if (data && data.data) {
         // Pass directly to xterm callbacks without adding to buffer
         eventCallbacks.value.onShellOutput.forEach(callback => callback(data.data))
+      }
+    });
+
+    socketInstance.on('terminal_buffer_restore', (data: any) => {
+      console.log('🔄 Received terminal_buffer_restore:', data);
+      if (data && data.data) {
+        console.log(`📜 Restoring ${data.buffer_size} characters of terminal history`);
+        // Pass restored buffer to xterm with a flag indicating it's restored content
+        eventCallbacks.value.onBufferRestore.forEach(callback => callback(data.data, {
+          buffer_size: data.buffer_size,
+          restore_timestamp: data.restore_timestamp,
+          session: data.session
+        }))
       }
     });
 
@@ -394,6 +405,10 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     eventCallbacks.value.onChatMessage.push(callback)
   }
 
+  const onBufferRestore = (callback: (data: string, metadata: any) => void) => {
+    eventCallbacks.value.onBufferRestore.push(callback)
+  }
+
 
 
 
@@ -419,6 +434,17 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       }
     } else {
       eventCallbacks.value.onChatMessage = []
+    }
+  }
+
+  const offBufferRestore = (callback?: (data: string, metadata: any) => void) => {
+    if (callback) {
+      const index = eventCallbacks.value.onBufferRestore.indexOf(callback)
+      if (index !== -1) {
+        eventCallbacks.value.onBufferRestore.splice(index, 1)
+      }
+    } else {
+      eventCallbacks.value.onBufferRestore = []
     }
   }
 
@@ -614,10 +640,12 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     // Event Registration
     onShellOutput,
     onChatMessage,
+    onBufferRestore,
 
     // Event Cleanup
     offShellOutput,
     offChatMessage,
+    offBufferRestore,
 
     // Terminal Actions
     initializeSession,

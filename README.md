@@ -19,12 +19,55 @@ AetherTerm is a xterm compatible terminal that runs in your browser.
 - **MOTD (Message of the Day)** - Customizable welcome message with connection info and branding!
 - Cross-browser compatibility!
 
-## Try it
+## Installation Options
+
+AetherTerm offers flexible installation options based on your needs:
+
+### Core Installation (Lightweight)
+```bash
+# Basic terminal functionality only (~50MB)
+uv sync
+# or
+pip install aetherterm
+```
+
+### AI-Enhanced Installation (Recommended)
+```bash
+# Full AI chat and LangChain support (~500MB)
+uv sync --extra ai
+# or
+pip install aetherterm[ai]
+```
+
+### Minimal AI Installation
+```bash
+# LangChain and AI providers only (~100MB)
+uv sync --extra langchain
+# or
+pip install aetherterm[langchain]
+```
+
+### Complete Installation
+```bash
+# All features including ML/AI (~2GB)
+uv sync --extra all
+# or
+pip install aetherterm[all]
+```
+
+### Development Installation
+```bash
+# For development with all tools
+uv sync --extra dev
+# or
+pip install aetherterm[dev]
+```
+
+See [Optional Dependencies Guide](docs/OPTIONAL_DEPENDENCIES.md) for detailed information.
+
+## Quick Start
 
 ```bash
-$ pip install aetherterm
-$ pip install aetherterm[themes]  # If you want to use themes
-$ pip install aetherterm[systemd]  # If you want to use systemd
 $ aetherterm
 ```
 

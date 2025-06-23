@@ -27,7 +27,7 @@ import sys  # Import sys
 import termios
 from logging import getLogger
 
-from aetherterm import utils
+from aetherterm.agentserver import utils
 
 from .base_terminal import BaseTerminal
 
@@ -103,6 +103,9 @@ class AsyncioTerminal(BaseTerminal):
 
     async def start_pty(self):
         """Start the PTY process using asyncio."""
+        print(f"[DEBUG] Starting PTY for session {self.session}", flush=True)
+        log.info(f"Starting PTY for session {self.session}")
+
         # Make a "unique" id in 4 bytes
         self.uid = "".join(
             random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits)
@@ -141,6 +144,7 @@ class AsyncioTerminal(BaseTerminal):
                     pass
 
                 # Set up environment and execute shell
+                print(f"[DEBUG] Child process executing: {shell_cmd}", flush=True)
                 os.execvpe(shell_cmd[0], shell_cmd, env)
             else:
                 # Parent process
@@ -152,12 +156,14 @@ class AsyncioTerminal(BaseTerminal):
 
                 # Start reading from PTY
                 self.reader_task = asyncio.create_task(self._read_from_pty())
-                
+
                 # Send MOTD for new sessions after a delay to allow shell initialization
                 if len(self.client_sids) == 1:  # This is the first client for this session
                     asyncio.create_task(self._delayed_motd_send())
 
-                log.info(f"PTY started with PID {pid}")
+                log.info(f"PTY started with PID {pid}, shell: {shell_cmd}")
+                log.debug(f"Parent process: PTY started with PID {pid}, fd={master_fd}")
+                log.debug(f"Starting PTY reader task")
 
         except Exception as e:
             log.error(f"Failed to start PTY: {e}")
@@ -241,6 +247,7 @@ class AsyncioTerminal(BaseTerminal):
 
     async def _read_from_pty(self):
         """Continuously read from PTY and send to clients."""
+        log.info(f"PTY reader task started for session {self.session}, fd={self.fd}")
         try:
             while not self.closed:
                 try:
@@ -265,12 +272,18 @@ class AsyncioTerminal(BaseTerminal):
                         # Decode and send to clients
                         try:
                             text = data.decode("utf-8", "replace")
+                            log.info(f"PTY output received ({len(data)} bytes): {repr(text)}")
                             self.send(text)
                         except Exception as e:
                             log.error(f"Error decoding PTY data: {e}")
+                    else:
+                        # No data available, sleep to prevent busy waiting
+                        await asyncio.sleep(0.05)
+                        log.debug(f"No PTY data available, continuing read loop")
 
                 except asyncio.TimeoutError:
-                    # No data available, continue
+                    # No data available, sleep to prevent busy waiting
+                    await asyncio.sleep(0.05)
                     continue
                 except Exception as e:
                     log.error(f"Error reading from PTY: {e}")
@@ -291,17 +304,43 @@ class AsyncioTerminal(BaseTerminal):
     async def write(self, message):
         """Write message to PTY."""
         if self.closed or not self.fd:
+            log.debug(f"Write failed: closed={self.closed}, fd={self.fd}")
             return
 
-        try:
-            log.debug("WRIT<%r" % message)
-            # Write to PTY
-            await asyncio.get_event_loop().run_in_executor(
-                None, os.write, self.fd, message.encode("utf-8")
-            )
-        except Exception as e:
-            log.error(f"Error writing to PTY: {e}")
-            await self.close()
+        data = message.encode("utf-8")
+        max_retries = 3
+        retry_delay = 0.01  # 10ms
+
+        for attempt in range(max_retries):
+            try:
+                log.info(f"Writing to PTY fd={self.fd}: {repr(message)}")
+                # Write to PTY
+                await asyncio.get_event_loop().run_in_executor(None, os.write, self.fd, data)
+                log.info("PTY write successful")
+                return  # Success, exit retry loop
+
+            except OSError as e:
+                if e.errno == 11:  # EAGAIN/EWOULDBLOCK - resource temporarily unavailable
+                    if attempt < max_retries - 1:
+                        log.debug(
+                            f"PTY write buffer full, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})"
+                        )
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        log.warning(f"PTY write failed after {max_retries} attempts: {e}")
+                        # Don't close terminal for buffer full errors, just drop the data
+                        return
+                else:
+                    # Other OS errors (broken pipe, etc.) - terminal is probably dead
+                    log.error(f"PTY write error: {e}")
+                    await self.close()
+                    return
+            except Exception as e:
+                log.error(f"Unexpected error writing to PTY: {e}")
+                await self.close()
+                return
 
     async def resize(self, cols, rows):
         """Resize the PTY."""
@@ -335,8 +374,11 @@ class AsyncioTerminal(BaseTerminal):
         if self.fd is not None:
             try:
                 os.close(self.fd)
+                log.debug(f"Closed PTY file descriptor {self.fd}")
             except Exception as e:
-                log.debug(f"Error closing PTY fd: {e}")
+                log.debug(f"Error closing PTY fd {self.fd}: {e}")
+            finally:
+                self.fd = None
 
         # Terminate process
         if hasattr(self, "pid"):

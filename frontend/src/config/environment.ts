@@ -9,6 +9,7 @@ export interface EnvironmentConfig {
   enableJWTDevRegister: boolean;
   apiBaseUrl: string;
   socketUrl: string;
+  socketTrackingEnabled: boolean;
 }
 
 // Detect development environment
@@ -25,7 +26,8 @@ export const environment: EnvironmentConfig = {
   enableDevTools: isDev,
   enableJWTDevRegister: isDev, // Only enable JWT dev registration in development
   apiBaseUrl: isDev ? 'http://localhost:57575' : '',
-  socketUrl: isDev ? 'http://localhost:57575' : ''
+  socketUrl: isDev ? 'http://localhost:57575' : '',
+  socketTrackingEnabled: import.meta.env.VITE_SOCKET_TRACKING_ENABLED === 'true' || isDev
 };
 
 // Export individual flags for convenience
@@ -35,7 +37,8 @@ export const {
   enableDevTools,
   enableJWTDevRegister,
   apiBaseUrl,
-  socketUrl
+  socketUrl,
+  socketTrackingEnabled
 } = environment;
 
 // Debug logging in development

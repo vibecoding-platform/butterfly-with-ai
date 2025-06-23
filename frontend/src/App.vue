@@ -160,13 +160,9 @@ onMounted(async () => {
   loadPanelWidth();
   loadPanelVisibility();
   
-  // Initialize OpenTelemetry service
+  // Update OpenTelemetry context (initialization already done in main.ts)
   try {
-    console.log('🔍 Initializing OpenTelemetry...')
-    await openTelemetryService.initialize()
-    console.log('✅ OpenTelemetry initialized successfully')
-    
-    // Set initial context
+    // Set App component context
     openTelemetryService.updateContext({
       userId: getCurrentUserId(),
       componentName: 'App'
@@ -183,7 +179,7 @@ onMounted(async () => {
       }
     })
     
-    // Create test trace for OpenObserve verification
+    // Create test trace for telemetry verification
     const testSpan = openTelemetryService.createSpan('app_initialization', {
       'app.version': process.env.VUE_APP_VERSION || '1.0.0',
       'app.environment': process.env.NODE_ENV || 'development',
@@ -193,11 +189,11 @@ onMounted(async () => {
     if (testSpan) {
       testSpan.addEvent('Application started successfully')
       testSpan.end()
-      console.log('🧪 Test trace sent to OpenObserve')
+      console.log('🧪 Test trace sent to telemetry system')
     }
     
   } catch (error) {
-    console.error('❌ Failed to initialize OpenTelemetry:', error)
+    console.error('❌ Failed to update OpenTelemetry context:', error)
     // Don't block app startup if telemetry fails
   }
 });

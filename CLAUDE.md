@@ -92,6 +92,37 @@ Built with Python (FastAPI/Socket.IO) backend and Vue.js 3 + TypeScript frontend
 - **📁 Data Persistence**: Session storage, configuration management, audit trails
 - **🔄 Integration APIs**: REST endpoints, WebSocket events, plugin interfaces
 
+## Critical Development Guidelines
+
+### ⚠️ Workspace同期・再現フロー
+
+**重要**: AetherTermのWorkspace（セッション・タブ・ペーン構成）は特定の順序で同期・再現する必要があります。
+
+**Workspace概念**:
+- **Workspace**: ユーザーの作業環境全体
+- **Session**: 独立した作業セッション（プロジェクト単位）  
+- **Tab**: セッション内のタブ（ターミナル、AIアシスタント等）
+- **Pane**: タブ内の分割されたペーン（複数ターミナル表示）
+
+**正しい同期フロー**:
+1. Socket接続 → 2. Workspace状態同期 → 3. Session/Tab/Pane復元 → 4. Terminal接続復元 → 5. 必要時のみ新規作成
+
+**❌ 絶対に避けるべき**:
+- Socket接続後の即座Terminal作成
+- Workspace同期前のSession作成
+- 既存状態を無視した新規Workspace作成
+
+**📖 詳細**: [Workspace Initialization Flow](./docs/developers/WORKSPACE_INITIALIZATION.md)
+
+### Socket.IO Communication Tracing
+
+**プロジェクト固有のSocket.IO通信トラッキングシステム**:
+- Request-Response correlation tracking
+- OpenObserve Cloud統合
+- リアルタイム監視ダッシュボード
+
+**📖 詳細**: [Socket.IO Tracing Implementation](./docs/developers/SOCKET_IO_TRACING.md)
+
 ## Development Commands
 
 ### Initial Setup
@@ -473,3 +504,75 @@ make lint
 - Use `--more` flag for detailed logging
 - Utilize browser developer tools
 - Socket.IO debug functionality
+
+## Documentation Organization
+
+### Directory Structure
+```
+docs/
+├── README.md                    # Documentation overview
+├── users/                      # エンドユーザー向けドキュメント
+│   ├── business/               # ビジネスユーザー向け
+│   ├── tech/                   # 技術ユーザー向け
+│   └── operations/             # 運用担当者向け
+├── platform/                   # AetherPlatform内部開発者向け
+│   ├── architecture/           # アーキテクチャ設計
+│   ├── COMPONENT_FUNCTIONS.md  # コンポーネント機能
+│   ├── SYSTEM_CAPABILITIES.md  # システム機能
+│   ├── DEVELOPMENT_ROADMAP.md  # 開発ロードマップ
+│   └── tech/                   # 技術詳細
+└── workspace/                  # このWorkspace・作業環境
+    ├── work/                   # 現在の作業
+    │   ├── TERMINAL_CONNECTION_DEBUG_STATUS.md
+    │   └── CURRENT_SESSION_DESIGN.md
+    ├── archive/                # 完了した作業
+    │   ├── work-sessions/      # 作業セッション記録
+    │   └── phases/             # 完了した開発フェーズ
+    └── RESTART_INSTRUCTIONS.md # 作業再開用指示
+```
+
+### Documentation Rules
+
+#### 1. **Placement Guidelines**
+- **Root level**: Keep only essential project files (`README.md`, `CLAUDE.md`, `CHANGELOG.md`, `STARTUP.md`)
+- **docs/users/**: エンドユーザー向けドキュメント (business/tech/operations)
+- **docs/platform/**: AetherPlatform内部開発者向けドキュメント (アーキテクチャ、開発ガイド)
+- **docs/workspace/**: このWorkspace・作業環境固有のドキュメント (作業記録、デバッグ)
+
+#### 2. **Naming Conventions**
+- Use descriptive names with context (e.g., `TERMINAL_CONNECTION_DEBUG_STATUS.md`)
+- Include date in work session records (e.g., `WORK_SESSION_2025-06-17.md`)
+- Use ALL_CAPS for documentation titles for consistency
+
+#### 3. **Lifecycle Management**
+- **Active work** → `docs/workspace/work/`
+- **Completed work** → `docs/workspace/archive/work-sessions/`
+- **Platform design documents** → `docs/platform/architecture/`
+- **User documentation** → `docs/users/` (business/tech/operations)
+- **Work restart instructions** → `docs/workspace/RESTART_INSTRUCTIONS.md`
+
+#### 4. **Archive Policy**
+- Move completed work sessions to `docs/archive/work-sessions/`
+- Move completed development phases to `docs/archive/phases/`
+- Remove temporary files and outdated implementation guides
+- Keep design documents for historical reference
+
+#### 5. **Current Work Documentation**
+For ongoing debugging or development work:
+- Create detailed status documents in `docs/workspace/work/`
+- Include problem description, technical details, and next steps
+- Update regularly with progress and findings
+- Move to archive when work is completed
+
+#### 6. **Work Restart Instructions**
+For resuming work in new Claude sessions:
+- **Primary reference**: `docs/workspace/RESTART_INSTRUCTIONS.md`
+- Contains complete context and step-by-step restart commands
+- Updated with latest work status and next steps
+
+**Quick restart command for new Claude sessions:**
+```
+AetherTermプロジェクトのターミナル接続問題の調査を再開してください。
+
+まず「docs/workspace/RESTART_INSTRUCTIONS.md」を読んで、完全なコンテキストと指示を取得してください。
+```

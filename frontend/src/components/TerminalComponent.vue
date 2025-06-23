@@ -169,6 +169,25 @@ onMounted(async () => {
       terminal.value?.write(data);
     });
 
+    // Handle buffer restoration for reconnections
+    terminalStore.onBufferRestore((data: string, metadata: any) => {
+      console.log('🔄 Restoring terminal buffer:', {
+        size: metadata.buffer_size,
+        session: metadata.session,
+        timestamp: metadata.restore_timestamp
+      });
+      
+      if (terminal.value && data) {
+        // Clear terminal first to avoid duplicate content
+        terminal.value.clear();
+        
+        // Write the restored buffer content
+        terminal.value.write(data);
+        
+        console.log(`✅ Successfully restored ${metadata.buffer_size} characters of terminal history`);
+      }
+    });
+
     terminal.value.onKey(e => {
       const ev = e.domEvent;
 
@@ -204,6 +223,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   terminalStore.offShellOutput();
+  terminalStore.offBufferRestore();
   terminal.value?.dispose();
   window.removeEventListener('resize', () => {
     fitAddon.value?.fit();

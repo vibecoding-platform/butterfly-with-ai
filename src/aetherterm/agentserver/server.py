@@ -383,35 +383,8 @@ async def start_server(**kwargs):
 
     log.info("Starting server")
 
-    # Get the ASGI application from the container
-    app = container.app()
-    sio = container.sio()
-
-    # Set the socket.io instance in handlers module
-    socket_handlers.set_sio_instance(sio)
-
-    # Register Socket.IO event handlers
-    sio.on("connect", socket_handlers.connect)
-    sio.on("disconnect", socket_handlers.disconnect)
-    sio.on("create_terminal", socket_handlers.create_terminal)
-    sio.on("terminal_input", socket_handlers.terminal_input)
-    sio.on("terminal_resize", socket_handlers.terminal_resize)
-    
-    # Register AI-related event handlers
-    sio.on("ai_chat_message", socket_handlers.ai_chat_message)
-    sio.on("ai_terminal_analysis", socket_handlers.ai_terminal_analysis)
-    sio.on("ai_get_info", socket_handlers.ai_get_info)
-
-    # Register Wrapper session sync handlers
-    sio.on("wrapper_session_sync", socket_handlers.wrapper_session_sync)
-    sio.on("get_wrapper_sessions", socket_handlers.get_wrapper_sessions)
-
-    # Register Block/Unblock handlers
-    sio.on("unblock_request", socket_handlers.unblock_request)
-    sio.on("get_block_status", socket_handlers.get_block_status)
-
-    # Mount the FastAPI router onto the main ASGI app
-    app.other_asgi_app.include_router(router, prefix=uri_root_path)
+    # Use setup_app to get properly configured ASGI app
+    app = setup_app(**kwargs)
 
     # Start the Uvicorn server
     log_level_name = logging.getLevelName(log_level).lower()
@@ -440,11 +413,16 @@ async def start_server(**kwargs):
 
 # Factory functions for ASGI servers (uvicorn/hypercorn compatibility)
 
+
 def create_app(**kwargs):
     """Create the AetherTerm AgentServer ASGI application with dependency injection."""
     import socketio
     from fastapi import FastAPI
     from fastapi.staticfiles import StaticFiles
+
+    # Initialize OpenTelemetry early
+    from aetherterm.agentserver.telemetry.config import configure_telemetry
+    telemetry_config = configure_telemetry()
 
     # Default configuration values
     default_config = {
@@ -477,20 +455,34 @@ def create_app(**kwargs):
 
     # Configure the dependency injection container
     from aetherterm.agentserver.containers import configure_container
+
     container = configure_container(config)
 
     # Create FastAPI application
     fastapi_app = FastAPI()
+    
+    # Instrument FastAPI with OpenTelemetry if enabled
+    if telemetry_config.enabled:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        FastAPIInstrumentor.instrument_app(fastapi_app)
+    
     static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
     if os.path.exists(static_path):
         fastapi_app.mount("/static", StaticFiles(directory=static_path), name="static")
 
     # Include router
     from aetherterm.agentserver.routes import router
+
     fastapi_app.include_router(router)
 
     # Create Socket.IO server
     sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+    
+    # Instrument Socket.IO with OpenTelemetry if enabled
+    if telemetry_config.enabled:
+        from aetherterm.agentserver.telemetry.socket_instrumentation import get_socketio_instrumentation
+        socketio_instrumentation = get_socketio_instrumentation()
+        socketio_instrumentation.instrument_emit(sio)
 
     # Create combined ASGI application
     uri_root_path = config.get("uri_root_path", "")
@@ -505,32 +497,71 @@ def create_app(**kwargs):
 
 def setup_app(**kwargs):
     """Setup the application and prepare it for running."""
-    # Handle certificate generation first
-    prepare_ssl_certs(**kwargs)
-
     # Create and return the ASGI app
     asgi_app, sio, container, config = create_app(**kwargs)
 
     # Set the socket.io instance in handlers module
     from aetherterm.agentserver import socket_handlers
+
     socket_handlers.set_sio_instance(sio)
 
-    # Register Socket.IO event handlers
+    # Register core Socket.IO event handlers
     sio.on("connect", socket_handlers.connect)
     sio.on("disconnect", socket_handlers.disconnect)
-    sio.on("create_terminal", socket_handlers.create_terminal)
-    sio.on("terminal_input", socket_handlers.terminal_input)
-    sio.on("terminal_resize", socket_handlers.terminal_resize)
-    
-    # Register AI-specific handlers
-    sio.on("wrapper_session_sync", socket_handlers.wrapper_session_sync)
-    sio.on("get_wrapper_sessions", socket_handlers.get_wrapper_sessions)
-    sio.on("unblock_request", socket_handlers.unblock_request)
-    sio.on("get_block_status", socket_handlers.get_block_status)
+
+    # Register workspace management handlers (simplified)
+    sio.on("workspace:initialize", socket_handlers.workspace_initialize)
+    sio.on("workspace:sync:request", socket_handlers.workspace_sync_request)
+
+    # Register tab management handlers
+    sio.on("workspace:tab:create", socket_handlers.workspace_tab_create)
+    sio.on("workspace:tab:close", socket_handlers.workspace_tab_close)
+
+    # Setup dynamic event handling for hierarchical events
+    original_trigger_event = sio._trigger_event
+
+    async def enhanced_trigger_event(event, namespace, sid, data):
+        """Enhanced trigger_event that handles hierarchical terminal events"""
+        print(
+            f"[ENHANCED TRIGGER] Event received: {event}, namespace: {namespace}, sid: {sid}, data: {data}",
+            flush=True,
+        )
+        log.info(f"🔀 Enhanced trigger event: {event}, namespace: {namespace}, sid: {sid}")
+
+        # Check if this is a hierarchical terminal event that we should handle
+        if event.startswith("workspace:tab:") and ":pane:" in event and ":terminal:" in event:
+            print(f"[ENHANCED TRIGGER] Handling hierarchical terminal event: {event}", flush=True)
+            log.info(f"🎯 Handling hierarchical terminal event: {event}")
+            # Handle hierarchical terminal events
+            await socket_handlers.handle_dynamic_terminal_event(sid, event, data)
+            return True  # Event was handled
+        else:
+            print(f"[ENHANCED TRIGGER] Passing to original handler: {event}", flush=True)
+            log.debug(f"➡️ Passing to original handler: {event}")
+            # Let the original handler process the event
+            return await original_trigger_event(event, namespace, sid, data)
+
+    # Replace the trigger_event method
+    sio._trigger_event = enhanced_trigger_event
 
     # Set up auto-blocker integration
     from aetherterm.agentserver.auto_blocker import set_socket_io_instance
+
     set_socket_io_instance(sio)
+
+    # Set up workspace callbacks
+    socket_handlers.setup_workspace_callbacks()
+
+    # Initialize terminal configuration
+    try:
+        from aetherterm.agentserver.config.terminal_config import (
+            set_default_terminal_type_from_config,
+        )
+
+        set_default_terminal_type_from_config()
+        log.info("Terminal configuration initialized")
+    except Exception as e:
+        log.warning(f"Failed to initialize terminal configuration: {e}")
 
     log.info("AetherTerm AgentServer application setup complete")
 
@@ -558,7 +589,9 @@ def create_asgi_app():
     config["login"] = os.getenv("AETHERTERM_LOGIN", "").lower() in ("true", "1", "yes")
     config["pam_profile"] = os.getenv("AETHERTERM_PAM_PROFILE", "")
     config["ai_mode"] = os.getenv("AETHERTERM_AI_MODE", "streaming")
-    config["ai_provider"] = os.getenv("AETHERTERM_AI_PROVIDER", "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock")
+    config["ai_provider"] = os.getenv(
+        "AETHERTERM_AI_PROVIDER", "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock"
+    )
     config["ai_api_key"] = os.getenv("ANTHROPIC_API_KEY")
     config["ai_model"] = os.getenv("AETHERTERM_AI_MODEL", "claude-3-5-sonnet-20241022")
 

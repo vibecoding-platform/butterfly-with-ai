@@ -1,3 +1,5 @@
+.venv/
+.venv_minimal/
 *.crt
 *.key
 *.p12
@@ -18,4 +20,5 @@ src/aetherterm/agentserver/static/assets/
 src/aetherterm/agentserver/static/index.html
 butterfly/themes/
 logs/*.log
+run/
 *.log

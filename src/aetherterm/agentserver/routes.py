@@ -240,3 +240,70 @@ async def local_js():
                 log.warning(f"Could not read {file_path}: {e}")
 
     return Response(content=js_content, media_type="application/javascript")
+
+
+@router.get("/api/terminal/status")
+async def terminal_status():
+    """Get terminal configuration and status information."""
+    try:
+        from aetherterm.agentserver.config.terminal_config import get_terminal_status
+
+        return JSONResponse(get_terminal_status())
+    except Exception as e:
+        log.error(f"Error getting terminal status: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/api/terminal/config")
+async def set_terminal_config(request: Request):
+    """Set terminal configuration."""
+    try:
+        from aetherterm.agentserver.config.terminal_config import get_terminal_config
+        from aetherterm.agentserver.terminals.terminal_factory import (
+            get_terminal_factory,
+            TerminalType,
+        )
+
+        data = await request.json()
+        terminal_type_str = data.get("default_type")
+
+        if not terminal_type_str:
+            return JSONResponse({"error": "default_type is required"}, status_code=400)
+
+        # Validate terminal type
+        try:
+            terminal_type = TerminalType(terminal_type_str)
+        except ValueError:
+            available_types = [t.value for t in TerminalType]
+            return JSONResponse(
+                {"error": f"Invalid terminal type. Available types: {available_types}"},
+                status_code=400,
+            )
+
+        # Update configuration
+        config = get_terminal_config()
+        if not config.is_type_available(terminal_type):
+            return JSONResponse(
+                {"error": f"Terminal type '{terminal_type.value}' is not available"},
+                status_code=400,
+            )
+
+        config.set_default_type(terminal_type)
+
+        # Update factory
+        factory = get_terminal_factory()
+        factory.set_default_type(terminal_type)
+
+        log.info(f"Terminal configuration updated to use {terminal_type.value} by default")
+
+        return JSONResponse(
+            {
+                "success": True,
+                "default_type": terminal_type.value,
+                "message": f"Default terminal type set to {terminal_type.value}",
+            }
+        )
+
+    except Exception as e:
+        log.error(f"Error setting terminal config: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)

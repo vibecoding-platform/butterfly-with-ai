@@ -21,7 +21,9 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       'stream': 'stream-browserify',
-      'buffer': 'buffer'
+      'buffer': 'buffer',
+      'events': 'events',
+      'util': 'util'
     },
   },
   build: {
@@ -34,6 +36,8 @@ export default defineConfig({
     }
   },
   server: {
+    port: 5173,
+    strictPort: true,
     watch: {
       usePolling: true
     }

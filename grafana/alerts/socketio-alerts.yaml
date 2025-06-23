@@ -1,0 +1,110 @@
+# OpenObserve Alert Configuration for AetherTerm Socket.IO Monitoring
+# Import this into your OpenObserve instance
+
+alerts:
+  - name: "High Socket.IO Error Rate"
+    description: "Socket.IO error rate is above threshold"
+    condition:
+      query: "sum(rate(socketio_errors_total[5m])) / sum(rate(socketio_requests_total[5m])) * 100 > 5"
+      evaluation_interval: "1m"
+      for: "2m"
+    severity: "warning"
+    labels:
+      service: "aetherterm"
+      component: "socketio"
+    annotations:
+      summary: "High error rate detected in Socket.IO operations"
+      description: "Socket.IO error rate is {{ $value }}% over the last 5 minutes"
+
+  - name: "Socket.IO High Response Time"
+    description: "Socket.IO response time is too high"
+    condition:
+      query: "histogram_quantile(0.95, rate(socketio_duration_bucket[5m])) > 2000"
+      evaluation_interval: "1m"
+      for: "3m"
+    severity: "warning"
+    labels:
+      service: "aetherterm"
+      component: "socketio"
+    annotations:
+      summary: "High response time detected in Socket.IO operations"
+      description: "95th percentile response time is {{ $value }}ms"
+
+  - name: "Frontend-Backend Trace Correlation Issues"
+    description: "Traces are not being properly correlated between frontend and backend"
+    condition:
+      query: "rate(socketio_correlation_failures_total[10m]) > 0.1"
+      evaluation_interval: "2m"
+      for: "5m"
+    severity: "critical"
+    labels:
+      service: "aetherterm"
+      component: "tracing"
+    annotations:
+      summary: "Trace correlation issues detected"
+      description: "Frontend-backend trace correlation failure rate: {{ $value }}/min"
+
+  - name: "High Number of Pending Requests"
+    description: "Too many Socket.IO requests are pending"
+    condition:
+      query: "socketio_pending_requests > 100"
+      evaluation_interval: "30s"
+      for: "2m"
+    severity: "warning"
+    labels:
+      service: "aetherterm"
+      component: "socketio"
+    annotations:
+      summary: "High number of pending Socket.IO requests"
+      description: "{{ $value }} requests are currently pending"
+
+  - name: "Socket.IO Service Down"
+    description: "Socket.IO service appears to be down"
+    condition:
+      query: "up{service_name=\"aetherterm-backend\"} == 0"
+      evaluation_interval: "30s"
+      for: "1m"
+    severity: "critical"
+    labels:
+      service: "aetherterm"
+      component: "socketio"
+    annotations:
+      summary: "AetherTerm backend service is down"
+      description: "The AetherTerm backend service has been down for more than 1 minute"
+
+  - name: "Terminal Creation Failures"
+    description: "Terminal creation operations are failing"
+    condition:
+      query: "rate(socketio_terminal_creation_failures_total[5m]) > 0.01"
+      evaluation_interval: "1m"
+      for: "3m"
+    severity: "warning"
+    labels:
+      service: "aetherterm"
+      component: "terminal"
+    annotations:
+      summary: "Terminal creation failures detected"
+      description: "Terminal creation failure rate: {{ $value }}/sec"
+
+notification_channels:
+  - name: "slack-aetherterm"
+    type: "slack"
+    settings:
+      url: "${SLACK_WEBHOOK_URL}"
+      channel: "#aetherterm-alerts"
+      title: "AetherTerm Alert"
+      text: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}"
+
+  - name: "email-devteam"
+    type: "email"
+    settings:
+      addresses: ["devteam@example.com"]
+      subject: "AetherTerm Alert: {{ .GroupLabels.service }}"
+
+notification_policies:
+  - match:
+      service: "aetherterm"
+    receiver: "slack-aetherterm"
+    group_wait: "10s"
+    group_interval: "10s"
+    repeat_interval: "1h"
