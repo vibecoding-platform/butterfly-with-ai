@@ -8,7 +8,7 @@ import sys
 
 import click
 
-from aetherterm.agentserver.server import prepare_ssl_certs
+from aetherterm.agentserver.utils.ssl_certs import prepare_ssl_certs
 
 # Configure logging for the launcher script
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
