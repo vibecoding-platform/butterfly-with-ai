@@ -1948,6 +1948,51 @@ async def workspace_tab_create(sid, data):
 
         await sio_instance.emit("workspace:tab:created", response_data, room=sid)
 
+        # Auto-create terminal for terminal tabs
+        if tab_type == "terminal" and tab_object["panes"]:
+            pane_id = tab_object["panes"][0]["id"]
+            terminal_id = f"term-{uuid.uuid4().hex[:11]}"
+            
+            log.info(f"🖥️ Auto-creating terminal {terminal_id} for tab {tab_id}")
+            
+            try:
+                # Create terminal using the terminal factory
+                from aetherterm.agentserver.terminals.terminal_factory import get_terminal_factory, TerminalType
+                
+                factory = get_terminal_factory()
+                output_callback = await create_terminal_output_callback(terminal_id)
+                
+                # Create terminal with simplified parameters
+                terminal = await factory.create_terminal(
+                    terminal_id=terminal_id,
+                    socket_id=sid,
+                    terminal_type=TerminalType.PTY,
+                    output_callback=output_callback,
+                    rows=24,
+                    cols=80
+                )
+                
+                if terminal:
+                    # Update tab object with terminal ID
+                    tab_object["panes"][0]["terminalId"] = terminal_id
+                    
+                    # Notify client that terminal was created
+                    terminal_created_data = {
+                        "tabId": tab_id,
+                        "paneId": pane_id,
+                        "terminalId": terminal_id,
+                        "success": True
+                    }
+                    
+                    await sio_instance.emit("terminal:created", terminal_created_data, room=sid)
+                    
+                    log.info(f"✅ Auto-created terminal {terminal_id} for tab {tab_id}")
+                else:
+                    log.error(f"❌ Failed to auto-create terminal for tab {tab_id}")
+                    
+            except Exception as terminal_error:
+                log.error(f"❌ Error auto-creating terminal: {terminal_error}", exc_info=True)
+
         # Track successful response
         track_socket_response(request_id, "workspace:tab:created", success=True)
 
