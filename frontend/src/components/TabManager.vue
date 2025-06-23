@@ -131,6 +131,7 @@ import { useSessionStore } from '@/stores/sessionStore'
 import TerminalPaneManager from './TerminalPaneManager.vue'
 import AIAssistantComponent from './AIAssistantComponent.vue'
 import type { Session, Tab, TerminalTab, AIAssistantTab, TabType } from '@/types/session'
+import { getWorkspaceService } from '@/services/workspace/WorkspaceSocketService'
 
 interface Props {
   session: Session
@@ -138,6 +139,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const sessionStore = useSessionStore()
+const workspaceService = getWorkspaceService()
 
 // Tab menu state
 const showNewTabMenu = ref(false)
@@ -168,81 +170,39 @@ const closeTab = (tabId: string) => {
   // TODO: Emit tab:close event
 }
 
-const createTerminalTab = () => {
+const createTerminalTab = async () => {
   const terminalCount = terminalTabs.value.length
   
-  // Send tab creation request to server first
-  console.log('🆕 Requesting new terminal tab creation')
-  
-  import('socket.io-client').then(({ default: io }) => {
-    const socket = io('http://localhost:57575', {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true
+  try {
+    console.log('🆕 Creating new terminal tab via WorkspaceService')
+    
+    // Use WorkspaceSocketService instead of direct Socket.IO
+    const response = await workspaceService.createTab({
+      title: `Terminal ${terminalCount + 1}`,
+      type: 'terminal',
+      sessionId: props.session.id
     })
     
-    socket.on('connect', () => {
-      console.log('📡 Connected to server for tab creation')
-      
-      // Send tab creation request
-      socket.emit('workspace:tab:create', {
-        title: `Terminal ${terminalCount + 1}`,
-        type: 'terminal',
-        sessionId: props.session.id
-      })
-    })
-    
-    socket.on('workspace:tab:created', (data) => {
-      console.log('✅ Tab created on server:', data)
-      console.log('📋 Current session tabs before:', props.session.tabs.length)
-      
-      // Create tab locally with server-provided ID
-      const paneId = `pane-${data.tabId}`
-      const newTab = {
-        id: data.tabId,
-        title: data.title,
-        type: 'terminal' as const,
-        isActive: true,
-        isShared: false,
-        connectedUsers: [],
-        panes: [{
-          id: paneId,
-          terminalId: null,
-          isActive: true
-        }],
-        activePaneId: paneId,
-        layout: 'horizontal'
-      }
-      
-      console.log('🆕 Creating new tab:', newTab)
-      
-      // Use sessionStore to add tab (better reactivity)
-      sessionStore.addTab(props.session.id, newTab)
-      sessionStore.switchToTab(props.session.id, newTab.id)
-      
-      console.log('📋 Current session tabs after:', props.session.tabs.length)
-      console.log('🎯 Active tab ID set to:', props.session.activeTabId)
-      
+    if (response.success && response.tab) {
+      // Tab will be automatically added to session via WorkspaceService event handling
+      // Just update UI state
       showNewTabMenu.value = false
       
-      // Clean up socket connection
-      socket.disconnect()
-    })
+      // Switch to the new tab
+      sessionStore.switchToTab(props.session.id, response.tab.id)
+      
+      console.log('📋 Tab creation completed')
+    } else {
+      throw new Error(response.error || 'Tab creation failed')
+    }
     
-    socket.on('workspace:tab:error', (data) => {
-      console.error('❌ Error creating tab:', data.error)
-      // TODO: Show error message to user
-      socket.disconnect()
-    })
-    
-    socket.on('connect_error', (error) => {
-      console.error('❌ Connection error:', error)
-      socket.disconnect()
-    })
-  })
+  } catch (error) {
+    console.error('❌ Error creating terminal tab:', error)
+    // TODO: Show error message to user
+  }
 }
 
-const createAIAssistant = (assistantType: 'code' | 'operations' | 'general') => {
+const createAIAssistant = async (assistantType: 'code' | 'operations' | 'general') => {
   const aiCount = aiAssistantTabs.value.length
   const titles = {
     code: 'Code Assistant',
@@ -250,17 +210,32 @@ const createAIAssistant = (assistantType: 'code' | 'operations' | 'general') => 
     general: 'General Assistant'
   }
   
-  const newTab = sessionStore.createAIAssistantTab(
-    props.session.id,
-    `${titles[assistantType]} ${aiCount + 1}`,
-    assistantType
-  )
-  
-  sessionStore.addTab(props.session.id, newTab)
-  sessionStore.switchToTab(props.session.id, newTab.id)
-  showNewTabMenu.value = false
-  
-  // TODO: Emit tab:create event
+  try {
+    console.log('🤖 Creating new AI assistant tab via WorkspaceService')
+    
+    const response = await workspaceService.createTab({
+      title: `${titles[assistantType]} ${aiCount + 1}`,
+      type: 'ai_assistant',
+      assistantType,
+      sessionId: props.session.id
+    })
+    
+    if (response.success && response.tab) {
+      console.log('✅ AI Assistant tab created successfully:', response.tab.id)
+      
+      // Tab will be automatically added via WorkspaceService event handling
+      showNewTabMenu.value = false
+      
+      // Switch to the new tab
+      sessionStore.switchToTab(props.session.id, response.tab.id)
+    } else {
+      throw new Error(response.error || 'AI Assistant tab creation failed')
+    }
+    
+  } catch (error) {
+    console.error('❌ Error creating AI assistant tab:', error)
+    // TODO: Show error message to user
+  }
 }
 
 const toggleNewTabMenu = () => {

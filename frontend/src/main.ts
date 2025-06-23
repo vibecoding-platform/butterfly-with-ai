@@ -8,6 +8,7 @@ import TrackedSocketService from './services/tracking/TrackedSocketService';
 import { useAetherTerminalServiceStore } from './stores/aetherTerminalServiceStore';
 import { openTelemetryService } from './services/OpenTelemetryService';
 import { environment } from './config/environment';
+import { getServiceFactory } from './services/ServiceFactory';
 
 
 // Register vue-advanced-chat
@@ -57,10 +58,40 @@ async function initializeRUM() {
   }
 }
 
-// Initialize RUM before mounting the app
-initializeRUM();
+// Initialize all services
+async function initializeServices() {
+  try {
+    // Initialize RUM first
+    await initializeRUM();
+    
+    // Initialize AetherTerm services (Socket.IO, Workspace, etc.)
+    const serviceFactory = getServiceFactory();
+    await serviceFactory.initialize({
+      socketUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:57575',
+      debug: environment.isDevelopment,
+      timeout: 10000,
+      reconnectionAttempts: 5,
+      autoInitialize: true
+    });
+    
+    if (environment.isDevelopment) {
+      console.log('✅ All AetherTerm services initialized successfully');
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize services:', error);
+    // Continue mounting app even if services fail to initialize
+  }
+}
 
-app.mount('#app');
+// Initialize services and mount app
+initializeServices().then(() => {
+  app.mount('#app');
+}).catch((error) => {
+  console.error('❌ Critical initialization error:', error);
+  // Mount app anyway to show error state
+  app.mount('#app');
+});
 
-// Note: Connection and session initialization will be handled by SessionManager component
-// after workspace data is loaded and existing sessions are restored
+// Note: Socket.IO connection is now managed centrally by ServiceFactory
+// Components should use WorkspaceSocketService instead of direct Socket.IO
