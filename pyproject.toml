@@ -7,7 +7,7 @@ name = "aetherterm"
 version = "0.0.1"
 description = "A sleek web based terminal emulator"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.13"
 authors = [
     {name = "Kazushige Takeuchi", email = "kaz@re-x.info"}
 ]
@@ -26,6 +26,7 @@ classifiers = [
 ]
 
 dependencies = [
+    # Core Terminal Dependencies
     "dependency-injector>=2.20.1",
     "python-socketio",
     "uvicorn",
@@ -36,7 +37,97 @@ dependencies = [
     "pyopenssl",
     "click",
     "websockets",
-    # LangChain関連依存関係
+    # OpenTelemetry関連依存関係
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-instrumentation>=0.41b0",
+    "opentelemetry-instrumentation-fastapi>=0.41b0",
+    "opentelemetry-instrumentation-requests>=0.41b0",
+    "opentelemetry-instrumentation-logging>=0.41b0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0",
+    "opentelemetry-propagator-b3>=1.20.0",
+]
+
+[project.optional-dependencies]
+themes = ["libsass"]
+lint = ["pytest", "pytest-flake8", "pytest-isort"]
+dev = ["ruff", "pre-commit", "mypy"]
+
+# AI/ML機能（LangChain + 機械学習）
+ai = [
+    # LangChain Core
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "langchain-anthropic>=0.1.0",
+    "langchain-community>=0.0.20",
+    # Vector Databases
+    "chromadb>=0.4.0",
+    "faiss-cpu>=1.7.0",
+    # Database Support
+    "redis>=5.0.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "psycopg2-binary>=2.9.0",
+    "asyncpg>=0.29.0",
+    # ML/NLP Libraries
+    "sentence-transformers>=2.2.0",
+    "tiktoken>=0.5.0",
+]
+
+# データ処理・分析（軽量版）
+data = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+]
+
+# フル機械学習スタック（重い依存関係含む）
+ml-full = [
+    # AI機能
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "langchain-anthropic>=0.1.0",
+    "langchain-community>=0.0.20",
+    "chromadb>=0.4.0",
+    "faiss-cpu>=1.7.0",
+    "redis>=5.0.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "psycopg2-binary>=2.9.0",
+    "asyncpg>=0.29.0",
+    "sentence-transformers>=2.2.0",
+    "tiktoken>=0.5.0",
+    # データ処理
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    # 追加ML依存関係
+    "scikit-learn>=1.3.0",
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "accelerate>=0.20.0",
+]
+
+# ベクターDB専用（ChromaDB + FAISS）
+vectordb = [
+    "chromadb>=0.4.0",
+    "faiss-cpu>=1.7.0",
+    "numpy>=1.24.0",
+]
+
+# LangChain専用（AIチャット機能のみ）
+langchain = [
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0", 
+    "langchain-anthropic>=0.1.0",
+    "langchain-community>=0.0.20",
+    "tiktoken>=0.5.0",
+]
+
+# 完全セット（開発・テスト用）
+all = [
+    # テーマ
+    "libsass",
+    # AI/ML全機能
     "langchain>=0.1.0",
     "langchain-openai>=0.1.0",
     "langchain-anthropic>=0.1.0",
@@ -52,12 +143,15 @@ dependencies = [
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "tiktoken>=0.5.0",
+    "scikit-learn>=1.3.0",
+    # 開発ツール
+    "ruff",
+    "pre-commit",
+    "mypy",
+    "pytest",
+    "pytest-flake8",
+    "pytest-isort",
 ]
-
-[project.optional-dependencies]
-themes = ["libsass"]
-lint = ["pytest", "pytest-flake8", "pytest-isort"]
-dev = ["ruff", "pre-commit", "mypy"]
 
 [project.urls]
 Homepage = "https://github.com/paradoxxxzero/aetherterm"
