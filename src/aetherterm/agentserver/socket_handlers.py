@@ -1911,11 +1911,37 @@ async def workspace_tab_create(sid, data):
 
         tab_id = f"{tab_type}-{uuid.uuid4().hex[:11]}"
 
-        # Notify client that tab was created
-        response_data = {"tabId": tab_id, "title": tab_title, "type": tab_type, "status": "created"}
+        # Create tab object compatible with new frontend architecture
+        tab_object = {
+            "id": tab_id,
+            "title": tab_title,
+            "type": tab_type,
+            "isActive": True,
+            "isShared": False,
+            "connectedUsers": [],
+            "panes": [{
+                "id": f"pane-{tab_id}",
+                "terminalId": None,
+                "isActive": True
+            }] if tab_type == "terminal" else [],
+            "activePaneId": f"pane-{tab_id}" if tab_type == "terminal" else None,
+            "layout": "horizontal"
+        }
 
-        if session_id:
-            response_data["sessionId"] = session_id
+        # Add AI assistant specific fields
+        if tab_type == "ai_assistant":
+            tab_object.update({
+                "assistantType": data.get("assistantType", "general"),
+                "contextSessionId": session_id,
+                "conversationHistory": []
+            })
+
+        # Notify client that tab was created (new format compatible with WorkspaceSocketService)
+        response_data = {
+            "success": True,
+            "tabId": tab_id,
+            "tab": tab_object
+        }
 
         if request_id:
             response_data["_requestId"] = request_id
@@ -1938,10 +1964,16 @@ async def workspace_tab_create(sid, data):
         # Track error response
         track_socket_response(request_id, "workspace:tab:created", success=False, error=error_msg)
 
-        # Notify client of error
-        await sio_instance.emit(
-            "workspace:tab:error", {"error": error_msg, "_requestId": request_id}, room=sid
-        )
+        # Notify client of error (new format compatible with WorkspaceSocketService)
+        error_response = {
+            "success": False,
+            "error": error_msg
+        }
+        
+        if request_id:
+            error_response["_requestId"] = request_id
+            
+        await sio_instance.emit("workspace:tab:created", error_response, room=sid)
 
 
 async def workspace_tab_close(sid, data):
