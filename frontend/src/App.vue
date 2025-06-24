@@ -1,19 +1,35 @@
 <script setup lang="ts">
 import 'normalize.css'; // インストールしたライブラリの場合
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
 import SupervisorControlPanel from './components/SupervisorControlPanel.vue';
 import ChatComponent from './components/ChatComponent.vue';
 import SimpleChatComponent from './components/SimpleChatComponent.vue';
 import TerminalComponent from './components/TerminalComponent.vue';
 import WorkspaceManager from './components/WorkspaceManager.vue';
 import WorkspaceDebugInfo from './components/WorkspaceDebugInfo.vue';
+import NewArchitectureTest from './components/NewArchitectureTest.vue';
 import DevJWTRegister from './components/DevJWTRegister.vue';
 import SocketTrackingMonitor from './components/SocketTrackingMonitor.vue';
+import ErrorScreen from './components/ErrorScreen.vue';
+import LoadingScreen from './components/LoadingScreen.vue';
+import TimeoutScreen from './components/TimeoutScreen.vue';
+import FloatingControlPanel from './components/FloatingControlPanel.vue';
 import { useChatStore } from './stores/chatStore';
 import { enableJWTDevRegister } from './config/environment';
 import { openTelemetryService } from './services/OpenTelemetryService';
+import { getSocketManager, type ErrorEvent } from './services/AetherTermSocketManager';
 
 const chatStore = useChatStore();
+
+// Error state management
+const showErrorScreen = ref(false);
+const currentError = ref<ErrorEvent | null>(null);
+const socketManager = getSocketManager();
+
+// Loading state management
+const isInitializing = ref(true);
+const initializationTimeout = ref(false);
+const initializationError = ref<string | null>(null);
 
 // Utility function to get current user ID
 const getCurrentUserId = (): string => {
@@ -21,8 +37,16 @@ const getCurrentUserId = (): string => {
   return localStorage.getItem('aetherterm-user-id') || 'anonymous-user';
 };
 const activeTab = ref('chat'); // 'supervisor', 'chat', 'debug', or 'dev-auth'
-const isSupervisorPanelFloating = ref(false);
 const isSupervisorPanelVisible = ref(true);
+
+// Show main app only when not in error state and initialization is complete
+const showMainApp = computed(() => !showErrorScreen.value && !isInitializing.value && !initializationTimeout.value);
+
+// Show loading screen during initialization
+const showLoadingScreen = computed(() => isInitializing.value && !showErrorScreen.value);
+
+// Show initialization timeout screen
+const showTimeoutScreen = computed(() => initializationTimeout.value && !showErrorScreen.value);
 
 // Panel width management
 const panelWidth = ref(320); // デフォルト幅
@@ -30,56 +54,11 @@ const isResizing = ref(false);
 const resizeStartX = ref(0);
 const resizeStartWidth = ref(0);
 
-// Dragging functionality for floating panel
-const isDragging = ref(false);
-const dragOffset = ref({ x: 0, y: 0 });
-const panelPosition = ref({ x: 20, y: 60 });
-
-const startDrag = (event: MouseEvent) => {
-  if (!isSupervisorPanelFloating.value) return;
-
-  isDragging.value = true;
-  const rect = (event.target as HTMLElement).closest('#supervisor-container')?.getBoundingClientRect();
-  if (rect) {
-    dragOffset.value = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
-    };
-  }
-
-  document.addEventListener('mousemove', onDrag);
-  document.addEventListener('mouseup', stopDrag);
-  event.preventDefault();
-};
-
-const onDrag = (event: MouseEvent) => {
-  if (!isDragging.value) return;
-
-  const newX = event.clientX - dragOffset.value.x;
-  const newY = event.clientY - dragOffset.value.y;
-
-  // Constrain to viewport
-  const maxX = window.innerWidth - 300; // min panel width
-  const maxY = window.innerHeight - 400; // min panel height
-
-  panelPosition.value = {
-    x: Math.max(0, Math.min(newX, maxX)),
-    y: Math.max(0, Math.min(newY, maxY))
-  };
-};
-
-const stopDrag = () => {
-  isDragging.value = false;
-  document.removeEventListener('mousemove', onDrag);
-  document.removeEventListener('mouseup', stopDrag);
-};
 
 // Panel resize functionality with throttling
 let resizeThrottleId = 0;
 
 const startResize = (event: MouseEvent) => {
-  if (isSupervisorPanelFloating.value) return; // リサイズはFixed時のみ
-  
   isResizing.value = true;
   resizeStartX.value = event.clientX;
   resizeStartWidth.value = panelWidth.value;
@@ -155,10 +134,145 @@ const togglePanelVisibility = () => {
   savePanelVisibility();
 };
 
+const handleSwitchTab = (tab: string) => {
+  activeTab.value = tab;
+};
+
+// Error handling methods
+const handleConnectionError = (error: ErrorEvent) => {
+  console.error('🚨 Connection error detected:', error);
+  
+  // Only show error screen for non-recoverable errors or critical connection failures
+  if (!error.recoverable || error.type === 'CONNECTION_ERROR') {
+    currentError.value = error;
+    showErrorScreen.value = true;
+  }
+};
+
+const handleRetry = async () => {
+  showErrorScreen.value = false;
+  currentError.value = null;
+  
+  try {
+    await socketManager.retry();
+    console.log('✅ Connection retry successful');
+  } catch (error) {
+    console.error('❌ Connection retry failed:', error);
+    // Error will be handled by the error handler
+  }
+};
+
+const handleReload = () => {
+  window.location.reload();
+};
+
+const checkConnectionStatus = async () => {
+  try {
+    const connectionState = socketManager.getConnectionState();
+    
+    // If connection is in error state and not recoverable, show error screen
+    if (connectionState.value.status === 'error' && 
+        connectionState.value.errorType && 
+        !socketManager.isRecoverable()) {
+      const lastError = socketManager.getLastError();
+      if (lastError) {
+        handleConnectionError(lastError);
+      }
+    }
+  } catch (error) {
+    console.error('Error checking connection status:', error);
+  }
+};
+
+const handleInitializationComplete = () => {
+  isInitializing.value = false;
+  initializationTimeout.value = false;
+  initializationError.value = null;
+  console.log('✅ AetherTerm initialization completed');
+};
+
+const handleInitializationTimeout = () => {
+  isInitializing.value = false;
+  initializationTimeout.value = true;
+  initializationError.value = 'Initialization timed out after 30 seconds';
+  console.error('❌ AetherTerm initialization timed out');
+};
+
+const handleInitializationError = (error: string) => {
+  isInitializing.value = false;
+  initializationTimeout.value = true;
+  initializationError.value = error;
+  console.error('❌ AetherTerm initialization error:', error);
+};
+
+const retryInitialization = async () => {
+  isInitializing.value = true;
+  initializationTimeout.value = false;
+  initializationError.value = null;
+  
+  try {
+    // Try to reconnect socket manager
+    await socketManager.retry();
+    
+    // Wait for connection to establish
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout'));
+      }, 15000);
+      
+      const checkConnection = () => {
+        if (socketManager.isConnected()) {
+          clearTimeout(timeout);
+          resolve(void 0);
+        } else {
+          setTimeout(checkConnection, 500);
+        }
+      };
+      
+      checkConnection();
+    });
+    
+    handleInitializationComplete();
+  } catch (error) {
+    handleInitializationError(error instanceof Error ? error.message : 'Unknown error');
+  }
+};
+
 // 初期化時に保存された設定を読み込み
 onMounted(async () => {
   loadPanelWidth();
   loadPanelVisibility();
+  
+  // Setup error handling
+  const unsubscribeErrorHandler = socketManager.onError(handleConnectionError);
+  
+  // Set up initialization timeout (30 seconds)
+  const initTimeoutHandle = setTimeout(handleInitializationTimeout, 30000);
+  
+  // Monitor socket connection for initialization completion
+  const checkInitialization = () => {
+    if (socketManager.isConnected()) {
+      clearTimeout(initTimeoutHandle);
+      handleInitializationComplete();
+    } else {
+      // Check again in 500ms if still initializing
+      if (isInitializing.value) {
+        setTimeout(checkInitialization, 500);
+      }
+    }
+  };
+  
+  // Start monitoring initialization
+  checkInitialization();
+  
+  // Check initial connection status
+  await checkConnectionStatus();
+  
+  // Store unsubscribe function for cleanup
+  onUnmounted(() => {
+    unsubscribeErrorHandler();
+    clearTimeout(initTimeoutHandle);
+  });
   
   // Update OpenTelemetry context (initialization already done in main.ts)
   try {
@@ -199,8 +313,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  document.removeEventListener('mousemove', onDrag);
-  document.removeEventListener('mouseup', stopDrag);
   document.removeEventListener('mousemove', onResize);
   document.removeEventListener('mouseup', stopResize);
 });
@@ -214,34 +326,65 @@ watch(chatStore.activeMessages, (newMessages) => {
 
 <template>
   <div id="app-container">
-    <!-- Main Content Area -->
-    <div class="main-content">
-      <!-- Session Manager Container (Full Width) -->
-      <div id="workspace-container">
-        <WorkspaceManager />
-      </div>
-    </div>
+    <!-- Loading Screen -->
+    <LoadingScreen 
+      v-if="showLoadingScreen"
+      initial-message="🚀 Initializing AetherTerm services..."
+      :timeout="30000"
+      @timeout="handleInitializationTimeout"
+    />
 
-    <!-- Supervisor Control Panel (Fixed or Floating) -->
+    <!-- Timeout Screen -->
+    <TimeoutScreen 
+      v-if="showTimeoutScreen"
+      :error-message="initializationError || ''"
+      :server-url="socketManager.getConnectionState().value.serverUrl || ''"
+      :timestamp="new Date()"
+      :duration="30000"
+      @retry="retryInitialization"
+      @reload="handleReload"
+      @continue="handleInitializationComplete"
+    />
+
+    <!-- Error Screen Overlay -->
+    <ErrorScreen 
+      v-if="showErrorScreen && currentError"
+      :error-type="currentError.type"
+      :error-message="currentError.message"
+      :error-code="currentError.code"
+      :additional-info="currentError.details"
+      :server-url="socketManager.getConnectionState().value.serverUrl || ''"
+      :timestamp="currentError.timestamp"
+      :show-retry="true"
+      :auto-retry="false"
+      @retry="handleRetry"
+      @reload="handleReload"
+    />
+
+    <!-- Main App Content (hidden when error screen is shown) -->
+    <div v-if="showMainApp" class="main-app-container">
+      <!-- Main Content Area -->
+      <div class="main-content">
+        <!-- Session Manager Container (Full Width) -->
+        <div id="workspace-container">
+          <WorkspaceManager />
+        </div>
+      </div>
+
+      <!-- Supervisor Control Panel (Fixed) -->
     <div
       v-if="isSupervisorPanelVisible"
       id="supervisor-container"
+      class="supervisor-fixed"
       :class="{
-        'supervisor-floating': isSupervisorPanelFloating,
-        'supervisor-fixed': !isSupervisorPanelFloating,
-        'dragging': isDragging,
         'resizing': isResizing
       }"
-      :style="isSupervisorPanelFloating ? {
-        top: panelPosition.y + 'px',
-        right: 'auto',
-        left: panelPosition.x + 'px'
-      } : {
+      :style="{
         width: panelWidth + 'px'
       }"
     >
-      <!-- Resize Handle (Fixed時のみ表示) -->
-      <div v-if="!isSupervisorPanelFloating" class="resize-handle-container">
+      <!-- Resize Handle -->
+      <div class="resize-handle-container">
         <div 
           class="resize-handle-button" 
           @mousedown="startResize"
@@ -276,6 +419,13 @@ watch(chatStore.activeMessages, (newMessages) => {
           🔗 Socket Monitor
         </button>
         <button
+          :class="{ 'active': activeTab === 'test' }"
+          @click="activeTab = 'test'"
+          class="test-tab"
+        >
+          🧪 New Architecture Test
+        </button>
+        <button
           v-if="enableJWTDevRegister"
           :class="{ 'active': activeTab === 'dev-auth' }"
           @click="activeTab = 'dev-auth'"
@@ -298,28 +448,24 @@ watch(chatStore.activeMessages, (newMessages) => {
       <div v-if="activeTab === 'socket-monitor'" class="tab-content socket-monitor-tab">
         <SocketTrackingMonitor />
       </div>
+      <div v-if="activeTab === 'test'" class="tab-content test-tab">
+        <NewArchitectureTest />
+      </div>
       <div v-if="activeTab === 'dev-auth'" class="tab-content dev-auth-tab">
         <DevJWTRegister />
       </div>
+
+      <!-- Integrated Control Panel -->
+      <FloatingControlPanel 
+        :panel-visible="isSupervisorPanelVisible"
+        :panel-width="panelWidth"
+        @toggle-panel="togglePanelVisibility"
+        @switch-tab="handleSwitchTab"
+      />
     </div>
 
-    <!-- Panel Toggle Button -->
-    <div 
-      class="panel-toggle-container"
-      :style="{
-        right: isSupervisorPanelVisible && !isSupervisorPanelFloating ? (panelWidth + 'px') : '0px'
-      }"
-    >
-      <button 
-        @click="togglePanelVisibility" 
-        class="panel-toggle-btn"
-        :class="{ 'panel-hidden': !isSupervisorPanelVisible }"
-        :title="isSupervisorPanelVisible ? 'Hide Chat Panel' : 'Show Chat Panel'"
-      >
-        {{ isSupervisorPanelVisible ? '→' : '←' }}
-      </button>
-    </div>
     
+    </div> <!-- Close showMainApp div -->
   </div>
 </template>
 
@@ -415,7 +561,13 @@ html, body, #app {
 #app-container {
   height: 100vh;
   position: relative;
+  display: block;
+}
+
+.main-app-container {
+  height: 100vh;
   display: flex;
+  position: relative;
 }
 
 .main-content {
@@ -479,22 +631,14 @@ html, body, #app {
   max-width: 600px;
 }
 
-.supervisor-floating {
-  position: fixed;
-  top: 60px;
-  right: 20px;
-  width: 400px;
-  height: 70vh;
-  border: 1px solid #444;
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  resize: both;
-  overflow: auto;
-  min-width: 300px;
-  min-height: 400px;
-  max-width: 90vw;
-  max-height: 90vh;
+
+.supervisor-fixed {
+  height: 100%;
+  border-left: 1px solid #444;
+  flex-shrink: 0;
+  position: relative;
+  min-width: 250px;
+  max-width: 600px;
 }
 
 .supervisor-header {
@@ -505,11 +649,6 @@ html, body, #app {
   background-color: #1e1e1e;
   border-bottom: 1px solid #444;
   color: white;
-  cursor: move; /* For floating panel dragging */
-}
-
-.supervisor-floating .supervisor-header {
-  border-radius: 8px 8px 0 0;
 }
 
 .supervisor-header h3 {
@@ -650,49 +789,6 @@ html, body, #app {
   }
 }
 
-/* Draggable functionality for floating panel */
-.supervisor-floating .supervisor-header {
-  user-select: none;
-}
-
-/* Scrollbar styling for admin panel */
-.supervisor-floating {
-  scrollbar-width: thin;
-  scrollbar-color: #666 #2d2d2d;
-}
-
-.supervisor-floating::-webkit-scrollbar {
-  width: 8px;
-}
-
-.supervisor-floating::-webkit-scrollbar-track {
-  background: #2d2d2d;
-}
-
-.supervisor-floating::-webkit-scrollbar-thumb {
-  background: #666;
-  border-radius: 4px;
-}
-
-.supervisor-floating::-webkit-scrollbar-thumb:hover {
-  background: #888;
-}
-
-/* Draggable functionality enhancements */
-.supervisor-floating .supervisor-header {
-  user-select: none;
-}
-
-.supervisor-container.dragging {
-  opacity: 0.9;
-  transform: scale(1.02);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-  z-index: 1001;
-}
-
-.supervisor-floating.dragging {
-  transition: none;
-}
 
 /* Resize handle styles */
 .resize-handle-container {
@@ -797,69 +893,5 @@ html, body, #app {
   border-radius: 8px 8px 0 0;
 }
 
-/* Panel Toggle Button */
-.panel-toggle-container {
-  position: fixed;
-  top: 20px;
-  transform: none;
-  z-index: 1001;
-  transition: right 0.3s ease;
-}
 
-.panel-toggle-btn {
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  width: 60px;
-  height: 30px;
-  border-radius: 0 0 0 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
-  transform: translateY(0);
-  writing-mode: initial;
-  text-orientation: initial;
-}
-
-.panel-toggle-btn:hover {
-  background-color: #45a049;
-  transform: translateY(3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.panel-toggle-btn.panel-hidden {
-  background-color: #2196f3;
-  border-radius: 0 0 6px 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.panel-toggle-btn.panel-hidden:hover {
-  background-color: #1976d2;
-  transform: translateY(3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-/* モバイル画面での調整 */
-@media (max-width: 900px) {
-  .panel-toggle-container {
-    top: 10px;
-    right: 10px !important;
-  }
-  
-  .panel-toggle-btn {
-    width: 50px;
-    height: 35px;
-    border-radius: 0 0 6px 6px;
-    font-size: 16px;
-  }
-  
-  .panel-toggle-btn.panel-hidden {
-    border-radius: 0 0 6px 6px;
-  }
-}
 </style>

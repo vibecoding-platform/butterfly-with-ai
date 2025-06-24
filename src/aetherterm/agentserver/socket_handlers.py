@@ -1928,12 +1928,20 @@ async def workspace_tab_create(sid, data):
             "layout": "horizontal"
         }
 
-        # Add AI assistant specific fields
-        if tab_type == "ai_assistant":
+        # Add AI agent specific fields
+        if tab_type == "ai_agent":
             tab_object.update({
-                "assistantType": data.get("assistantType", "general"),
+                "agentType": data.get("agentType", "autonomous"),
                 "contextSessionId": session_id,
-                "conversationHistory": []
+                "taskQueue": [],
+                "executionStatus": "idle",
+                "controlledTerminals": [],
+                "capabilities": {
+                    "autonomousExecution": True,
+                    "multiTerminalControl": True,
+                    "errorRecovery": True,
+                    "goalOriented": True
+                }
             })
 
         # Notify client that tab was created (new format compatible with WorkspaceSocketService)
@@ -1992,6 +2000,122 @@ async def workspace_tab_create(sid, data):
                     
             except Exception as terminal_error:
                 log.error(f"❌ Error auto-creating terminal: {terminal_error}", exc_info=True)
+
+        # Auto-initialize AI agent terminal for ai_agent tabs
+        if tab_type == "ai_agent":
+            # Create pane for AI agent terminal
+            pane_id = f"pane-{tab_id}"
+            terminal_id = f"term-{uuid.uuid4().hex[:11]}"
+            agent_id = f"agent-{uuid.uuid4().hex[:11]}"
+            
+            # Add pane to tab object
+            tab_object["panes"] = [{
+                "id": pane_id,
+                "terminalId": terminal_id,
+                "isActive": True
+            }]
+            tab_object["activePaneId"] = pane_id
+            
+            log.info(f"🤖 Auto-creating AI agent terminal {terminal_id} for tab {tab_id}")
+            
+            try:
+                # Get agent config from data
+                agent_config = data.get("agentConfig", {})
+                agent_type = agent_config.get("type", "general")
+                
+                # Determine shell type based on AI agent type
+                if agent_type == "build":
+                    # Coding AI: Use development-focused shell
+                    shell_command = ["/bin/bash", "--rcfile", "/etc/aetherterm/coding-ai.bashrc"]
+                    shell_env = {
+                        "AETHER_AI_TYPE": "coding",
+                        "AETHER_AI_MODE": "development",
+                        "PS1": "🧠(Coding-AI) \\u@\\h:\\w$ "
+                    }
+                elif agent_type == "operations":
+                    # Operation AI: Use operations-focused shell
+                    shell_command = ["/bin/bash", "--rcfile", "/etc/aetherterm/operation-ai.bashrc"]
+                    shell_env = {
+                        "AETHER_AI_TYPE": "operations",
+                        "AETHER_AI_MODE": "automation",
+                        "PS1": "⚙️(Op-AI) \\u@\\h:\\w$ "
+                    }
+                else:
+                    # General AI: Standard enhanced shell
+                    shell_command = ["/bin/bash", "--rcfile", "/etc/aetherterm/ai-agent.bashrc"]
+                    shell_env = {
+                        "AETHER_AI_TYPE": "general",
+                        "AETHER_AI_MODE": "assistant",
+                        "PS1": "🤖(AI) \\u@\\h:\\w$ "
+                    }
+                
+                # Create terminal using the terminal factory with AI-specific shell
+                from aetherterm.agentserver.terminals.terminal_factory import get_terminal_factory, TerminalType
+                
+                factory = get_terminal_factory()
+                output_callback = await create_terminal_output_callback(terminal_id)
+                
+                # Create AI agent terminal with custom shell
+                terminal = await factory.create_terminal(
+                    terminal_id=terminal_id,
+                    socket_id=sid,
+                    terminal_type=TerminalType.PTY,
+                    output_callback=output_callback,
+                    rows=24,
+                    cols=80,
+                    shell_command=shell_command,
+                    shell_env=shell_env
+                )
+                
+                if terminal:
+                    # Initialize AI agent capabilities
+                    agent_capabilities = {
+                        "autonomousExecution": True,
+                        "multiTerminalControl": True,
+                        "errorRecovery": True,
+                        "goalOriented": True,
+                        "taskPlanning": True,
+                        "progressTracking": True,
+                        "reportGeneration": True
+                    }
+                    
+                    # Update tab object with agent ID and status
+                    tab_object.update({
+                        "agentId": agent_id,
+                        "agentStatus": "initialized",
+                        "lastActivity": datetime.now().isoformat()
+                    })
+                    
+                    # Notify client that AI agent terminal was created
+                    terminal_created_data = {
+                        "tabId": tab_id,
+                        "paneId": pane_id,
+                        "terminalId": terminal_id,
+                        "agentId": agent_id,
+                        "agentType": agent_type,
+                        "shellType": shell_command[0] if shell_command else "/bin/bash",
+                        "success": True
+                    }
+                    
+                    await sio_instance.emit("terminal:created", terminal_created_data, room=sid)
+                    
+                    # Notify client that AI agent was initialized
+                    agent_initialized_data = {
+                        "tabId": tab_id,
+                        "agentId": agent_id,
+                        "capabilities": agent_capabilities,
+                        "status": "initialized",
+                        "success": True
+                    }
+                    
+                    await sio_instance.emit("ai_agent:initialized", agent_initialized_data, room=sid)
+                    
+                    log.info(f"✅ Auto-created AI agent terminal {terminal_id} and initialized agent {agent_id} for tab {tab_id}")
+                else:
+                    log.error(f"❌ Failed to create AI agent terminal for tab {tab_id}")
+                
+            except Exception as agent_error:
+                log.error(f"❌ Error auto-creating AI agent terminal: {agent_error}", exc_info=True)
 
         # Track successful response
         track_socket_response(request_id, "workspace:tab:created", success=True)
@@ -2054,3 +2178,1064 @@ async def workspace_tab_close(sid, data):
 
         # Track error response
         track_socket_response(request_id, "workspace:tab:closed", success=False, error=error_msg)
+
+
+# =============================================================================
+# AI Agent Event Handlers
+# =============================================================================
+
+@instrument_socketio_handler("ai_agent:task:assign")
+async def ai_agent_task_assign(sid, data):
+    """Handle AI agent task assignment"""
+    request_id = track_socket_request("ai_agent:task:assign", data, sid)
+    
+    try:
+        log.info(f"🎯 AI agent task assignment: {data}")
+        
+        tab_id = data.get("tabId")
+        task_description = data.get("task")
+        priority = data.get("priority", "normal")
+        
+        if not all([tab_id, task_description]):
+            await sio_instance.emit("ai_agent:task:error", {
+                "error": "Missing required fields: tabId, task",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Generate task ID
+        task_id = f"task-{uuid4().hex[:11]}"
+        
+        # Create task object
+        task_object = {
+            "id": task_id,
+            "tabId": tab_id,
+            "description": task_description,
+            "priority": priority,
+            "status": "assigned",
+            "assignedAt": datetime.now().isoformat(),
+            "steps": [],
+            "progress": 0
+        }
+        
+        # Notify client that task was assigned
+        response_data = {
+            "success": True,
+            "taskId": task_id,
+            "task": task_object,
+            "_requestId": request_id
+        }
+        
+        await sio_instance.emit("ai_agent:task:assigned", response_data, room=sid)
+        
+        # Start task planning
+        await sio_instance.emit("ai_agent:task:planning", {
+            "taskId": task_id,
+            "status": "planning",
+            "message": f"AIエージェントがタスクを分析中: {task_description}"
+        }, room=sid)
+        
+        track_socket_response(request_id, "ai_agent:task:assigned", success=True)
+        log.info(f"✅ Task {task_id} assigned to AI agent")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error in AI agent task assignment: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:task:assigned", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:task:error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:status:request")
+async def ai_agent_status_request(sid, data):
+    """Handle AI agent status request"""
+    request_id = track_socket_request("ai_agent:status:request", data, sid)
+    
+    try:
+        tab_id = data.get("tabId")
+        
+        if not tab_id:
+            await sio_instance.emit("ai_agent:status:error", {
+                "error": "Missing required field: tabId",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Mock agent status (in real implementation, get from agent manager)
+        agent_status = {
+            "tabId": tab_id,
+            "agentId": f"agent-{tab_id.split('-')[1] if '-' in tab_id else 'unknown'}",
+            "status": "idle",
+            "currentTask": None,
+            "capabilities": {
+                "autonomousExecution": True,
+                "multiTerminalControl": True,
+                "errorRecovery": True,
+                "goalOriented": True,
+                "taskPlanning": True
+            },
+            "connectedTerminals": [],
+            "lastActivity": datetime.now().isoformat()
+        }
+        
+        response_data = {
+            "success": True,
+            "agentStatus": agent_status,
+            "_requestId": request_id
+        }
+        
+        await sio_instance.emit("ai_agent:status:response", response_data, room=sid)
+        
+        track_socket_response(request_id, "ai_agent:status:response", success=True)
+        log.info(f"✅ AI agent status sent for tab {tab_id}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error in AI agent status request: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:status:response", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:status:error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+# ===== PANE COORDINATION HANDLERS =====
+
+@instrument_socketio_handler("ai_agent:pane:create_request")
+async def ai_agent_pane_create_request(sid, data):
+    """Create a new pane for AI agent coordination"""
+    request_id = track_socket_request("ai_agent:pane:create_request", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.pane_coordinator import get_pane_coordinator
+        
+        pane_coordinator = get_pane_coordinator()
+        
+        agent_id = data.get("agentId")
+        target_tab_id = data.get("targetTabId")
+        pane_specification = data.get("paneSpecification", {})
+        
+        if not agent_id or not target_tab_id:
+            await sio_instance.emit("ai_agent:pane:create_error", {
+                "error": "Missing required fields: agentId, targetTabId",
+                "_requestId": request_id
+            }, room=sid)
+            return
+            
+        # Create pane request
+        result = await pane_coordinator.create_pane_request(
+            agent_id, target_tab_id, pane_specification
+        )
+        
+        if result["success"]:
+            await sio_instance.emit("ai_agent:pane:created", {
+                **result,
+                "_requestId": request_id
+            }, room=sid)
+            track_socket_response(request_id, "ai_agent:pane:created", success=True)
+            log.info(f"✅ Pane created: {result['paneId']}")
+        else:
+            await sio_instance.emit("ai_agent:pane:create_error", {
+                "error": result.get("error", "Unknown error"),
+                "_requestId": request_id
+            }, room=sid)
+            track_socket_response(request_id, "ai_agent:pane:create_error", success=False)
+            
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error creating pane: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:pane:create_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:pane:create_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:pane:work_assign")
+async def ai_agent_pane_work_assign(sid, data):
+    """Assign work between panes"""
+    request_id = track_socket_request("ai_agent:pane:work_assign", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.pane_coordinator import get_pane_coordinator
+        
+        pane_coordinator = get_pane_coordinator()
+        
+        requester_id = data.get("requesterId")
+        target_pane_id = data.get("targetPaneId")
+        work_order = data.get("workOrder", {})
+        
+        if not all([requester_id, target_pane_id, work_order]):
+            await sio_instance.emit("ai_agent:pane:work_error", {
+                "error": "Missing required fields: requesterId, targetPaneId, workOrder",
+                "_requestId": request_id
+            }, room=sid)
+            return
+            
+        # Create work order
+        created_order = await pane_coordinator.create_work_order(
+            requester_id,
+            target_pane_id,
+            work_order.get("taskType", "general"),
+            work_order
+        )
+        
+        # Emit to target pane
+        await sio_instance.emit("ai_agent:pane:work_request", {
+            "taskId": created_order.task_id,
+            "requesterId": requester_id,
+            "workOrder": {
+                "taskId": created_order.task_id,
+                "taskType": created_order.task_type,
+                "priority": created_order.priority,
+                "description": created_order.description,
+                "inputArtifacts": created_order.input_artifacts,
+                "requirements": created_order.requirements,
+                "deliverables": created_order.deliverables,
+                "deadline": created_order.deadline.isoformat() if created_order.deadline else None
+            },
+            "_requestId": request_id
+        })
+        
+        # Confirm to requester
+        await sio_instance.emit("ai_agent:pane:work_assigned", {
+            "success": True,
+            "taskId": created_order.task_id,
+            "targetPaneId": target_pane_id,
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "ai_agent:pane:work_assigned", success=True)
+        log.info(f"✅ Work assigned: {created_order.task_id} to {target_pane_id}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error assigning work: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:pane:work_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:pane:work_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:pane:work_response")
+async def ai_agent_pane_work_response(sid, data):
+    """Handle work order response (accept/reject)"""
+    request_id = track_socket_request("ai_agent:pane:work_response", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.pane_coordinator import get_pane_coordinator
+        
+        pane_coordinator = get_pane_coordinator()
+        
+        task_id = data.get("taskId")
+        responder_id = data.get("responderId")
+        status = data.get("status")  # accepted, rejected, queued
+        
+        if not all([task_id, responder_id, status]):
+            await sio_instance.emit("ai_agent:pane:response_error", {
+                "error": "Missing required fields: taskId, responderId, status",
+                "_requestId": request_id
+            }, room=sid)
+            return
+            
+        if status == "accepted":
+            success = await pane_coordinator.accept_work_order(
+                task_id, responder_id, data.get("estimatedCompletion")
+            )
+            
+            if success:
+                # Notify requester
+                await sio_instance.emit("ai_agent:pane:work_accepted", {
+                    "taskId": task_id,
+                    "responderId": responder_id,
+                    "estimatedStartTime": data.get("estimatedStartTime"),
+                    "estimatedCompletion": data.get("estimatedCompletion"),
+                    "_requestId": request_id
+                })
+                
+                track_socket_response(request_id, "ai_agent:pane:work_accepted", success=True)
+                log.info(f"✅ Work order {task_id} accepted by {responder_id}")
+            else:
+                await sio_instance.emit("ai_agent:pane:response_error", {
+                    "error": "Failed to accept work order",
+                    "_requestId": request_id
+                }, room=sid)
+        else:
+            # Handle rejection or queuing
+            await sio_instance.emit("ai_agent:pane:work_rejected", {
+                "taskId": task_id,
+                "responderId": responder_id,
+                "reason": data.get("reason", ""),
+                "_requestId": request_id
+            })
+            
+            track_socket_response(request_id, "ai_agent:pane:work_rejected", success=True)
+            log.info(f"❌ Work order {task_id} rejected by {responder_id}")
+            
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error handling work response: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:pane:response_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:pane:response_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:pane:progress_report")
+async def ai_agent_pane_progress_report(sid, data):
+    """Handle task progress reporting"""
+    request_id = track_socket_request("ai_agent:pane:progress_report", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.pane_coordinator import get_pane_coordinator
+        
+        pane_coordinator = get_pane_coordinator()
+        
+        pane_id = data.get("paneId")
+        task_id = data.get("taskId")
+        progress = data.get("progress", {})
+        
+        if not all([pane_id, task_id]):
+            await sio_instance.emit("ai_agent:pane:progress_error", {
+                "error": "Missing required fields: paneId, taskId",
+                "_requestId": request_id
+            }, room=sid)
+            return
+            
+        # Update progress
+        success = await pane_coordinator.update_task_progress(
+            task_id, pane_id, {
+                "progress": progress,
+                "metrics": data.get("metrics", {}),
+                "issues": data.get("issues", []),
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        if success:
+            # Broadcast progress to interested parties
+            await sio_instance.emit("ai_agent:pane:progress_updated", {
+                "taskId": task_id,
+                "paneId": pane_id,
+                "progress": progress,
+                "metrics": data.get("metrics", {}),
+                "issues": data.get("issues", []),
+                "_requestId": request_id
+            })
+            
+            track_socket_response(request_id, "ai_agent:pane:progress_updated", success=True)
+            log.info(f"📊 Progress updated for task {task_id}: {progress.get('percentage', 0)}%")
+        else:
+            await sio_instance.emit("ai_agent:pane:progress_error", {
+                "error": "Failed to update progress",
+                "_requestId": request_id
+            }, room=sid)
+            
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error reporting progress: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:pane:progress_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:pane:progress_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:pane:report_request")
+async def ai_agent_pane_report_request(sid, data):
+    """Handle report collection request"""
+    request_id = track_socket_request("ai_agent:pane:report_request", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.pane_coordinator import get_pane_coordinator
+        
+        pane_coordinator = get_pane_coordinator()
+        
+        requester_id = data.get("requesterId")
+        target_panes = data.get("targetPanes", [])
+        report_scope = data.get("reportScope", {})
+        
+        if not all([requester_id, target_panes]):
+            await sio_instance.emit("ai_agent:pane:report_error", {
+                "error": "Missing required fields: requesterId, targetPanes",
+                "_requestId": request_id
+            }, room=sid)
+            return
+            
+        # Collect reports
+        collected_reports = await pane_coordinator.collect_reports(
+            requester_id, target_panes, report_scope
+        )
+        
+        await sio_instance.emit("ai_agent:pane:reports_collected", {
+            "success": True,
+            "reports": collected_reports,
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "ai_agent:pane:reports_collected", success=True)
+        log.info(f"📋 Reports collected from {len(target_panes)} panes")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error collecting reports: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:pane:report_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:pane:report_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:pane:communicate")
+async def ai_agent_pane_communicate(sid, data):
+    """Handle direct communication between panes"""
+    request_id = track_socket_request("ai_agent:pane:communicate", data, sid)
+    
+    try:
+        from_pane = data.get("fromPane")
+        to_pane = data.get("toPane")
+        message_type = data.get("messageType")
+        message = data.get("message", {})
+        
+        if not all([from_pane, to_pane, message_type]):
+            await sio_instance.emit("ai_agent:pane:communicate_error", {
+                "error": "Missing required fields: fromPane, toPane, messageType",
+                "_requestId": request_id
+            }, room=sid)
+            return
+            
+        # Forward message to target pane
+        await sio_instance.emit("ai_agent:pane:message_received", {
+            "fromPane": from_pane,
+            "toPane": to_pane,
+            "messageType": message_type,
+            "message": message,
+            "timestamp": datetime.now().isoformat(),
+            "_requestId": request_id
+        })
+        
+        # Confirm to sender
+        await sio_instance.emit("ai_agent:pane:message_sent", {
+            "success": True,
+            "fromPane": from_pane,
+            "toPane": to_pane,
+            "messageType": message_type,
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "ai_agent:pane:message_sent", success=True)
+        log.info(f"💬 Message sent from {from_pane} to {to_pane}: {message_type}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error in pane communication: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:pane:communicate_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:pane:communicate_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+# ===== HIERARCHICAL AGENT MANAGEMENT HANDLERS =====
+
+@instrument_socketio_handler("ai_agent:parent:create")
+async def ai_agent_parent_create(sid, data):
+    """Create hierarchical agent structure"""
+    request_id = track_socket_request("ai_agent:parent:create", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        task_type = data.get("taskType")
+        project_config = data.get("projectConfig", {})
+        child_specs = data.get("childAgentSpecs", [])
+        
+        if not task_type:
+            await sio_instance.emit("ai_agent:hierarchy:error", {
+                "error": "Missing required field: taskType",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Create hierarchical agents
+        parent_agent, child_agents = await agent_manager.create_parent_agent(
+            task_type, project_config, child_specs
+        )
+        
+        # Create terminals for child agents
+        terminal_assignments = {}
+        for child_agent in child_agents:
+            if child_agent.terminal_id:
+                # TODO: Create actual terminal using terminal factory
+                terminal_assignments[child_agent.agent_id] = child_agent.terminal_id
+        
+        response_data = {
+            "success": True,
+            "parentAgent": {
+                "agentId": parent_agent.agent_id,
+                "specialization": parent_agent.specialization,
+                "capabilities": parent_agent.capabilities,
+                "status": parent_agent.status.value
+            },
+            "childAgents": [
+                {
+                    "agentId": child.agent_id,
+                    "specialization": child.specialization,
+                    "tools": child.tools,
+                    "terminalId": child.terminal_id,
+                    "capabilities": child.capabilities,
+                    "status": child.status.value
+                } for child in child_agents
+            ],
+            "terminalAssignments": terminal_assignments,
+            "_requestId": request_id
+        }
+        
+        await sio_instance.emit("ai_agent:hierarchy:created", response_data, room=sid)
+        track_socket_response(request_id, "ai_agent:hierarchy:created", success=True)
+        log.info(f"✅ Hierarchical agent structure created: {parent_agent.agent_id}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error creating hierarchical agents: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:hierarchy:error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:hierarchy:error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:task:distribute")
+async def ai_agent_task_distribute(sid, data):
+    """Distribute tasks from parent to child agents"""
+    request_id = track_socket_request("ai_agent:task:distribute", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        parent_id = data.get("parentId")
+        tasks = data.get("tasks", [])
+        
+        if not parent_id or not tasks:
+            await sio_instance.emit("ai_agent:task:distribute_error", {
+                "error": "Missing required fields: parentId, tasks",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Distribute tasks
+        task_assignments = await agent_manager.distribute_tasks(parent_id, tasks)
+        
+        # Notify each child agent about their tasks
+        for assignment in task_assignments:
+            await sio_instance.emit("ai_agent:task:received", {
+                "taskId": assignment.task_id,
+                "parentId": assignment.parent_id,
+                "targetAgent": assignment.target_agent,
+                "taskType": assignment.task_type,
+                "parameters": assignment.parameters,
+                "priority": assignment.priority,
+                "dependencies": assignment.dependencies,
+                "_requestId": request_id
+            })
+        
+        # Confirm to parent
+        await sio_instance.emit("ai_agent:task:distributed", {
+            "success": True,
+            "parentId": parent_id,
+            "distributedTasks": len(task_assignments),
+            "taskIds": [a.task_id for a in task_assignments],
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "ai_agent:task:distributed", success=True)
+        log.info(f"✅ Distributed {len(task_assignments)} tasks from parent {parent_id}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error distributing tasks: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:task:distribute_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:task:distribute_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:communicate")
+async def ai_agent_communicate(sid, data):
+    """Handle communication between agents"""
+    request_id = track_socket_request("ai_agent:communicate", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        from_agent = data.get("fromAgent")
+        to_agent = data.get("toAgent")
+        message_type = data.get("messageType", "general")
+        message = data.get("message", {})
+        
+        if not from_agent or not to_agent:
+            await sio_instance.emit("ai_agent:communicate_error", {
+                "error": "Missing required fields: fromAgent, toAgent",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Process communication
+        success = await agent_manager.agent_communicate(
+            from_agent, to_agent, message_type, message
+        )
+        
+        if success:
+            # Notify recipient
+            await sio_instance.emit("ai_agent:message:received", {
+                "fromAgent": from_agent,
+                "toAgent": to_agent,
+                "messageType": message_type,
+                "message": message,
+                "timestamp": datetime.now().isoformat(),
+                "_requestId": request_id
+            })
+            
+            # Confirm to sender
+            await sio_instance.emit("ai_agent:message:sent", {
+                "success": True,
+                "fromAgent": from_agent,
+                "toAgent": to_agent,
+                "messageType": message_type,
+                "_requestId": request_id
+            }, room=sid)
+            
+            track_socket_response(request_id, "ai_agent:message:sent", success=True)
+            log.info(f"💬 Agent communication: {from_agent} -> {to_agent}: {message_type}")
+        else:
+            await sio_instance.emit("ai_agent:communicate_error", {
+                "error": "Communication failed",
+                "_requestId": request_id
+            }, room=sid)
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error in agent communication: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:communicate_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:communicate_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agent:hierarchy:status")
+async def ai_agent_hierarchy_status(sid, data):
+    """Get status of agent hierarchy"""
+    request_id = track_socket_request("ai_agent:hierarchy:status", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        parent_id = data.get("parentId")
+        
+        if not parent_id:
+            await sio_instance.emit("ai_agent:hierarchy:status_error", {
+                "error": "Missing required field: parentId",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Get hierarchy status
+        status = await agent_manager.get_hierarchy_status(parent_id)
+        
+        await sio_instance.emit("ai_agent:hierarchy:status_response", {
+            "success": True,
+            "hierarchyStatus": status,
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "ai_agent:hierarchy:status_response", success=True)
+        log.info(f"📊 Hierarchy status retrieved for {parent_id}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error getting hierarchy status: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agent:hierarchy:status_error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agent:hierarchy:status_error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+# ===== SPECIALIZED AI AGENT HANDLERS =====
+
+@instrument_socketio_handler("monitoring_ai:watch:start")
+async def monitoring_ai_watch_start(sid, data):
+    """Start monitoring for monitoring AI agent"""
+    request_id = track_socket_request("monitoring_ai:watch:start", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager, AgentStatus
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        agent_id = data.get("agentId")
+        targets = data.get("targets", [])
+        thresholds = data.get("thresholds", {})
+        alert_channels = data.get("alertChannels", [])
+        
+        if not agent_id or not targets:
+            await sio_instance.emit("monitoring_ai:watch:error", {
+                "error": "Missing required fields: agentId, targets",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Update agent status to monitoring
+        await agent_manager.update_agent_status(
+            agent_id,
+            AgentStatus.MONITORING,
+            {
+                "monitoring_targets": targets,
+                "thresholds": thresholds,
+                "alert_channels": alert_channels,
+                "started_at": datetime.now().isoformat()
+            }
+        )
+        
+        # Start monitoring (mock implementation)
+        monitoring_config = {
+            "agentId": agent_id,
+            "targets": targets,
+            "thresholds": thresholds,
+            "alertChannels": alert_channels,
+            "status": "active",
+            "startedAt": datetime.now().isoformat()
+        }
+        
+        await sio_instance.emit("monitoring_ai:watch:started", {
+            "success": True,
+            "monitoringConfig": monitoring_config,
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "monitoring_ai:watch:started", success=True)
+        log.info(f"👁️ Monitoring started for agent {agent_id}: {targets}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error starting monitoring: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "monitoring_ai:watch:error", success=False, error=error_msg)
+        
+        await sio_instance.emit("monitoring_ai:watch:error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("monitoring_ai:alert:detected")
+async def monitoring_ai_alert_detected(sid, data):
+    """Handle alert detection from monitoring AI"""
+    request_id = track_socket_request("monitoring_ai:alert:detected", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        alert_id = data.get("alertId")
+        severity = data.get("severity")
+        metric = data.get("metric")
+        value = data.get("value")
+        threshold = data.get("threshold")
+        suggested_actions = data.get("suggestedActions", [])
+        
+        if not all([alert_id, severity, metric]):
+            await sio_instance.emit("monitoring_ai:alert:error", {
+                "error": "Missing required fields: alertId, severity, metric",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Process alert and determine if operations AI should be notified
+        if severity in ["critical", "high"]:
+            # Find operations AI agents to notify
+            operations_agents = await agent_manager.get_specialization_agents("operations")
+            
+            for ops_agent in operations_agents:
+                # Send incident notification to operations AI
+                await agent_manager.agent_communicate(
+                    data.get("agentId", "monitoring-ai"),
+                    ops_agent.agent_id,
+                    "incident_alert",
+                    {
+                        "alertId": alert_id,
+                        "severity": severity,
+                        "metric": metric,
+                        "value": value,
+                        "threshold": threshold,
+                        "suggestedActions": suggested_actions,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                
+                # Notify operations AI via Socket.IO
+                await sio_instance.emit("operations_ai:incident:received", {
+                    "alertId": alert_id,
+                    "severity": severity,
+                    "metric": metric,
+                    "value": value,
+                    "threshold": threshold,
+                    "suggestedActions": suggested_actions,
+                    "fromAgent": data.get("agentId", "monitoring-ai"),
+                    "toAgent": ops_agent.agent_id,
+                    "_requestId": request_id
+                })
+        
+        # Broadcast alert to interested parties
+        await sio_instance.emit("monitoring_ai:alert:broadcast", {
+            "alert": {
+                "alertId": alert_id,
+                "severity": severity,
+                "metric": metric,
+                "value": value,
+                "threshold": threshold,
+                "impact": data.get("impact", "unknown"),
+                "suggestedActions": suggested_actions,
+                "timestamp": datetime.now().isoformat()
+            },
+            "_requestId": request_id
+        })
+        
+        track_socket_response(request_id, "monitoring_ai:alert:broadcast", success=True)
+        log.info(f"🚨 Alert detected: {alert_id} ({severity}) - {metric}: {value}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error handling alert detection: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "monitoring_ai:alert:error", success=False, error=error_msg)
+        
+        await sio_instance.emit("monitoring_ai:alert:error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("operations_ai:action:execute")
+async def operations_ai_action_execute(sid, data):
+    """Execute automated action via operations AI"""
+    request_id = track_socket_request("operations_ai:action:execute", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager, AgentStatus
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        agent_id = data.get("agentId")
+        action = data.get("action")
+        parameters = data.get("parameters", {})
+        urgency = data.get("urgency", "normal")
+        approval = data.get("approval", "manual")
+        
+        if not agent_id or not action:
+            await sio_instance.emit("operations_ai:action:error", {
+                "error": "Missing required fields: agentId, action",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Update agent status to executing
+        await agent_manager.update_agent_status(
+            agent_id,
+            AgentStatus.EXECUTING,
+            {
+                "action": action,
+                "parameters": parameters,
+                "urgency": urgency,
+                "started_at": datetime.now().isoformat()
+            }
+        )
+        
+        # Simulate action execution (in real implementation, execute actual operations)
+        action_id = f"action-{uuid4().hex[:11]}"
+        
+        # Mock execution result based on action type
+        if action == "auto_scale":
+            execution_result = {
+                "actionId": action_id,
+                "result": "success",
+                "details": {
+                    "service": parameters.get("service", "unknown"),
+                    "old_instances": 3,
+                    "new_instances": parameters.get("factor", 2) * 3,
+                    "execution_time": "45s"
+                },
+                "next_steps": ["monitor_performance", "validate_stability"]
+            }
+        elif action == "restart_service":
+            execution_result = {
+                "actionId": action_id,
+                "result": "success",
+                "details": {
+                    "service": parameters.get("service", "unknown"),
+                    "restart_time": "30s",
+                    "health_check": "passed"
+                },
+                "next_steps": ["monitor_health", "verify_functionality"]
+            }
+        else:
+            execution_result = {
+                "actionId": action_id,
+                "result": "success",
+                "details": {
+                    "action": action,
+                    "execution_time": "60s"
+                },
+                "next_steps": ["verify_result"]
+            }
+        
+        # Update agent status back to idle
+        await agent_manager.update_agent_status(
+            agent_id,
+            AgentStatus.IDLE,
+            {
+                "last_action": action,
+                "action_result": execution_result["result"],
+                "completed_at": datetime.now().isoformat()
+            }
+        )
+        
+        await sio_instance.emit("operations_ai:action:completed", {
+            "success": True,
+            "executionResult": execution_result,
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "operations_ai:action:completed", success=True)
+        log.info(f"⚙️ Action executed: {action_id} - {action}")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error executing operations action: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "operations_ai:action:error", success=False, error=error_msg)
+        
+        await sio_instance.emit("operations_ai:action:error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)
+
+
+@instrument_socketio_handler("ai_agents:collaborate")
+async def ai_agents_collaborate(sid, data):
+    """Handle collaboration request between AI agents"""
+    request_id = track_socket_request("ai_agents:collaborate", data, sid)
+    
+    try:
+        from aetherterm.agentserver.services.hierarchical_agent_manager import get_hierarchical_agent_manager
+        
+        agent_manager = get_hierarchical_agent_manager()
+        
+        initiator = data.get("initiator")
+        target = data.get("target")
+        collaboration_type = data.get("collaboration_type")
+        incident = data.get("incident", {})
+        requested_action = data.get("requested_action")
+        
+        if not all([initiator, target, collaboration_type]):
+            await sio_instance.emit("ai_agents:collaboration:error", {
+                "error": "Missing required fields: initiator, target, collaboration_type",
+                "_requestId": request_id
+            }, room=sid)
+            return
+        
+        # Generate collaboration ID
+        collaboration_id = f"collab-{uuid4().hex[:11]}"
+        
+        # Process collaboration request
+        await agent_manager.agent_communicate(
+            initiator,
+            target,
+            f"collaboration_{collaboration_type}",
+            {
+                "collaboration_id": collaboration_id,
+                "incident": incident,
+                "requested_action": requested_action,
+                "collaboration_type": collaboration_type
+            }
+        )
+        
+        # Simulate collaboration response (in real implementation, wait for actual agent response)
+        if collaboration_type == "incident_response":
+            collaboration_response = {
+                "collaboration_id": collaboration_id,
+                "responder": target,
+                "status": "accepted",
+                "planned_actions": [
+                    "restart_db_connections",
+                    "increase_pool_size",
+                    "failover_to_replica"
+                ],
+                "estimated_time": "2-3分"
+            }
+        else:
+            collaboration_response = {
+                "collaboration_id": collaboration_id,
+                "responder": target,
+                "status": "accepted",
+                "message": "Collaboration request accepted"
+            }
+        
+        await sio_instance.emit("ai_agents:collaboration:response", {
+            "success": True,
+            "collaborationResponse": collaboration_response,
+            "_requestId": request_id
+        }, room=sid)
+        
+        track_socket_response(request_id, "ai_agents:collaboration:response", success=True)
+        log.info(f"🤝 Collaboration established: {collaboration_id} ({initiator} -> {target})")
+        
+    except Exception as e:
+        error_msg = str(e)
+        log.error(f"Error handling collaboration: {e}", exc_info=True)
+        
+        track_socket_response(request_id, "ai_agents:collaboration:error", success=False, error=error_msg)
+        
+        await sio_instance.emit("ai_agents:collaboration:error", {
+            "error": error_msg,
+            "_requestId": request_id
+        }, room=sid)

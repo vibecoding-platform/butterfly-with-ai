@@ -71,11 +71,12 @@ async function initializeServices() {
       debug: environment.isDevelopment,
       timeout: 10000,
       reconnectionAttempts: 5,
-      autoInitialize: true
+      autoInitialize: false  // Disable auto workspace initialization for now
     });
     
     if (environment.isDevelopment) {
       console.log('✅ All AetherTerm services initialized successfully');
+      console.log('🔗 Socket Manager:', serviceFactory.getSocketManager().getConnectionStatus().value);
     }
     
   } catch (error) {

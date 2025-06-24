@@ -516,6 +516,30 @@ def setup_app(**kwargs):
     # Register tab management handlers
     sio.on("workspace:tab:create", socket_handlers.workspace_tab_create)
     sio.on("workspace:tab:close", socket_handlers.workspace_tab_close)
+    
+    # Register AI agent handlers
+    sio.on("ai_agent:task:assign", socket_handlers.ai_agent_task_assign)
+    sio.on("ai_agent:status:request", socket_handlers.ai_agent_status_request)
+    
+    # Register pane coordination handlers
+    sio.on("ai_agent:pane:create_request", socket_handlers.ai_agent_pane_create_request)
+    sio.on("ai_agent:pane:work_assign", socket_handlers.ai_agent_pane_work_assign)
+    sio.on("ai_agent:pane:work_response", socket_handlers.ai_agent_pane_work_response)
+    sio.on("ai_agent:pane:progress_report", socket_handlers.ai_agent_pane_progress_report)
+    sio.on("ai_agent:pane:report_request", socket_handlers.ai_agent_pane_report_request)
+    sio.on("ai_agent:pane:communicate", socket_handlers.ai_agent_pane_communicate)
+    
+    # Register hierarchical agent management handlers
+    sio.on("ai_agent:parent:create", socket_handlers.ai_agent_parent_create)
+    sio.on("ai_agent:task:distribute", socket_handlers.ai_agent_task_distribute)
+    sio.on("ai_agent:communicate", socket_handlers.ai_agent_communicate)
+    sio.on("ai_agent:hierarchy:status", socket_handlers.ai_agent_hierarchy_status)
+    
+    # Register specialized AI agent handlers
+    sio.on("monitoring_ai:watch:start", socket_handlers.monitoring_ai_watch_start)
+    sio.on("monitoring_ai:alert:detected", socket_handlers.monitoring_ai_alert_detected)
+    sio.on("operations_ai:action:execute", socket_handlers.operations_ai_action_execute)
+    sio.on("ai_agents:collaborate", socket_handlers.ai_agents_collaborate)
 
     # Setup dynamic event handling for hierarchical events
     original_trigger_event = sio._trigger_event

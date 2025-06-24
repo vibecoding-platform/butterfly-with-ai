@@ -21,7 +21,8 @@ class TabType(Enum):
     """Types of tabs in a session"""
 
     TERMINAL = "terminal"
-    AI_ASSISTANT = "ai_assistant"
+    AI_ASSISTANT = "ai_assistant"  # 既存アシスタント（受動的支援）
+    AI_AGENT = "ai_agent"          # 新規エージェント（能動的実行）
 
 
 class MessageType(Enum):

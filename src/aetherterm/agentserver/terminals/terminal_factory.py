@@ -251,6 +251,8 @@ class TerminalFactory:
         socket_id: str,
         terminal_type: Optional[TerminalType] = None,
         output_callback: Optional[Callable] = None,
+        shell_command: Optional[list] = None,
+        shell_env: Optional[dict] = None,
         **kwargs,
     ) -> Optional[TerminalInterface]:
         """
@@ -279,6 +281,13 @@ class TerminalFactory:
         try:
             if terminal_type == TerminalType.PTY:
                 terminal = PtyTerminalWrapper(terminal_id, socket_id, output_callback)
+                # Store shell configuration for PTY terminals
+                if hasattr(terminal, 'set_shell_config'):
+                    terminal.set_shell_config(shell_command, shell_env)
+                elif shell_command or shell_env:
+                    # Pass shell config through kwargs for PTY start method
+                    kwargs['shell_command'] = shell_command
+                    kwargs['shell_env'] = shell_env
             elif terminal_type == TerminalType.ASYNCIO:
                 terminal = AsyncioTerminalWrapper(terminal_id, socket_id, output_callback, **kwargs)
             else:
@@ -286,7 +295,7 @@ class TerminalFactory:
                 return None
 
             self.active_terminals[terminal_id] = terminal
-            log.info(f"Created {terminal_type.value} terminal {terminal_id}")
+            log.info(f"Created {terminal_type.value} terminal {terminal_id} with shell config")
             return terminal
 
         except Exception as e:

@@ -16,6 +16,19 @@ export interface ConnectionState {
   lastError: string | null
   connectedAt: Date | null
   socketId: string | null
+  errorType: 'CONNECTION_ERROR' | 'SERVER_ERROR' | 'NETWORK_ERROR' | 'TIMEOUT_ERROR' | 'UNKNOWN_ERROR' | null
+  errorDetails: any
+  serverUrl: string | null
+}
+
+// Error event interface
+export interface ErrorEvent {
+  type: 'CONNECTION_ERROR' | 'SERVER_ERROR' | 'NETWORK_ERROR' | 'TIMEOUT_ERROR' | 'UNKNOWN_ERROR'
+  message: string
+  code?: string
+  details?: any
+  timestamp: Date
+  recoverable: boolean
 }
 
 // Event routing interface
@@ -48,8 +61,18 @@ export class AetherTermSocketManager {
     reconnectAttempts: 0,
     lastError: null,
     connectedAt: null,
-    socketId: null
+    socketId: null,
+    errorType: null,
+    errorDetails: null,
+    serverUrl: null
   })
+
+  // Error handling
+  private errorHandlers: ((error: ErrorEvent) => void)[] = []
+  private lastErrorEvent: ErrorEvent | null = null
+  private maxReconnectAttempts = 5
+  private reconnectDelay = 1000
+  private currentUrl = ''
 
   // Request tracking for correlation
   private pendingRequests: Map<string, {
@@ -89,12 +112,21 @@ export class AetherTermSocketManager {
       reconnectionAttempts = 5
     } = options
 
+    this.currentUrl = url
+    this.maxReconnectAttempts = reconnectionAttempts
+
     if (this.socket?.connected) {
       console.log('🔗 Socket.IO already connected')
       return
     }
 
-    this.updateConnectionState({ status: 'connecting' })
+    this.updateConnectionState({ 
+      status: 'connecting',
+      serverUrl: url,
+      errorType: null,
+      errorDetails: null,
+      lastError: null
+    })
 
     try {
       // Create single Socket.IO connection
@@ -114,7 +146,9 @@ export class AetherTermSocketManager {
       // Wait for connection
       await new Promise<void>((resolve, reject) => {
         const connectTimeout = setTimeout(() => {
-          reject(new Error('Connection timeout'))
+          const timeoutError = new Error('Connection timeout')
+          this.handleError('TIMEOUT_ERROR', timeoutError.message, 'TIMEOUT', timeoutError, false)
+          reject(timeoutError)
         }, timeout)
 
         this.socket!.once('connect', () => {
@@ -124,17 +158,16 @@ export class AetherTermSocketManager {
             connectedAt: new Date(),
             socketId: this.socket!.id,
             reconnectAttempts: 0,
-            lastError: null
+            lastError: null,
+            errorType: null,
+            errorDetails: null
           })
           resolve()
         })
 
         this.socket!.once('connect_error', (error) => {
           clearTimeout(connectTimeout)
-          this.updateConnectionState({
-            status: 'error',
-            lastError: error.message
-          })
+          this.handleError('CONNECTION_ERROR', error.message, 'CONNECT_ERROR', error, true)
           reject(error)
         })
       })
@@ -142,10 +175,8 @@ export class AetherTermSocketManager {
       console.log('✅ AetherTermSocketManager connected:', this.socket.id)
       
     } catch (error) {
-      this.updateConnectionState({
-        status: 'error',
-        lastError: error instanceof Error ? error.message : 'Unknown error'
-      })
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      this.handleError('CONNECTION_ERROR', errorMessage, 'CONNECT_FAILED', error, true)
       throw error
     }
   }
@@ -163,7 +194,9 @@ export class AetherTermSocketManager {
         connectedAt: new Date(),
         socketId: this.socket!.id,
         reconnectAttempts: 0,
-        lastError: null
+        lastError: null,
+        errorType: null,
+        errorDetails: null
       })
       console.log('🔗 Socket.IO connected:', this.socket!.id)
     })
@@ -173,41 +206,74 @@ export class AetherTermSocketManager {
         status: 'disconnected',
         connectedAt: null,
         socketId: null,
-        lastError: reason
+        lastError: reason,
+        errorType: 'CONNECTION_ERROR',
+        errorDetails: { reason }
       })
       console.log('🔌 Socket.IO disconnected:', reason)
+      
+      // Emit error event for graceful disconnection
+      if (reason !== 'io client disconnect') {
+        this.handleError('CONNECTION_ERROR', `Connection lost: ${reason}`, 'DISCONNECT', { reason }, true)
+      }
+    })
+
+    this.socket.on('connect_error', (error) => {
+      const attempts = this._connectionState.value.reconnectAttempts + 1
+      this.updateConnectionState({
+        status: 'error',
+        reconnectAttempts: attempts,
+        lastError: error.message,
+        errorType: 'CONNECTION_ERROR',
+        errorDetails: error
+      })
+      
+      this.handleError('CONNECTION_ERROR', error.message, 'CONNECT_ERROR', error, attempts < this.maxReconnectAttempts)
+      console.error('❌ Socket.IO connection error:', error)
+    })
+
+    this.socket.on('reconnect_attempt', (attemptNumber) => {
+      this.updateConnectionState({
+        status: 'connecting',
+        reconnectAttempts: attemptNumber
+      })
+      console.log(`🔄 Reconnection attempt ${attemptNumber}/${this.maxReconnectAttempts}`)
     })
 
     this.socket.on('reconnect', (attemptNumber) => {
       this.updateConnectionState({
         status: 'connected',
-        reconnectAttempts: attemptNumber,
-        lastError: null
+        connectedAt: new Date(),
+        socketId: this.socket!.id,
+        reconnectAttempts: 0,
+        lastError: null,
+        errorType: null,
+        errorDetails: null
       })
-      console.log('🔄 Socket.IO reconnected after', attemptNumber, 'attempts')
-    })
-
-    this.socket.on('reconnect_error', (error) => {
-      this.updateConnectionState({
-        lastError: error.message
-      })
+      console.log('✅ Socket.IO reconnected after', attemptNumber, 'attempts')
     })
 
     this.socket.on('reconnect_failed', () => {
       this.updateConnectionState({
         status: 'error',
-        lastError: 'Reconnection failed'
+        lastError: 'Reconnection failed after maximum attempts',
+        errorType: 'CONNECTION_ERROR',
+        errorDetails: { maxAttempts: this.maxReconnectAttempts }
       })
-      console.error('❌ Socket.IO reconnection failed')
+      
+      this.handleError('CONNECTION_ERROR', 'Failed to reconnect after maximum attempts', 'RECONNECT_FAILED', 
+        { maxAttempts: this.maxReconnectAttempts }, false)
+      console.error('❌ Socket.IO reconnection failed after maximum attempts')
     })
 
-    // Latency monitoring
-    this.socket.on('pong', (latency) => {
-      this.updateConnectionState({ latency })
+    // Error handling for server errors
+    this.socket.on('error', (error) => {
+      this.handleError('SERVER_ERROR', error.message || 'Server error', 'SERVER_ERROR', error, true)
+      console.error('❌ Socket.IO server error:', error)
     })
 
-    // Global event router - routes all events to registered services
-    this.socket.onAny((eventName: string, ...args: any[]) => {
+    // Setup event routing for all other events
+    this.socket.onAny((eventName, ...args) => {
       this.routeEvent(eventName, args[0])
     })
   }
@@ -419,6 +485,107 @@ export class AetherTermSocketManager {
    */
   private updateConnectionState(updates: Partial<ConnectionState>): void {
     Object.assign(this._connectionState.value, updates)
+  }
+
+  /**
+   * Handle error and notify error handlers
+   */
+  private handleError(
+    type: ErrorEvent['type'], 
+    message: string, 
+    code?: string, 
+    details?: any, 
+    recoverable: boolean = true
+  ): void {
+    const errorEvent: ErrorEvent = {
+      type,
+      message,
+      code,
+      details,
+      timestamp: new Date(),
+      recoverable
+    }
+
+    this.lastErrorEvent = errorEvent
+
+    // Update connection state
+    this.updateConnectionState({
+      errorType: type,
+      errorDetails: details,
+      lastError: message
+    })
+
+    // Notify all registered error handlers
+    this.errorHandlers.forEach(handler => {
+      try {
+        handler(errorEvent)
+      } catch (error) {
+        console.error('Error in error handler:', error)
+      }
+    })
+
+    console.error(`🚨 ${type}: ${message}`, details)
+  }
+
+  /**
+   * Register error handler
+   */
+  public onError(handler: (error: ErrorEvent) => void): () => void {
+    this.errorHandlers.push(handler)
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.errorHandlers.indexOf(handler)
+      if (index > -1) {
+        this.errorHandlers.splice(index, 1)
+      }
+    }
+  }
+
+  /**
+   * Get last error event
+   */
+  public getLastError(): ErrorEvent | null {
+    return this.lastErrorEvent
+  }
+
+  /**
+   * Retry connection
+   */
+  public async retry(): Promise<void> {
+    if (this.socket?.connected) {
+      console.log('🔗 Already connected, no need to retry')
+      return
+    }
+
+    console.log('🔄 Retrying connection...')
+    
+    // Disconnect existing socket if any
+    if (this.socket) {
+      this.socket.disconnect()
+      this.socket = null
+    }
+
+    // Clear error state
+    this.updateConnectionState({
+      errorType: null,
+      errorDetails: null,
+      lastError: null,
+      reconnectAttempts: 0
+    })
+
+    // Reconnect with current URL
+    await this.connect({ 
+      url: this.currentUrl,
+      reconnectionAttempts: this.maxReconnectAttempts 
+    })
+  }
+
+  /**
+   * Check if error is recoverable
+   */
+  public isRecoverable(): boolean {
+    return this.lastErrorEvent?.recoverable ?? true
   }
 
   /**
