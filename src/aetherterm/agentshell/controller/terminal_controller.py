@@ -16,6 +16,7 @@ from ..pty.terminal_pty import TerminalPTY
 from ..service.ai_service import AIService
 from ..service.session_service import SessionService
 from ..service.telemetry_service import TelemetryService
+from ..integrations.openhands_integration import OpenHandsIntegration
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,10 @@ class TerminalController:
         self._pty = TerminalPTY(config, session_id)
         self._pty.add_event_callback(self._handle_terminal_event)
 
+        # OpenHands統合
+        self._openhands = OpenHandsIntegration(terminal_output_callback=self._send_to_terminal)
+        self._openhands_enabled = False
+
         # コマンド実行追跡
         self._current_command = ""
         self._command_start_time: Optional[datetime] = None
@@ -67,6 +72,18 @@ class TerminalController:
         # PTY監視を開始
         await self._pty.start_monitoring(command)
 
+        # OpenHands統合の初期化（AI エージェントの場合）
+        if self._should_enable_openhands():
+            try:
+                success = await self._openhands.initialize()
+                self._openhands_enabled = success
+                if success:
+                    logger.info("OpenHands integration enabled for this session")
+                else:
+                    logger.warning("OpenHands integration failed to initialize")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenHands: {e}")
+
         # セッションサービスにセッション作成を通知
         if self._session_service:
             child_pid = self._pty.get_child_pid()
@@ -85,6 +102,15 @@ class TerminalController:
         # テレメトリーでセッション終了をトレース
         if self._telemetry_service:
             self._telemetry_service.trace_session_event("stop", self.session_id)
+
+        # OpenHands統合のクリーンアップ
+        if self._openhands_enabled:
+            try:
+                await self._openhands.cleanup()
+                self._openhands_enabled = False
+                logger.info("OpenHands integration cleaned up")
+            except Exception as e:
+                logger.error(f"Error cleaning up OpenHands: {e}")
 
         # PTY監視を停止
         await self._pty.stop_monitoring()
@@ -178,6 +204,29 @@ class TerminalController:
 
         return False
 
+    def _should_enable_openhands(self) -> bool:
+        """
+        OpenHands統合を有効にするかどうかを判定
+        
+        環境変数 AETHER_AI_TYPE に基づいて判定
+        """
+        import os
+        ai_type = os.getenv('AETHER_AI_TYPE', '').lower()
+        return ai_type in ['coding', 'operations', 'general']
+
+    async def _send_to_terminal(self, text: str) -> None:
+        """
+        ターミナルにテキストを送信（OpenHands統合用）
+        
+        Args:
+            text: 送信するテキスト
+        """
+        try:
+            # PTYに直接出力を送信
+            await self._pty.write_output(text)
+        except Exception as e:
+            logger.error(f"Failed to send text to terminal: {e}")
+
     async def _handle_command_completion(self, session_id: str, output: str) -> None:
         """
         コマンド完了を処理
@@ -254,6 +303,18 @@ class TerminalController:
         Returns:
             bool: 送信に成功した場合True
         """
+        # OpenHandsコマンドの処理
+        if self._openhands_enabled and data.endswith(b'\r'):
+            # コマンドラインが完成した場合
+            try:
+                command_line = data.decode('utf-8').strip()
+                if command_line and await self._openhands.handle_command(command_line):
+                    # OpenHandsが処理した場合は、PTYには送信しない
+                    return True
+            except Exception as e:
+                logger.error(f"OpenHands command processing error: {e}")
+                # エラーの場合は通常のPTY処理にフォールバック
+        
         return await self._pty.send_input(data)
 
     async def resize_terminal(self, rows: int, cols: int) -> bool:
