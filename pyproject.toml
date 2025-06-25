@@ -58,9 +58,6 @@ dependencies = [
 themes = ["libsass"]
 lint = ["pytest", "pytest-flake8", "pytest-isort"]
 dev = ["ruff", "pre-commit", "mypy", "pytest", "pytest-cov", "pytest-asyncio"]
-arm64 = [
-    "psycopg2>=2.9.0",  # Use psycopg2 instead of psycopg2-binary for ARM64
-]
 test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",

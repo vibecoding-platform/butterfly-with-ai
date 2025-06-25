@@ -161,7 +161,7 @@ class AutoBlocker:
         """セッションのブロック状態を取得"""
         return self.blocked_sessions.get(session_id)
 
-    def get_all_blocked_sessions(self) -> Dict[str, BlockState]:
+    def get_all_blocked_sessions(self) -> dict[str, BlockState]:
         """すべてのブロックされたセッションを取得"""
         return self.blocked_sessions.copy()
 
@@ -215,7 +215,7 @@ class AutoBlocker:
         }
         return severity_map.get(reason, "medium")
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """ブロック統計を取得"""
         if not self.blocked_sessions:
             return {"total_blocked": 0, "by_reason": {}, "oldest_block": None, "newest_block": None}

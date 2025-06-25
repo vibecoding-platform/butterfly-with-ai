@@ -1,10 +1,18 @@
 # See https://pre-commit.com for more information
+exclude: ^\.venv/
 repos:
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            docs/.*\.md$|
+            .*\.md$|
+            CHANGELOG\.md$|
+            README\.md$
+          )
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
