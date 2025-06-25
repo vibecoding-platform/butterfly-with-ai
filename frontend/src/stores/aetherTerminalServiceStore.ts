@@ -54,7 +54,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     isReconnecting: false,
     reconnectAttempts: 0,
     maxReconnectAttempts: 5,
-    latency: 0
+    latency: 0,
   })
 
   const socket = ref<Socket | null>(null)
@@ -67,7 +67,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     isReconnecting: false,
     lastActivity: new Date(),
     supervisorControlled: false,
-    aiMonitoring: true
+    aiMonitoring: true,
   })
 
   const pendingCommands = ref<TerminalCommand[]>([])
@@ -83,14 +83,14 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       'Privilege escalation monitoring',
       'Network configuration changes',
       'Service management operations',
-      'Data destruction prevention'
+      'Data destruction prevention',
     ],
     currentProcedure: 'System maintenance checklist',
     procedureStep: 1,
     totalSteps: 5,
     lastAnalysis: new Date(),
     riskAssessment: 'low',
-    suggestedActions: []
+    suggestedActions: [],
   })
 
   // Dynamic dangerous commands (managed by AI)
@@ -102,19 +102,20 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     onChatMessage: ((data: any) => void)[]
   }>({
     onShellOutput: [],
-    onChatMessage: []
+    onChatMessage: [],
   })
 
   // Getters
   const hasPendingCommands = computed(() => pendingCommands.value.length > 0)
-  const isTerminalBlocked = computed(() =>
-    session.value.isPaused ||
-    session.value.isReconnecting ||
-    hasPendingCommands.value ||
-    !connectionState.value.isConnected
+  const isTerminalBlocked = computed(
+    () =>
+      session.value.isPaused ||
+      session.value.isReconnecting ||
+      hasPendingCommands.value ||
+      !connectionState.value.isConnected
   )
   const criticalCommandsPending = computed(() =>
-    pendingCommands.value.filter(cmd => cmd.riskLevel === 'critical')
+    pendingCommands.value.filter((cmd) => cmd.riskLevel === 'critical')
   )
   const connectionStatus = computed(() => {
     if (connectionState.value.isConnected) return 'connected'
@@ -126,7 +127,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   // Connection Actions
   const setSocket = (socketInstance: Socket) => {
     socket.value = socketInstance
-    console.log('Setting socket value:', socketInstance);
+    console.log('Setting socket value:', socketInstance)
   }
 
   // const setupSocketListeners = () => {
@@ -243,11 +244,11 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   const setupSocketListeners = () => {
     if (!socket.value) return
 
-    const socketInstance = socket.value as Socket;
+    const socketInstance = socket.value as Socket
 
     // Connection events
     socketInstance.on('connect', () => {
-      console.log('Socket connected, setting up listeners');
+      console.log('Socket connected, setting up listeners')
       connectionState.value.isConnected = true
       connectionState.value.isConnecting = false
       connectionState.value.isReconnecting = false
@@ -261,8 +262,8 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       socketInstance.emit('create_terminal', {
         session: session.value.id || '',
         user: '',
-        path: ''
-      });
+        path: '',
+      })
     })
 
     socketInstance.on('disconnect', (reason: string) => {
@@ -302,47 +303,46 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
     // Terminal events - using the correct event names from server
     socketInstance.on('terminal_output', (data: any) => {
-      console.log('Received terminal_output:', data);
+      console.log('Received terminal_output:', data)
       if (data && data.data) {
         // Pass directly to xterm callbacks without adding to buffer
-        eventCallbacks.value.onShellOutput.forEach(callback => callback(data.data))
+        eventCallbacks.value.onShellOutput.forEach((callback) => callback(data.data))
       }
-    });
+    })
 
     socketInstance.on('terminal_ready', (data: any) => {
-      console.log('Terminal ready:', data);
-      session.value.id = data.session || '';
-      session.value.isActive = true;
-    });
+      console.log('Terminal ready:', data)
+      session.value.id = data.session || ''
+      session.value.isActive = true
+    })
 
     socketInstance.on('terminal_error', (data: any) => {
-      console.log('Terminal error:', data);
-      addToOutput(`[ERROR] ${data.error || 'Unknown terminal error'}`);
-    });
+      console.log('Terminal error:', data)
+      addToOutput(`[ERROR] ${data.error || 'Unknown terminal error'}`)
+    })
 
     socketInstance.on('terminal_closed', (data: any) => {
-      console.log('Terminal closed:', data);
-      session.value.isActive = false;
-      addToOutput(`[SYSTEM] Terminal session closed`);
-    });
+      console.log('Terminal closed:', data)
+      session.value.isActive = false
+      addToOutput(`[SYSTEM] Terminal session closed`)
+    })
 
     // Legacy events for compatibility
     socketInstance.on('shell_output', (data: string) => {
-      console.log('Received shell_output:', data);
-      eventCallbacks.value.onShellOutput.forEach(callback => callback(data))
-    });
+      console.log('Received shell_output:', data)
+      eventCallbacks.value.onShellOutput.forEach((callback) => callback(data))
+    })
 
     // Admin control events
     socketInstance.on('admin_pause_terminal', (data: any) => {
-      console.log('Received admin_pause_terminal event', data);
-      pauseTerminal(data.reason);
-    });
+      console.log('Received admin_pause_terminal event', data)
+      pauseTerminal(data.reason)
+    })
 
     socketInstance.on('admin_resume_terminal', () => {
-      console.log('Received admin_resume_terminal event');
-      resumeTerminal();
-    });
-
+      console.log('Received admin_resume_terminal event')
+      resumeTerminal()
+    })
 
     socketInstance.on('command_approval', (data: any) => {
       if (data.approved) {
@@ -350,12 +350,12 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       } else {
         rejectCommand(data.commandId, data.reason || 'Rejected by admin')
       }
-    });
+    })
 
     // Chat events
     socketInstance.on('chat_message', (data: any) => {
-      eventCallbacks.value.onChatMessage.forEach(callback => callback(data))
-    });
+      eventCallbacks.value.onChatMessage.forEach((callback) => callback(data))
+    })
   }
 
   const startReconnection = () => {
@@ -370,33 +370,27 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const connect = () => {
     if (connectionState.value.isConnected || connectionState.value.isConnecting) {
-      return;
+      return
     }
 
-    connectionState.value.isConnecting = true;
+    connectionState.value.isConnecting = true
     addToOutput('[SYSTEM] Connecting to AetherTerm service...')
-    console.log('connect function called');
+    console.log('connect function called')
 
     // Setup socket listeners once if socket exists
     if (socket.value) {
-      setupSocketListeners();
+      setupSocketListeners()
     }
-  };
-
+  }
 
   // Event Registration
   const onShellOutput = (callback: (data: string) => void) => {
     eventCallbacks.value.onShellOutput.push(callback)
   }
 
-
   const onChatMessage = (callback: (data: any) => void) => {
     eventCallbacks.value.onChatMessage.push(callback)
   }
-
-
-
-
 
   // Event Cleanup
   const offShellOutput = (callback?: (data: string) => void) => {
@@ -409,7 +403,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       eventCallbacks.value.onShellOutput = []
     }
   }
-
 
   const offChatMessage = (callback?: (data: any) => void) => {
     if (callback) {
@@ -432,16 +425,15 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const pauseTerminal = (reason: string) => {
     session.value.isPaused = true
-    isSupervisorLocked.value = true;
+    isSupervisorLocked.value = true
     addToOutput(`[SYSTEM] Terminal paused: ${reason}`)
   }
 
   const resumeTerminal = () => {
     session.value.isPaused = false
-    isSupervisorLocked.value = false;
+    isSupervisorLocked.value = false
     addToOutput('[SYSTEM] Terminal resumed')
   }
-
 
   const analyzeCommand = (command: string): TerminalCommand => {
     const commandId = Date.now().toString()
@@ -449,19 +441,22 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     let aiSuggestion = ''
 
     // Check for dangerous commands
-    const isDangerous = dangerousCommands.value.some(dangerous =>
+    const isDangerous = dangerousCommands.value.some((dangerous) =>
       command.toLowerCase().includes(dangerous.toLowerCase())
     )
 
     if (isDangerous) {
       riskLevel = 'critical'
-      aiSuggestion = 'This command may cause system damage or data loss. Consider using safer alternatives.'
+      aiSuggestion =
+        'This command may cause system damage or data loss. Consider using safer alternatives.'
     } else if (command.includes('sudo')) {
       riskLevel = 'high'
-      aiSuggestion = 'This command requires elevated privileges. Ensure you understand its implications.'
+      aiSuggestion =
+        'This command requires elevated privileges. Ensure you understand its implications.'
     } else if (command.includes('chmod') || command.includes('chown')) {
       riskLevel = 'medium'
-      aiSuggestion = 'This command modifies file permissions. Verify the target files and permissions.'
+      aiSuggestion =
+        'This command modifies file permissions. Verify the target files and permissions.'
     }
 
     return {
@@ -471,7 +466,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       status: riskLevel === 'critical' ? 'pending' : 'approved',
       riskLevel,
       aiSuggestion,
-      source: 'user'
+      source: 'user',
     }
   }
 
@@ -489,7 +484,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
           commandId: analyzedCommand.id,
           command: analyzedCommand.command,
           riskLevel: analyzedCommand.riskLevel,
-          aiSuggestion: analyzedCommand.aiSuggestion
+          aiSuggestion: analyzedCommand.aiSuggestion,
         })
       }
 
@@ -503,7 +498,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     if (socket.value) {
       socket.value.emit('terminal_command', {
         command: analyzedCommand.command,
-        commandId: analyzedCommand.id
+        commandId: analyzedCommand.id,
       })
     }
 
@@ -513,17 +508,17 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   // Send raw input to terminal
   const sendInput = (input: string) => {
     session.value.lastActivity = new Date()
-    
+
     if (socket.value) {
       socket.value.emit('terminal_input', {
         session: session.value.id,
-        data: input
+        data: input,
       })
     }
   }
 
   const approveCommand = (commandId: string) => {
-    const commandIndex = pendingCommands.value.findIndex(cmd => cmd.id === commandId)
+    const commandIndex = pendingCommands.value.findIndex((cmd) => cmd.id === commandId)
     if (commandIndex !== -1) {
       const command = pendingCommands.value[commandIndex]
       command.status = 'approved'
@@ -535,7 +530,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       if (socket.value) {
         socket.value.emit('terminal_command', {
           command: command.command,
-          commandId: command.id
+          commandId: command.id,
         })
       }
 
@@ -545,7 +540,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   }
 
   const rejectCommand = (commandId: string, reason: string) => {
-    const commandIndex = pendingCommands.value.findIndex(cmd => cmd.id === commandId)
+    const commandIndex = pendingCommands.value.findIndex((cmd) => cmd.id === commandId)
     if (commandIndex !== -1) {
       const command = pendingCommands.value[commandIndex]
       command.status = 'rejected'
@@ -565,29 +560,23 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const sendResize = (cols: number, rows: number) => {
     if (socket.value && session.value.id) {
-      console.log(`Sending terminal resize: ${cols}x${rows} for session ${session.value.id}`);
+      console.log(`Sending terminal resize: ${cols}x${rows} for session ${session.value.id}`)
       socket.value.emit('terminal_resize', {
         session: session.value.id,
         cols: cols,
-        rows: rows
-      });
+        rows: rows,
+      })
     }
   }
 
   const addToOutput = (text: string) => {
-    console.log('addToOutput called with:', text);
+    console.log('addToOutput called with:', text)
     outputBuffer.value.push(`[${new Date().toLocaleTimeString()}] ${text}`)
     // Keep only last 1000 lines
     if (outputBuffer.value.length > 1000) {
       outputBuffer.value = outputBuffer.value.slice(-1000)
     }
   }
-
-
-
-
-
-
 
   return {
     // State
@@ -631,6 +620,6 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     sendChatMessage,
     sendResize,
     addToOutput,
-    setSocket
+    setSocket,
   }
 })

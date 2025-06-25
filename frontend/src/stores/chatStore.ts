@@ -58,9 +58,9 @@ export const useChatStore = defineStore('chat', () => {
     permissions: {
       canControlTerminal: false,
       canApproveCommands: false,
-      canViewLogs: true
+      canViewLogs: true,
     },
-    lastSeen: new Date()
+    lastSeen: new Date(),
   })
 
   const rooms = ref<ChatRoom[]>([
@@ -74,8 +74,8 @@ export const useChatStore = defineStore('chat', () => {
       permissions: {
         canSendMessages: true,
         canControlTerminal: false,
-        canViewHistory: true
-      }
+        canViewHistory: true,
+      },
     },
     {
       id: 'terminal-control',
@@ -87,8 +87,8 @@ export const useChatStore = defineStore('chat', () => {
       permissions: {
         canSendMessages: true,
         canControlTerminal: true,
-        canViewHistory: true
-      }
+        canViewHistory: true,
+      },
     },
     {
       id: 'ai-assistance',
@@ -100,9 +100,9 @@ export const useChatStore = defineStore('chat', () => {
       permissions: {
         canSendMessages: true,
         canControlTerminal: false,
-        canViewHistory: true
-      }
-    }
+        canViewHistory: true,
+      },
+    },
   ])
 
   const messages = ref<Map<string, ChatMessage[]>>(new Map())
@@ -112,31 +112,25 @@ export const useChatStore = defineStore('chat', () => {
   const typingUsers = ref<Map<string, string[]>>(new Map())
 
   // Initialize messages for each room
-  rooms.value.forEach(room => {
+  rooms.value.forEach((room) => {
     messages.value.set(room.id, [])
   })
 
   // Getters
-  const activeRoom = computed(() => 
-    rooms.value.find(room => room.id === activeRoomId.value)
-  )
+  const activeRoom = computed(() => rooms.value.find((room) => room.id === activeRoomId.value))
 
-  const activeMessages = computed(() => 
-    messages.value.get(activeRoomId.value) || []
-  )
+  const activeMessages = computed(() => messages.value.get(activeRoomId.value) || [])
 
-  const totalUnreadCount = computed(() => 
+  const totalUnreadCount = computed(() =>
     rooms.value.reduce((total, room) => total + room.unreadCount, 0)
   )
 
-  const onlineUsers = computed(() => 
-    rooms.value.flatMap(room => room.participants)
-      .filter(user => user.status === 'online')
+  const onlineUsers = computed(() =>
+    rooms.value.flatMap((room) => room.participants).filter((user) => user.status === 'online')
   )
 
-  const adminUsers = computed(() => 
-    rooms.value.flatMap(room => room.participants)
-      .filter(user => user.role === 'admin')
+  const adminUsers = computed(() =>
+    rooms.value.flatMap((room) => room.participants).filter((user) => user.role === 'admin')
   )
 
   // Actions
@@ -156,7 +150,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const switchRoom = (roomId: string) => {
-    const room = rooms.value.find(r => r.id === roomId)
+    const room = rooms.value.find((r) => r.id === roomId)
     if (room) {
       activeRoomId.value = roomId
       room.unreadCount = 0
@@ -167,7 +161,7 @@ export const useChatStore = defineStore('chat', () => {
     const newMessage: ChatMessage = {
       ...message,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      timestamp: new Date()
+      timestamp: new Date(),
     }
 
     const roomMessages = messages.value.get(roomId) || []
@@ -175,7 +169,7 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.set(roomId, roomMessages)
 
     // Update room's last message and unread count
-    const room = rooms.value.find(r => r.id === roomId)
+    const room = rooms.value.find((r) => r.id === roomId)
     if (room) {
       room.lastMessage = newMessage
       if (roomId !== activeRoomId.value && message.senderId !== currentUser.value.id) {
@@ -195,7 +189,7 @@ export const useChatStore = defineStore('chat', () => {
       roomId: activeRoomId.value,
       type,
       status: 'sending',
-      metadata
+      metadata,
     })
 
     return message
@@ -203,7 +197,7 @@ export const useChatStore = defineStore('chat', () => {
 
   const updateMessageStatus = (messageId: string, status: ChatMessage['status']) => {
     for (const [roomId, roomMessages] of messages.value.entries()) {
-      const message = roomMessages.find(m => m.id === messageId)
+      const message = roomMessages.find((m) => m.id === messageId)
       if (message) {
         message.status = status
         break
@@ -219,7 +213,7 @@ export const useChatStore = defineStore('chat', () => {
       roomId,
       type: 'system',
       status: 'sent',
-      metadata
+      metadata,
     })
   }
 
@@ -231,14 +225,14 @@ export const useChatStore = defineStore('chat', () => {
       roomId,
       type: 'command',
       status: 'sent',
-      metadata: { commandId }
+      metadata: { commandId },
     })
   }
 
   const addUserToRoom = (roomId: string, user: ChatUser) => {
-    const room = rooms.value.find(r => r.id === roomId)
+    const room = rooms.value.find((r) => r.id === roomId)
     if (room) {
-      const existingUser = room.participants.find(p => p.id === user.id)
+      const existingUser = room.participants.find((p) => p.id === user.id)
       if (!existingUser) {
         room.participants.push(user)
         addSystemMessage(roomId, `${user.username} joined the room`)
@@ -249,9 +243,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const removeUserFromRoom = (roomId: string, userId: string) => {
-    const room = rooms.value.find(r => r.id === roomId)
+    const room = rooms.value.find((r) => r.id === roomId)
     if (room) {
-      const userIndex = room.participants.findIndex(p => p.id === userId)
+      const userIndex = room.participants.findIndex((p) => p.id === userId)
       if (userIndex !== -1) {
         const user = room.participants[userIndex]
         room.participants.splice(userIndex, 1)
@@ -261,8 +255,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const updateUserStatus = (userId: string, status: ChatUser['status']) => {
-    rooms.value.forEach(room => {
-      const user = room.participants.find(p => p.id === userId)
+    rooms.value.forEach((room) => {
+      const user = room.participants.find((p) => p.id === userId)
       if (user) {
         user.status = status
         user.lastSeen = new Date()
@@ -272,7 +266,7 @@ export const useChatStore = defineStore('chat', () => {
 
   const setUserTyping = (roomId: string, userId: string, isTyping: boolean) => {
     const roomTypingUsers = typingUsers.value.get(roomId) || []
-    
+
     if (isTyping) {
       if (!roomTypingUsers.includes(userId)) {
         roomTypingUsers.push(userId)
@@ -283,18 +277,18 @@ export const useChatStore = defineStore('chat', () => {
         roomTypingUsers.splice(index, 1)
       }
     }
-    
+
     typingUsers.value.set(roomId, roomTypingUsers)
   }
 
   const getTypingUsers = (roomId: string) => {
     const userIds = typingUsers.value.get(roomId) || []
-    const room = rooms.value.find(r => r.id === roomId)
+    const room = rooms.value.find((r) => r.id === roomId)
     if (!room) return []
-    
+
     return userIds
-      .map(id => room.participants.find(p => p.id === id))
-      .filter(user => user && user.id !== currentUser.value.id)
+      .map((id) => room.participants.find((p) => p.id === id))
+      .filter((user) => user && user.id !== currentUser.value.id)
   }
 
   const clearMessages = (roomId: string) => {
@@ -302,7 +296,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const markAllAsRead = (roomId: string) => {
-    const room = rooms.value.find(r => r.id === roomId)
+    const room = rooms.value.find((r) => r.id === roomId)
     if (room) {
       room.unreadCount = 0
     }
@@ -317,14 +311,14 @@ export const useChatStore = defineStore('chat', () => {
     isConnected,
     isReconnecting,
     typingUsers,
-    
+
     // Getters
     activeRoom,
     activeMessages,
     totalUnreadCount,
     onlineUsers,
     adminUsers,
-    
+
     // Actions
     setCurrentUser,
     setConnectionStatus,
@@ -341,6 +335,6 @@ export const useChatStore = defineStore('chat', () => {
     setUserTyping,
     getTypingUsers,
     clearMessages,
-    markAllAsRead
+    markAllAsRead,
   }
 })

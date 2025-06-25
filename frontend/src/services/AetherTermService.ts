@@ -12,7 +12,7 @@ class AetherTermService {
   private ctlWs: WebSocket | null = null
   private static instance: AetherTermService
 
-  private constructor() { }
+  private constructor() {}
 
   static getInstance(): AetherTermService {
     if (!AetherTermService.instance) {
@@ -24,13 +24,12 @@ class AetherTermService {
   connect(): Socket {
     if (!this.socket) {
       this.socket = io(socketUrl || window.location.origin, {
-        path: '/socket.io'
+        path: '/socket.io',
       })
 
       this.socket.on('connect', () => {
         console.log('AetherTerm Socket.IO connected')
         this.setupVueTermWebSockets()
-
       })
 
       this.socket.on('disconnect', () => {
@@ -54,7 +53,6 @@ class AetherTermService {
   getSocket(): Socket | null {
     return this.socket
   }
-
 
   disconnect(): void {
     if (this.socket) {
@@ -115,7 +113,7 @@ class AetherTermService {
       console.log('Sending command:', command) // Debug log
       this.socket.emit('terminal_command', {
         command: command,
-        commandId: commandId || Date.now().toString()
+        commandId: commandId || Date.now().toString(),
       })
     }
   }
@@ -133,20 +131,27 @@ class AetherTermService {
     }
   }
 
-  onAdminSuppressOutput(callback: (data: { suppress: boolean, reason?: string }) => void): void {
+  onAdminSuppressOutput(callback: (data: { suppress: boolean; reason?: string }) => void): void {
     if (this.socket) {
       this.socket.on('admin_suppress_output', callback)
     }
   }
 
-  onCommandApproval(callback: (data: { commandId: string, approved: boolean, reason?: string }) => void): void {
+  onCommandApproval(
+    callback: (data: { commandId: string; approved: boolean; reason?: string }) => void
+  ): void {
     if (this.socket) {
       this.socket.on('command_approval', callback)
     }
   }
 
   // Emit command review required
-  emitCommandReviewRequired(data: { commandId: string, command: string, riskLevel: string, aiSuggestion: string }): void {
+  emitCommandReviewRequired(data: {
+    commandId: string
+    command: string
+    riskLevel: string
+    aiSuggestion: string
+  }): void {
     if (this.socket) {
       this.socket.emit('command_review_required', data)
     }
