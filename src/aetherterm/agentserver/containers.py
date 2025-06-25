@@ -86,12 +86,12 @@ def configure_container(config=None):
         "ai_api_key": os.getenv("ANTHROPIC_API_KEY"),
         "ai_model": "claude-3-5-sonnet-20241022",
     }
-    
+
     # Merge defaults with provided config
     final_config = defaults.copy()
     if config:
         final_config.update(config)
-    
+
     container.config.from_dict(final_config)
 
     container.wire(

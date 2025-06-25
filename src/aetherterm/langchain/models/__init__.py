@@ -7,12 +7,12 @@ from .memory import ContextEntry, MemoryEntry, MemoryType
 from .session import SessionContext, SessionStatus
 
 __all__ = [
+    "ContextEntry",
     "ConversationEntry",
     "ConversationType",
-    "MessageRole",
     "MemoryEntry",
     "MemoryType",
-    "ContextEntry",
+    "MessageRole",
     "SessionContext",
     "SessionStatus",
 ]

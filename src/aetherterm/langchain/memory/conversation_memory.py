@@ -275,7 +275,6 @@ class ConversationMemoryManager:
         """会話タイプに基づいてメモリ優先度を決定します。"""
         if conversation_type in [ConversationType.ERROR_MESSAGE, ConversationType.SYSTEM_MESSAGE]:
             return MemoryType.LONG_TERM  # 重要な情報は長期メモリへ
-        elif conversation_type == ConversationType.USER_INPUT:
+        if conversation_type == ConversationType.USER_INPUT:
             return MemoryType.MEDIUM_TERM
-        else:
-            return MemoryType.SHORT_TERM  # AI応答やコマンド実行は短期・中期で十分な場合が多い
+        return MemoryType.SHORT_TERM  # AI応答やコマンド実行は短期・中期で十分な場合が多い

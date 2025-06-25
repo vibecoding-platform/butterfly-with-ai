@@ -10,10 +10,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import chromadb
 import faiss
 import numpy as np
-from langchain.schema import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS, Chroma
 from langchain_openai import OpenAIEmbeddings
+
+from langchain.schema import Document
 
 from ..config.storage_config import StorageConfig, VectorStoreType
 from ..models.conversation import ConversationEntry, ConversationType, MessageRole

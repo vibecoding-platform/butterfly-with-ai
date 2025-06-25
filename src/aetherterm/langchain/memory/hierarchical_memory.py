@@ -180,7 +180,7 @@ class HierarchicalMemoryManager:
             if data:
                 if isinstance(data, dict):
                     return MemoryEntry.from_dict(data)
-                elif isinstance(data, MemoryEntry):
+                if isinstance(data, MemoryEntry):
                     return data
             return None
         except Exception as e:

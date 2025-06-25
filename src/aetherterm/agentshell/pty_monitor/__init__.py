@@ -12,4 +12,4 @@ from .input_blocker import InputBlocker
 from .main import main
 from .pty_controller import PTYController
 
-__all__ = ["main", "PTYController", "AIAnalyzer", "InputBlocker"]
+__all__ = ["AIAnalyzer", "InputBlocker", "PTYController", "main"]

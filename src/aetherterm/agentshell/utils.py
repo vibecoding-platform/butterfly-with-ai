@@ -10,9 +10,10 @@ import os
 import signal
 import time
 import uuid
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Awaitable, Callable, Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +157,7 @@ def safe_read_file(file_path: Path, encoding: str = "utf-8") -> Optional[str]:
         if not file_path.exists():
             return None
 
-        with open(file_path, "r", encoding=encoding) as f:
+        with open(file_path, encoding=encoding) as f:
             return f.read()
 
     except Exception as e:

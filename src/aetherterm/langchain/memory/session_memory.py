@@ -261,17 +261,15 @@ class SessionMemoryManager:
                 context = await self.get_session_context(session_id)
                 if context:
                     return context.get_activity_summary()
-                else:
-                    return {"message": f"セッションが見つかりません: {session_id}"}
-            else:
-                # TODO: 全体統計を取得するロジックを実装
-                active_sessions = await self.list_active_sessions()
-                total_sessions = len(active_sessions)  # 簡易的な合計
+                return {"message": f"セッションが見つかりません: {session_id}"}
+            # TODO: 全体統計を取得するロジックを実装
+            active_sessions = await self.list_active_sessions()
+            total_sessions = len(active_sessions)  # 簡易的な合計
 
-                return {
-                    "total_active_sessions": total_sessions,
-                    "message": "全体統計は簡易版です。より詳細な統計は別途実装が必要です。",
-                }
+            return {
+                "total_active_sessions": total_sessions,
+                "message": "全体統計は簡易版です。より詳細な統計は別途実装が必要です。",
+            }
 
         except Exception as e:
             self._logger.error(f"セッション統計情報取得中にエラーが発生: {e}")

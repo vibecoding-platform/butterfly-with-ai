@@ -7,7 +7,7 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
 
 log = logging.getLogger("aetherterm.auto_blocker")
 
@@ -40,7 +40,7 @@ class AutoBlocker:
 
     def __init__(self, socket_io_instance=None):
         self.sio = socket_io_instance
-        self.blocked_sessions: Dict[str, BlockState] = {}
+        self.blocked_sessions: dict[str, BlockState] = {}
 
     def set_socket_io(self, sio_instance):
         """Socket.IOインスタンスを設定"""
@@ -52,7 +52,7 @@ class AutoBlocker:
         reason: BlockReason,
         message: str,
         alert_message: str,
-        detected_keywords: list = None,
+        detected_keywords: Optional[list] = None,
     ) -> bool:
         """
         セッションをブロック

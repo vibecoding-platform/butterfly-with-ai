@@ -39,7 +39,6 @@ class AIProvider(ABC):
         Returns:
             Dict[str, Any]: AI解析結果
         """
-        pass
 
     @abstractmethod
     async def suggest_error_fix(
@@ -56,7 +55,6 @@ class AIProvider(ABC):
         Returns:
             Dict[str, Any]: 修正提案
         """
-        pass
 
     @abstractmethod
     async def suggest_next_commands(
@@ -72,7 +70,6 @@ class AIProvider(ABC):
         Returns:
             Dict[str, Any]: コマンド提案
         """
-        pass
 
 
 class OpenAIProvider(AIProvider):
@@ -143,9 +140,8 @@ class OpenAIProvider(AIProvider):
             ) as response:
                 if response.status == 200:
                     return await response.json()
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"OpenAI API error: {response.status} - {error_text}")
+                error_text = await response.text()
+                raise Exception(f"OpenAI API error: {response.status} - {error_text}")
 
     def _build_analysis_prompt(
         self, command: str, output: str, exit_code: int, context: Dict[str, Any] = None
@@ -328,9 +324,8 @@ class AnthropicProvider(AIProvider):
             ) as response:
                 if response.status == 200:
                     return await response.json()
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Anthropic API error: {response.status} - {error_text}")
+                error_text = await response.text()
+                raise Exception(f"Anthropic API error: {response.status} - {error_text}")
 
     def _build_analysis_prompt(
         self, command: str, output: str, exit_code: int, context: Dict[str, Any] = None
@@ -489,9 +484,8 @@ class LocalProvider(AIProvider):
             async with session.post(f"{self.endpoint}/api/generate", json=payload) as response:
                 if response.status == 200:
                     return await response.json()
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"ローカルAI API error: {response.status} - {error_text}")
+                error_text = await response.text()
+                raise Exception(f"ローカルAI API error: {response.status} - {error_text}")
 
     def _build_analysis_prompt(
         self, command: str, output: str, exit_code: int, context: Dict[str, Any] = None
@@ -536,9 +530,8 @@ def create_ai_provider(
     """AIプロバイダーのファクトリー関数"""
     if provider_type.lower() == "openai":
         return OpenAIProvider(api_key, model, endpoint)
-    elif provider_type.lower() == "anthropic":
+    if provider_type.lower() == "anthropic":
         return AnthropicProvider(api_key, model, endpoint)
-    elif provider_type.lower() == "local":
+    if provider_type.lower() == "local":
         return LocalProvider(api_key, model, endpoint)
-    else:
-        raise ValueError(f"サポートされていないAIプロバイダー: {provider_type}")
+    raise ValueError(f"サポートされていないAIプロバイダー: {provider_type}")

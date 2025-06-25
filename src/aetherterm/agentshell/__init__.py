@@ -25,8 +25,8 @@ from .containers import WrapperApplication, get_application
 from .main import WrapperMain
 
 __all__ = [
-    "WrapperConfig",
     "WrapperApplication",
+    "WrapperConfig",
     "WrapperMain",
     "get_application",
 ]

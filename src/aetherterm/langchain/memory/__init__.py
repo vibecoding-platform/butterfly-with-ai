@@ -6,4 +6,4 @@ from .conversation_memory import ConversationMemoryManager
 from .hierarchical_memory import HierarchicalMemoryManager
 from .session_memory import SessionMemoryManager
 
-__all__ = ["HierarchicalMemoryManager", "ConversationMemoryManager", "SessionMemoryManager"]
+__all__ = ["ConversationMemoryManager", "HierarchicalMemoryManager", "SessionMemoryManager"]

@@ -26,7 +26,6 @@ class MemoryStorageAdapter(ABC):
         Returns:
             str: 保存されたエントリのID
         """
-        pass
 
     @abstractmethod
     async def retrieve_conversations(
@@ -43,7 +42,6 @@ class MemoryStorageAdapter(ABC):
         Returns:
             List[ConversationEntry]: 会話履歴
         """
-        pass
 
     @abstractmethod
     async def search_conversations(
@@ -61,7 +59,6 @@ class MemoryStorageAdapter(ABC):
         Returns:
             List[ConversationEntry]: 検索結果
         """
-        pass
 
     @abstractmethod
     async def delete_old_conversations(self, days: int) -> int:
@@ -74,7 +71,6 @@ class MemoryStorageAdapter(ABC):
         Returns:
             int: 削除された件数
         """
-        pass
 
     @abstractmethod
     async def get_conversation_statistics(self, session_id: str) -> Dict[str, Any]:
@@ -87,7 +83,6 @@ class MemoryStorageAdapter(ABC):
         Returns:
             Dict[str, Any]: 統計情報
         """
-        pass
 
 
 class SessionStorageAdapter(ABC):
@@ -101,7 +96,6 @@ class SessionStorageAdapter(ABC):
         Args:
             context: セッションコンテキスト
         """
-        pass
 
     @abstractmethod
     async def retrieve_session_context(self, session_id: str) -> Optional[SessionContext]:
@@ -114,7 +108,6 @@ class SessionStorageAdapter(ABC):
         Returns:
             Optional[SessionContext]: セッションコンテキスト
         """
-        pass
 
     @abstractmethod
     async def update_session_activity(self, session_id: str) -> None:
@@ -124,7 +117,6 @@ class SessionStorageAdapter(ABC):
         Args:
             session_id: セッションID
         """
-        pass
 
     @abstractmethod
     async def list_active_sessions(self) -> List[SessionContext]:
@@ -134,7 +126,6 @@ class SessionStorageAdapter(ABC):
         Returns:
             List[SessionContext]: アクティブセッション一覧
         """
-        pass
 
     @abstractmethod
     async def cleanup_expired_sessions(self, timeout_minutes: int = 60) -> int:
@@ -147,7 +138,6 @@ class SessionStorageAdapter(ABC):
         Returns:
             int: クリーンアップされたセッション数
         """
-        pass
 
 
 class SummaryStorageAdapter(ABC):
@@ -164,7 +154,6 @@ class SummaryStorageAdapter(ABC):
         Returns:
             str: 保存された要約のID
         """
-        pass
 
     @abstractmethod
     async def retrieve_summaries(
@@ -180,7 +169,6 @@ class SummaryStorageAdapter(ABC):
         Returns:
             List[SessionSummary]: 要約一覧
         """
-        pass
 
     @abstractmethod
     async def search_summaries(self, query: str, limit: int = 10) -> List[SessionSummary]:
@@ -194,7 +182,6 @@ class SummaryStorageAdapter(ABC):
         Returns:
             List[SessionSummary]: 検索結果
         """
-        pass
 
     @abstractmethod
     async def delete_old_summaries(self, days: int) -> int:
@@ -207,7 +194,6 @@ class SummaryStorageAdapter(ABC):
         Returns:
             int: 削除された件数
         """
-        pass
 
 
 class VectorStorageAdapter(ABC):
@@ -224,7 +210,6 @@ class VectorStorageAdapter(ABC):
         Returns:
             List[float]: 埋め込みベクトル
         """
-        pass
 
     @abstractmethod
     async def store_embedding(
@@ -242,7 +227,6 @@ class VectorStorageAdapter(ABC):
         Returns:
             str: 保存されたエントリのID
         """
-        pass
 
     @abstractmethod
     async def similarity_search(
@@ -260,7 +244,6 @@ class VectorStorageAdapter(ABC):
         Returns:
             List[Tuple[str, float]]: (コンテンツID, 類似度スコア)のリスト
         """
-        pass
 
     @abstractmethod
     async def delete_embeddings(self, content_ids: List[str]) -> int:
@@ -273,7 +256,6 @@ class VectorStorageAdapter(ABC):
         Returns:
             int: 削除された件数
         """
-        pass
 
     @abstractmethod
     async def get_embedding_statistics(self) -> Dict[str, Any]:
@@ -283,7 +265,6 @@ class VectorStorageAdapter(ABC):
         Returns:
             Dict[str, Any]: 統計情報
         """
-        pass
 
 
 class CacheStorageAdapter(ABC):
@@ -300,7 +281,6 @@ class CacheStorageAdapter(ABC):
         Returns:
             Optional[Any]: 値
         """
-        pass
 
     @abstractmethod
     async def set(self, key: str, value: Any, ttl_seconds: int = None) -> None:
@@ -312,7 +292,6 @@ class CacheStorageAdapter(ABC):
             value: 値
             ttl_seconds: 有効期限（秒）
         """
-        pass
 
     @abstractmethod
     async def delete(self, key: str) -> bool:
@@ -325,7 +304,6 @@ class CacheStorageAdapter(ABC):
         Returns:
             bool: 削除成功フラグ
         """
-        pass
 
     @abstractmethod
     async def exists(self, key: str) -> bool:
@@ -338,7 +316,6 @@ class CacheStorageAdapter(ABC):
         Returns:
             bool: 存在フラグ
         """
-        pass
 
     @abstractmethod
     async def clear_pattern(self, pattern: str) -> int:
@@ -351,7 +328,6 @@ class CacheStorageAdapter(ABC):
         Returns:
             int: 削除された件数
         """
-        pass
 
     @abstractmethod
     async def get_cache_statistics(self) -> Dict[str, Any]:
@@ -361,7 +337,6 @@ class CacheStorageAdapter(ABC):
         Returns:
             Dict[str, Any]: 統計情報
         """
-        pass
 
 
 class BaseStorageAdapter:
@@ -415,17 +390,14 @@ class BaseStorageAdapter:
     @abstractmethod
     async def _connect_impl(self) -> None:
         """接続実装（サブクラスで実装）"""
-        pass
 
     @abstractmethod
     async def _disconnect_impl(self) -> None:
         """切断実装（サブクラスで実装）"""
-        pass
 
     @abstractmethod
     async def _health_check_impl(self) -> Dict[str, Any]:
         """ヘルスチェック実装（サブクラスで実装）"""
-        pass
 
     def __enter__(self):
         return self

@@ -42,8 +42,8 @@ def setup_telemetry(
 
 
 __all__ = [
+    "DistributedTracer",
     "StructuredLogger",
     "TelemetryManager",
-    "DistributedTracer",
     "setup_telemetry",
 ]

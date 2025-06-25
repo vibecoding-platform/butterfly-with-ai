@@ -62,9 +62,9 @@ def geolocation():
             if rv != "R":
                 loc += rv
     except Exception:
-        return
+        return None
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     if not loc or ";" not in loc:
-        return
+        return None
     return tuple(map(float, loc.split(";")))

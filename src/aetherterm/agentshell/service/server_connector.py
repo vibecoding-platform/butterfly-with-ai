@@ -63,9 +63,8 @@ class ServerConnector:
                 logger.info("AetherTermサーバーとの連携を開始しました")
                 self._is_enabled = True
                 return True
-            else:
-                logger.warning("AetherTermサーバーへの接続に失敗しました")
-                return False
+            logger.warning("AetherTermサーバーへの接続に失敗しました")
+            return False
         except Exception as e:
             logger.error(f"サーバー連携の開始に失敗しました: {e}")
             return False

@@ -157,15 +157,14 @@ class StorageConfig:
         if self.database_type == DatabaseType.SQLITE:
             return "sqlite:///./data/aetherterm.db"
 
-        elif self.database_type == DatabaseType.POSTGRESQL:
+        if self.database_type == DatabaseType.POSTGRESQL:
             password_part = f":{self.postgres_password}" if self.postgres_password else ""
             return (
                 f"postgresql://{self.postgres_username}{password_part}"
                 f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
             )
 
-        else:
-            raise ValueError(f"サポートされていないデータベースタイプ: {self.database_type}")
+        raise ValueError(f"サポートされていないデータベースタイプ: {self.database_type}")
 
     def get_redis_url(self) -> str:
         """Redis URL生成"""

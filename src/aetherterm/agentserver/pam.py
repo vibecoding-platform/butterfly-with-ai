@@ -185,7 +185,7 @@ def login_prompt(username, profile, env):
     pam = PAM()
 
     success = pam.authenticate(username, profile)
-    print("{} {}".format(pam.code, pam.reason))
+    print(f"{pam.code} {pam.reason}")
 
     if success:
         su = "/usr/bin/su"

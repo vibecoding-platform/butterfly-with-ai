@@ -1,4 +1,3 @@
-# *-* coding: utf-8 *-*
 # This file is part of aetherterm
 #
 # Copyright 2025 Florian Mounier

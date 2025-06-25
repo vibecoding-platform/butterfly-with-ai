@@ -170,7 +170,7 @@ class WrapperContainer(containers.DeclarativeContainer):
                 "ai_timeout": 30,
                 "session_timeout": 3600,  # 1時間
             }
-        elif env == EnvironmentConfig.STAGING:
+        if env == EnvironmentConfig.STAGING:
             return {
                 "debug": False,
                 "log_level": "INFO",
@@ -179,15 +179,15 @@ class WrapperContainer(containers.DeclarativeContainer):
                 "ai_timeout": 15,
                 "session_timeout": 1800,  # 30分
             }
-        else:  # PRODUCTION
-            return {
-                "debug": False,
-                "log_level": "WARNING",
-                "enable_console_export": False,
-                "enable_file_logging": True,
-                "ai_timeout": 10,
-                "session_timeout": 900,  # 15分
-            }
+        # PRODUCTION
+        return {
+            "debug": False,
+            "log_level": "WARNING",
+            "enable_console_export": False,
+            "enable_file_logging": True,
+            "ai_timeout": 10,
+            "session_timeout": 900,  # 15分
+        }
 
 
 class WrapperApplication:

@@ -175,7 +175,7 @@ class LogAnalyzer:
         for result in recent_results:
             if result.severity == SeverityLevel.CRITICAL:
                 return SeverityLevel.CRITICAL
-            elif result.severity == SeverityLevel.HIGH:
+            if result.severity == SeverityLevel.HIGH:
                 max_severity = SeverityLevel.HIGH
             elif result.severity == SeverityLevel.MEDIUM and max_severity == SeverityLevel.LOW:
                 max_severity = SeverityLevel.MEDIUM

@@ -37,7 +37,7 @@ def get_procfs_socket_line(hex_ip_port):
     elif len(hex_ip_port) == 37:  # ipv6
         fn = "/proc/net/tcp6"
     if not fn:
-        return
+        return None
     try:
         with open(fn) as k:
             lines = k.readlines()

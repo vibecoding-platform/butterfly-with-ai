@@ -247,10 +247,9 @@ class AetherTermShellAgent:
         """現在の動作モードを取得"""
         if self.is_server_connected():
             return "connected"
-        elif self.has_ai_provider():
+        if self.has_ai_provider():
             return "standalone_with_ai"
-        else:
-            return "standalone_local"
+        return "standalone_local"
 
     def get_status(self) -> Dict[str, Any]:
         """Shell Agentの状態を取得"""
@@ -293,9 +292,9 @@ class AetherTermShellAgent:
         endpoint = self.config.ai_service.endpoint.lower()
         if "openai" in endpoint or "api.openai.com" in endpoint:
             return "openai"
-        elif "anthropic" in endpoint or "api.anthropic.com" in endpoint:
+        if "anthropic" in endpoint or "api.anthropic.com" in endpoint:
             return "anthropic"
-        elif "localhost" in endpoint or "127.0.0.1" in endpoint:
+        if "localhost" in endpoint or "127.0.0.1" in endpoint:
             return "local"
 
         # デフォルト

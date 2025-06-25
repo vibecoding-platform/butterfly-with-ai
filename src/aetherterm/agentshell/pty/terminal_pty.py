@@ -12,8 +12,9 @@ import pty
 import select
 import signal
 import sys
+from collections.abc import Awaitable
 from datetime import datetime
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from ..config import MonitorConfig
 from ..domain.models import EventType, TerminalEvent
@@ -294,9 +295,8 @@ class TerminalPTY:
                     if e.errno == 5:  # EIO (Input/output error) は正常終了
                         logger.debug("PTYが閉じられました")
                         break
-                    else:
-                        logger.error(f"出力読み取りエラー: {e}")
-                        break
+                    logger.error(f"出力読み取りエラー: {e}")
+                    break
 
                 # 短時間待機
                 await asyncio.sleep(0.001)

@@ -1,4 +1,3 @@
-# *-* coding: utf-8 *-*
 # This file is part of aetherterm
 #
 # Copyright 2025 Florian Mounier
@@ -16,7 +15,6 @@
 # limitations under the License.
 
 import fcntl
-import io
 import os
 import pty
 import random
@@ -145,7 +143,6 @@ class DefaultTerminal(BaseTerminal):
                     user = input("login: ")
                 except (KeyboardInterrupt, EOFError):
                     log.debug("Error in login input", exc_info=True)
-                    pass
 
             try:
                 self.callee = utils.User(name=user)
@@ -276,8 +273,8 @@ class DefaultTerminal(BaseTerminal):
         def utf8_error(e):
             log.error(e)
 
-        self.reader = io.open(self.fd, "rb", buffering=0, closefd=False)
-        self.writer = io.open(self.fd, "wt", encoding="utf-8", closefd=False)
+        self.reader = open(self.fd, "rb", buffering=0, closefd=False)
+        self.writer = open(self.fd, "w", encoding="utf-8", closefd=False)
         ioloop.add_handler(self.fd, self.shell_handler, ioloop.READ | ioloop.ERROR)
 
     def write(self, message):
@@ -301,7 +298,7 @@ class DefaultTerminal(BaseTerminal):
         if events & ioloop.READ:
             try:
                 read = self.reader.read()
-            except IOError:
+            except OSError:
                 read = ""
 
             log.debug("READ>%r" % read)

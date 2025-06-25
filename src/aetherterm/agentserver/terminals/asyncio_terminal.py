@@ -1,4 +1,3 @@
-# *-* coding: utf-8 *-*
 # This file is part of aetherterm
 #
 # aetherterm Copyright(C) 2015-2017 Florian Mounier
@@ -152,7 +151,7 @@ class AsyncioTerminal(BaseTerminal):
 
                 # Start reading from PTY
                 self.reader_task = asyncio.create_task(self._read_from_pty())
-                
+
                 # Send MOTD for new sessions after a delay to allow shell initialization
                 if len(self.client_sids) == 1:  # This is the first client for this session
                     asyncio.create_task(self._delayed_motd_send())
@@ -209,18 +208,16 @@ class AsyncioTerminal(BaseTerminal):
                     self.callee.name,
                     self.pam_profile,
                 ]
+            # Fallback to su if PAM profile is not specified
+            if os.path.exists("/usr/bin/su"):
+                args = ["/usr/bin/su"]
             else:
-                # Fallback to su if PAM profile is not specified
-                if os.path.exists("/usr/bin/su"):
-                    args = ["/usr/bin/su"]
-                else:
-                    args = ["/bin/su"]
-                args.append("-l")
-                args.append(self.callee.name)
-                return args
-        else:
-            # If login is not required, use the user's default shell
-            return [self.callee.shell, "-il"]
+                args = ["/bin/su"]
+            args.append("-l")
+            args.append(self.callee.name)
+            return args
+        # If login is not required, use the user's default shell
+        return [self.callee.shell, "-il"]
 
     def _setup_child_process(self):
         """Setup function called in child process before exec."""
@@ -285,7 +282,7 @@ class AsyncioTerminal(BaseTerminal):
         """Read data from PTY (blocking operation for executor)."""
         try:
             return os.read(self.fd, 4096)
-        except (OSError, IOError):
+        except OSError:
             return b""
 
     async def write(self, message):

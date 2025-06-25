@@ -1,4 +1,3 @@
-# *-* coding: utf-8 *-*
 # This file is part of butterfly
 #
 # butterfly Copyright(C) 2015-2017 Florian Mounier
@@ -67,7 +66,7 @@ def parse_cert(cert):
     return user
 
 
-class User(object):
+class User:
     def __init__(self, uid=None, name=None):
         if uid is None and not name:
             uid = os.getuid()
@@ -111,7 +110,7 @@ class User(object):
         return "%s [%r]" % (self.name, self.uid)
 
 
-class ConnectionInfo(object):
+class ConnectionInfo:
     """Connection information for Socket.IO and other non-socket connections."""
 
     def __init__(self, environ=None, socket_remote_addr=None):
@@ -173,7 +172,7 @@ class ConnectionInfo(object):
         )
 
 
-class Socket(object):
+class Socket:
     def __init__(self, socket):
         sn = socket.getsockname()
         self.local_addr = sn[0]
@@ -252,7 +251,7 @@ def get_procfs_socket_line(hex_ip_port):
     elif len(hex_ip_port) == 37:  # ipv6
         fn = "/proc/net/tcp6"
     if not fn:
-        return
+        return None
     try:
         with open(fn) as k:
             lines = k.readlines()
@@ -458,7 +457,7 @@ def rm_user_info(id, pid):
     #         log.debug("Unable to update utmp info to " + file, exc_info=True)
 
 
-class AnsiColors(object):
+class AnsiColors:
     colors = {
         "black": 30,
         "red": 31,

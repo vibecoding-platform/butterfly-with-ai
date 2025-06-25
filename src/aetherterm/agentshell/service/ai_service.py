@@ -347,7 +347,6 @@ class IndependentAIService:
         """システム通知をチェック（デモ用）"""
         # 実際の実装では、他システムからの通知をチェック
         # ここではデモ用の処理のみ
-        pass
 
     async def report_command_execution(
         self, session_id: str, command: str, output: str, exit_code: int, execution_time: float

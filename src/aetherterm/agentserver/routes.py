@@ -1,4 +1,3 @@
-# *-* coding: utf-8 *-*
 # This file is part of aetherterm
 #
 # aetherterm Copyright(C) 2015-2017 Florian Mounier
@@ -234,7 +233,7 @@ async def local_js():
                 continue
             file_path = os.path.join(local_js_dir, filename)
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     js_content += f.read() + ";\n"
             except Exception as e:
                 log.warning(f"Could not read {file_path}: {e}")

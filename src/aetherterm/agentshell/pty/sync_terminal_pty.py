@@ -318,10 +318,9 @@ class SyncTerminalPTY:
                         # 最後の行が不完全なら残しておく
                         self.output_buffer = [line]
                         break
-                    else:
-                        # 完全な行を処理
-                        self._check_keywords_in_line(line)
-                        self.stats["lines_processed"] += 1
+                    # 完全な行を処理
+                    self._check_keywords_in_line(line)
+                    self.stats["lines_processed"] += 1
                 else:
                     # 全ての行が処理された
                     self.output_buffer = []  # バッファをクリア

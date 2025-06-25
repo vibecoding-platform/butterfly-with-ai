@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# *-* coding: utf-8 *-*
 
 # This file is part of aetherterm
 #
@@ -396,7 +395,7 @@ async def start_server(**kwargs):
     sio.on("create_terminal", socket_handlers.create_terminal)
     sio.on("terminal_input", socket_handlers.terminal_input)
     sio.on("terminal_resize", socket_handlers.terminal_resize)
-    
+
     # Register AI-related event handlers
     sio.on("ai_chat_message", socket_handlers.ai_chat_message)
     sio.on("ai_terminal_analysis", socket_handlers.ai_terminal_analysis)
@@ -521,7 +520,7 @@ def setup_app(**kwargs):
     sio.on("create_terminal", socket_handlers.create_terminal)
     sio.on("terminal_input", socket_handlers.terminal_input)
     sio.on("terminal_resize", socket_handlers.terminal_resize)
-    
+
     # Register AI-specific handlers
     sio.on("wrapper_session_sync", socket_handlers.wrapper_session_sync)
     sio.on("get_wrapper_sessions", socket_handlers.get_wrapper_sessions)

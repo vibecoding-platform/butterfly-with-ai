@@ -59,7 +59,6 @@ def add_user_info(id, fd, pid, user, host):
     if sys.platform != "linux":
         return
     # utmp/wtmp functionality is currently disabled
-    pass
 
 
 def rm_user_info(id, pid):
@@ -67,4 +66,3 @@ def rm_user_info(id, pid):
     if sys.platform != "linux":
         return
     # utmp/wtmp functionality is currently disabled
-    pass
