@@ -206,6 +206,8 @@ jobs:
           tags: aetherterm:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_PROGRESS=plain
 
   security-scan:
     name: Security Scan
