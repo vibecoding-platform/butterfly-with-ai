@@ -99,7 +99,7 @@ class AutoBlocker:
             # 特定のセッションに接続されているクライアントに送信
             import asyncio
 
-            asyncio.create_task(self.sio.emit("auto_block", block_data))
+            _ = asyncio.create_task(self.sio.emit("auto_block", block_data))
 
             log.info(f"Session {session_id} blocked: {reason.value} - {message}")
             return True
@@ -144,7 +144,7 @@ class AutoBlocker:
         try:
             import asyncio
 
-            asyncio.create_task(self.sio.emit("auto_unblock", unblock_data))
+            _ = asyncio.create_task(self.sio.emit("auto_unblock", unblock_data))
 
             log.info(f"Session {session_id} unblocked")
             return True
@@ -166,7 +166,7 @@ class AutoBlocker:
         return self.blocked_sessions.copy()
 
     def force_unblock_session(self, session_id: str) -> bool:
-        """強制的にセッションのブロックを解除（管理者用）"""
+        """強制的にセッションのブロックを解除(管理者用)"""
         if session_id in self.blocked_sessions:
             del self.blocked_sessions[session_id]
 
@@ -181,7 +181,7 @@ class AutoBlocker:
             try:
                 import asyncio
 
-                asyncio.create_task(self.sio.emit("force_unblock", force_unblock_data))
+                _ = asyncio.create_task(self.sio.emit("force_unblock", force_unblock_data))
 
                 log.info(f"Session {session_id} force unblocked by admin")
                 return True
@@ -193,7 +193,7 @@ class AutoBlocker:
         return False
 
     def cleanup_expired_blocks(self, max_age_seconds: int = 300):
-        """期限切れのブロックをクリーンアップ（5分でタイムアウト）"""
+        """期限切れのブロックをクリーンアップ(5分でタイムアウト)"""
         current_time = time.time()
         expired_sessions = []
 
