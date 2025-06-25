@@ -8,12 +8,33 @@ repos:
       - id: trailing-whitespace
         exclude: |
           (?x)^(
-            docs/.*\.md$|
             .*\.md$|
-            CHANGELOG\.md$|
-            README\.md$
+            docs/.*|
+            .*\.sass$|
+            .*\.toml$|
+            .*\.socket$|
+            .*\.service$|
+            \.roomodes$|
+            circus\.ini$|
+            \.roo/.*|
+            \.claude/.*|
+            src/aetherterm/agentserver/static/assets/.*
           )
       - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            .*\.md$|
+            docs/.*|
+            .*\.sass$|
+            .*\.toml$|
+            .*\.socket$|
+            .*\.service$|
+            \.roomodes$|
+            circus\.ini$|
+            \.roo/.*|
+            \.claude/.*|
+            src/aetherterm/agentserver/static/assets/.*
+          )
       - id: check-yaml
       - id: check-json
       - id: check-toml
@@ -22,6 +43,20 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: [--fix=lf]
+        exclude: |
+          (?x)^(
+            .*\.md$|
+            docs/.*|
+            .*\.sass$|
+            .*\.toml$|
+            .*\.socket$|
+            .*\.service$|
+            \.roomodes$|
+            circus\.ini$|
+            \.roo/.*|
+            \.claude/.*|
+            src/aetherterm/agentserver/static/assets/.*
+          )
 
   # Python linting and formatting
   - repo: https://github.com/astral-sh/ruff-pre-commit
