@@ -71,9 +71,19 @@ ignore = [
     "E731",   # lambda assignment
     "E402",   # module import not at top of file
     "B008",   # do not perform function calls in argument defaults
+    "B904",   # use raise from
     "C901",   # too complex
     "ISC001", # Conflicts with formatter
     "COM812", # Missing trailing comma (handled by formatter)
+    "DTZ005", # datetime without timezone
+    "PTH",    # use pathlib (too many changes needed)
+    "RUF002", # ambiguous unicode character
+    "RUF003", # ambiguous unicode character in comment
+    "SIM102", # nested if
+    "SIM110", # use any
+    "TID252", # relative imports
+    "UP006",  # deprecated collection types
+    "UP035",  # deprecated imports
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

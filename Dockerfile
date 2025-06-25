@@ -68,7 +68,7 @@ COPY --from=frontend-builder /app/frontend/dist ./src/aetherterm/agentserver/sta
 COPY --from=frontend-builder /app/frontend/dist/index.html ./src/aetherterm/agentserver/templates/
 
 # Copy default configuration
-COPY src/aetherterm/agentserver/aetherterm.conf.default /etc/aetherterm/aetherterm.conf
+COPY src/aetherterm/aetherterm.conf.default /etc/aetherterm/aetherterm.conf
 
 # Create necessary directories
 RUN mkdir -p /var/log/aetherterm /var/run/aetherterm \
