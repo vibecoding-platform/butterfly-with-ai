@@ -20,6 +20,9 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY README.md ./
 
+# Copy source code first for dependency resolution
+COPY src/ ./src/
+
 # Install Python dependencies
 RUN uv pip install --system --no-cache-dir -e .
 
