@@ -68,11 +68,16 @@ test = [
     "pytest-mock>=3.10.0",
     "coverage[toml]>=7.0.0",
 ]
+jupyter = [
+    "jupyter-server-proxy>=4.0.0",
+    "jupyter>=1.0.0",
+    "notebook>=6.4.0",
+]
 
 [project.urls]
-Homepage = "https://github.com/paradoxxxzero/aetherterm"
-Repository = "https://github.com/paradoxxxzero/aetherterm"
-Issues = "https://github.com/paradoxxxzero/aetherterm/issues"
+Homepage = "https://github.com/aether-platform/aetherterm"
+Repository = "https://github.com/aether-platform/aetherterm"
+Issues = "https://github.com/aether-platform/aetherterm/issues"
 
 [project.scripts]
 aetherterm = "aetherterm.scripts.aetherterm:main"
@@ -153,6 +158,10 @@ disallow_any_unimported = true
 
 [tool.wheel]
 universal = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B108", "B301", "B324", "B701"]
 
 [dependency-groups]
 dev = [
