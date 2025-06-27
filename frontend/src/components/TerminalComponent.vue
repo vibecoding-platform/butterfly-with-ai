@@ -19,11 +19,20 @@
     </div>
 
     <!-- Terminal Blocked Overlay -->
-
     <div v-if="terminalStore.isTerminalBlocked" class="terminal-overlay"></div>
 
     <!-- Xterm.js Integration -->
-    <div id="terminal" class="xterm-container"></div>
+    <div id="terminal" class="xterm-container" @click="hideSelectionPopup"></div>
+
+    <!-- Selection Action Popup -->
+    <SelectionActionPopup
+      :show="showSelectionPopup"
+      :position="popupPosition"
+      :selected-text="selectedText"
+      @copy="onCopyAction"
+      @send-to-ai="onSendToAI"
+      @hide="hideSelectionPopup"
+    />
   </div>
 </template>
 
@@ -35,12 +44,18 @@
   import '@xterm/xterm/css/xterm.css'
   import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { useAetherTerminalServiceStore } from '../stores/aetherTerminalServiceStore'
+  import SelectionActionPopup from './SelectionActionPopup.vue'
 
   const terminalEl = ref<HTMLElement | null>(null)
   const terminal = ref<Terminal | null>(null)
   const fitAddon = ref<FitAddon | null>(null)
 
   const terminalStore = useAetherTerminalServiceStore()
+
+  // Selection popup state
+  const showSelectionPopup = ref(false)
+  const popupPosition = ref({ x: 0, y: 0 })
+  const selectedText = ref('')
 
   const isSupervisorLocked = computed(() => {
     return terminalStore.isSupervisorLocked
@@ -176,6 +191,38 @@
         sendInput(e.key)
       })
 
+      // Handle text selection events
+      terminal.value.onSelectionChange(() => {
+        const selection = terminal.value?.getSelection()
+        if (selection && selection.trim()) {
+          selectedText.value = selection
+          showSelectionPopup.value = false // Hide popup initially
+        } else {
+          hideSelectionPopup()
+        }
+      })
+
+      // Handle mouse events for selection popup
+      terminalEl.value.addEventListener('mouseup', (event: MouseEvent) => {
+        setTimeout(() => {
+          const selection = terminal.value?.getSelection()
+          if (selection && selection.trim()) {
+            selectedText.value = selection.trim()
+            
+            // Position popup near mouse cursor
+            const terminalRect = terminalEl.value?.getBoundingClientRect()
+            if (terminalRect) {
+              popupPosition.value = {
+                x: Math.min(event.clientX - terminalRect.left, terminalRect.width - 180),
+                y: Math.max(event.clientY - terminalRect.top - 40, 0)
+              }
+            }
+            
+            showSelectionPopup.value = true
+          }
+        }, 10) // Small delay to ensure selection is processed
+      })
+
       window.addEventListener('resize', () => {
         if (fitAddon.value && terminal.value) {
           fitAddon.value.fit()
@@ -209,6 +256,29 @@
   const sendInput = (input: string) => {
     console.log('Sending input to backend:', input)
     terminalStore.sendInput(input)
+  }
+
+  // Selection popup event handlers
+  const hideSelectionPopup = () => {
+    showSelectionPopup.value = false
+    selectedText.value = ''
+  }
+
+  const onCopyAction = () => {
+    console.log('Text copied successfully')
+    // Optional: Show a toast notification
+  }
+
+  const onSendToAI = (text: string) => {
+    console.log('Sending text to AI:', text)
+    // Send text to AI chat component with selected terminal text
+    const chatMessage = {
+      type: 'user',
+      message: `Please analyze this terminal output: ${text}`,
+      timestamp: new Date(),
+      source: 'terminal_selection'
+    }
+    terminalStore.sendChatMessage(chatMessage)
   }
 
   // Override WebSocket.send to log data
