@@ -11,5 +11,6 @@ from .ai_analyzer import AIAnalyzer
 from .input_blocker import InputBlocker
 from .main import main
 from .pty_controller import PTYController
+from .command_interceptor import CommandInterceptor
 
-__all__ = ["AIAnalyzer", "InputBlocker", "PTYController", "main"]
+__all__ = ["AIAnalyzer", "InputBlocker", "PTYController", "CommandInterceptor", "main"]

@@ -7,7 +7,7 @@ name = "aetherterm"
 version = "0.0.1"
 description = "A sleek web based terminal emulator"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = "==3.12.*"
 authors = [
     {name = "Kazushige Takeuchi", email = "kaz@re-x.info"}
 ]
