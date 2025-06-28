@@ -7,7 +7,7 @@ import sys
 
 import click
 
-from aetherterm.agentserver.server import prepare_ssl_certs
+# SSL certificate preparation is now handled in server.py
 
 # Configure logging for the launcher script
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -85,7 +85,9 @@ def launch_uvicorn(kwargs):
             cmd.extend(["--log-level", "debug"])
         else:
             cmd.extend(["--log-level", "info"])
-        cmd.append("--reload")
+        # Only add reload if reload is not explicitly disabled
+        if not os.getenv("AETHERTERM_DISABLE_RELOAD"):
+            cmd.append("--reload")
     else:
         cmd.extend(["--log-level", "warning"])
 
@@ -137,7 +139,9 @@ def launch_hypercorn(kwargs):
             cmd.extend(["--log-level", "debug"])
         else:
             cmd.extend(["--log-level", "info"])
-        cmd.append("--reload")
+        # Only add reload if reload is not explicitly disabled
+        if not os.getenv("AETHERTERM_DISABLE_RELOAD"):
+            cmd.append("--reload")
     else:
         cmd.extend(["--log-level", "warning"])
 
@@ -237,8 +241,12 @@ def main(**kwargs):
     """AetherTerm AgentServer - A sleek web based terminal emulator."""
     log.info("Starting AetherTerm AgentServer...")
 
-    # Handle certificate generation if requested
-    prepare_ssl_certs(**kwargs)
+    # SSL certificates should be prepared beforehand using:
+    # aetherterm-ssl-setup --host=<host> --port=<port>
+    if not kwargs.get("unsecure", False):
+        log.info("Using HTTPS mode - ensure SSL certificates are prepared")
+    else:
+        log.info("Using HTTP mode (unsecure)")
 
     # Show URL
     protocol = "https" if not kwargs.get("unsecure", False) else "http"
