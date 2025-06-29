@@ -114,6 +114,7 @@ const clipboardAddon = ref<ClipboardAddon | null>(null)
 const serializeAddon = ref<SerializeAddon | null>(null)
 const contextMenuObserver = ref<MutationObserver | null>(null)
 const keyboardCleanup = ref<(() => void) | null>(null)
+const resizeCleanup = ref<(() => void) | null>(null)
 
 // Command queue for pre-execution
 const commandQueue = ref<QueuedCommand[]>([])
@@ -289,7 +290,7 @@ const initializeActiveTerminal = () => {
 
     // Setup keyboard and resize handlers
     keyboardCleanup.value = setupKeyboardHandlers()
-    setupResizeHandler()
+    resizeCleanup.value = setupResizeHandler()
 
     // Handle inventory terminal auto-command execution
     if (activeTab.value.subType === 'inventory' && activeTab.value.serverContext) {
@@ -571,18 +572,24 @@ const setupResizeHandler = () => {
 
   window.addEventListener('resize', handleResize)
   
-  onUnmounted(() => {
+  // Return cleanup function instead of using onUnmounted in async context
+  return () => {
     window.removeEventListener('resize', handleResize)
-  })
+  }
 }
 
 onUnmounted(() => {
   terminalStore.offShellOutput()
   
-  // Clean up keyboard handlers
+  // Clean up keyboard and resize handlers
   if (keyboardCleanup.value) {
     keyboardCleanup.value()
     keyboardCleanup.value = null
+  }
+  
+  if (resizeCleanup.value) {
+    resizeCleanup.value()
+    resizeCleanup.value = null
   }
   
   // Dispose of all addons before terminal
