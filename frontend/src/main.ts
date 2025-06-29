@@ -1,10 +1,9 @@
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
-import VueTerm from 'vue-term'
-// import 'vue-term/dist/style.css'; // This path seems incorrect, commenting out for now
 import { register } from 'vue-advanced-chat'
 import App from './App.vue'
 import router from './router'
+import vuetify from './plugins/vuetify'
 import AetherTermService from './services/AetherTermService'
 import { useAetherTerminalServiceStore } from './stores/aetherTerminalServiceStore'
 
@@ -16,7 +15,7 @@ const pinia = createPinia()
 
 app.use(pinia)
 app.use(router)
-app.component('VueTerm', VueTerm) // Register VueTerm globally
+app.use(vuetify)
 
 // Initialize AetherTermService and connect it to the store
 const aetherTermService = AetherTermService.getInstance()

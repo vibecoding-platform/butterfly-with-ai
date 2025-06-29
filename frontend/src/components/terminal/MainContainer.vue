@@ -9,12 +9,16 @@
       :is-supervisor-locked="isSupervisorLocked"
       @terminal-initialized="onTerminalInitialized"
     />
+    
+    <!-- Connection Status Overlay -->
+    <ConnectionStatusBanner />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useAetherTerminalServiceStore } from '../../stores/aetherTerminalServiceStore'
+import ConnectionStatusBanner from './ConnectionStatusBanner.vue'
 import TerminalTabBar from '../TabBarContainer.vue'
 import MainContentView from '../MainContentView.vue'
 

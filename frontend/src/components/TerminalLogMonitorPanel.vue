@@ -1161,51 +1161,6 @@ const cleanupWebSocketConnection = () => {
   isConnectedToWebSocket.value = false
 }
 
-// Enhanced search with WebSocket
-const performSearch = async () => {
-  if (!searchQuery.value.trim()) {
-    searchResults.value = []
-    return
-  }
-
-  isSearching.value = true
-
-  try {
-    if (isConnectedToWebSocket.value && terminalStore.service?.socket) {
-      // Use WebSocket for real-time search
-      terminalStore.service.socket.emit('log_monitor_search', {
-        query: searchQuery.value,
-        terminal_id: selectedTerminal.value || 'all',
-        limit: 100
-      })
-    } else {
-      // Fallback to REST API
-      const params = new URLSearchParams({
-        query: searchQuery.value,
-        limit: '100'
-      })
-
-      if (selectedTerminal.value) {
-        params.append('terminal_id', selectedTerminal.value)
-      }
-
-      const response = await fetch(`/api/log-processing/search?${params}`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        searchResults.value = data.results || []
-      } else {
-        console.warn('Search API not available, using mock data')
-        searchResults.value = getMockSearchResults(searchQuery.value)
-      }
-    }
-  } catch (error) {
-    console.warn('Search failed, using mock data:', error)
-    searchResults.value = getMockSearchResults(searchQuery.value)
-  } finally {
-    isSearching.value = false
-  }
-}
 
 // Lifecycle
 onMounted(() => {

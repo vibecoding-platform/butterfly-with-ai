@@ -21,7 +21,8 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       'stream': 'stream-browserify',
-      'buffer': 'buffer'
+      'buffer': 'buffer',
+      'util': 'util'
     },
   },
   build: {
@@ -29,13 +30,25 @@ export default defineConfig({
       output: {
         entryFileNames: `assets/[name].[hash].js`,
         chunkFileNames: `assets/[name].[hash].js`,
-        assetFileNames: `assets/[name].[hash].[ext]`
+        assetFileNames: `assets/[name].[hash].[ext]`,
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'vuetify': ['vuetify'],
+          'terminal': ['vue-term', 'xterm'],
+          'socket': ['socket.io-client']
+        }
       }
-    }
+    },
+    target: 'esnext',
+    minify: 'esbuild',
+    sourcemap: false
   },
   server: {
     watch: {
       usePolling: true
     }
+  },
+  optimizeDeps: {
+    include: ['vue', 'vue-router', 'pinia', 'vuetify', 'socket.io-client', 'util', 'buffer', 'stream-browserify']
   }
 })

@@ -379,9 +379,13 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     addToOutput('[SYSTEM] Connecting to AetherTerm service...')
     console.log('connect function called')
 
-    // Setup socket listeners once if socket exists
+    // Setup socket listeners and initiate connection if socket exists
     if (socket.value) {
       setupSocketListeners()
+      // Explicitly connect if not already connected
+      if (!socket.value.connected) {
+        socket.value.connect()
+      }
     }
   }
 

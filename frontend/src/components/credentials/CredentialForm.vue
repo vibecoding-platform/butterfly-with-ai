@@ -8,7 +8,7 @@
       item-value="name"
       label="Cloud Provider"
       required
-      :rules="[v => !!v || 'Provider is required']"
+      :rules="[(v: any) => !!v || 'Provider is required']"
       :disabled="!!editingCredential"
       class="mb-4"
     >
@@ -56,7 +56,7 @@
           :hint="getFieldHint(field)"
           persistent-hint
           required
-          :rules="[v => !!v || `${getFieldLabel(field)} is required`]"
+          :rules="[(v: any) => !!v || `${getFieldLabel(field)} is required`]"
           :type="isSecretField(field) && !showSecrets[field] ? 'password' : 'text'"
           :append-inner-icon="isSecretField(field) ? (showSecrets[field] ? 'mdi-eye-off' : 'mdi-eye') : undefined"
           @click:append-inner="toggleSecretVisibility(field)"

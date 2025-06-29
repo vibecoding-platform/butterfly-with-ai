@@ -113,6 +113,7 @@ const searchAddon = ref<SearchAddon | null>(null)
 const clipboardAddon = ref<ClipboardAddon | null>(null)
 const serializeAddon = ref<SerializeAddon | null>(null)
 const contextMenuObserver = ref<MutationObserver | null>(null)
+const keyboardCleanup = ref<(() => void) | null>(null)
 
 // Command queue for pre-execution
 const commandQueue = ref<QueuedCommand[]>([])
@@ -287,7 +288,7 @@ const initializeActiveTerminal = () => {
     setupTerminalEventHandlers()
 
     // Setup keyboard and resize handlers
-    setupKeyboardHandlers()
+    keyboardCleanup.value = setupKeyboardHandlers()
     setupResizeHandler()
 
     // Handle inventory terminal auto-command execution
@@ -545,10 +546,10 @@ const setupKeyboardHandlers = () => {
 
   document.addEventListener('keydown', handleKeyDown)
 
-  // Cleanup function for keyboard listener
-  onUnmounted(() => {
+  // Return cleanup function instead of using onUnmounted in async context
+  return () => {
     document.removeEventListener('keydown', handleKeyDown)
-  })
+  }
 }
 
 const setupResizeHandler = () => {
@@ -577,6 +578,12 @@ const setupResizeHandler = () => {
 
 onUnmounted(() => {
   terminalStore.offShellOutput()
+  
+  // Clean up keyboard handlers
+  if (keyboardCleanup.value) {
+    keyboardCleanup.value()
+    keyboardCleanup.value = null
+  }
   
   // Dispose of all addons before terminal
   searchAddon.value?.dispose()

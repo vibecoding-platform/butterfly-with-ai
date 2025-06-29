@@ -48,6 +48,7 @@ interface Props {
 interface Emits {
   (e: 'copy'): void
   (e: 'hide'): void
+  (e: 'sendToAi', text: string): void
 }
 
 const props = defineProps<Props>()
