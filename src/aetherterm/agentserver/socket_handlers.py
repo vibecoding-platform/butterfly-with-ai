@@ -15,19 +15,30 @@ from aetherterm.agentserver.log_analyzer import SeverityLevel, get_log_analyzer
 from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
 from aetherterm.agentserver.utils import User
 from aetherterm.agentserver.ai_services import AIService, get_ai_service
+from aetherterm.logprocessing.log_processing_manager import LogProcessingManager
 
 log = logging.getLogger("aetherterm.socket_handlers")
 
 # Global storage for socket.io server instance
 sio_instance = None
 
+# Global log processing manager
+log_processing_manager = None
+
 
 def set_sio_instance(sio):
     """Set the global socket.io server instance."""
-    global sio_instance
+    global sio_instance, log_processing_manager
     sio_instance = sio
     # 自動ブロッカーにSocket.IOインスタンスを設定
     set_socket_io_instance(sio)
+    
+    # Initialize log processing manager
+    try:
+        log_processing_manager = LogProcessingManager()
+        log.info("Log processing manager initialized")
+    except Exception as e:
+        log.error(f"Failed to initialize log processing manager: {e}")
 
 
 def get_user_info_from_environ(environ):
@@ -245,6 +256,14 @@ async def create_terminal(
         await terminal_instance.start_pty()
         log.info(f"PTY started successfully for session {session_id}")
 
+        # Initialize log capture for this terminal
+        if log_processing_manager:
+            try:
+                await log_processing_manager.initialize_terminal_capture(session_id)
+                log.debug(f"Log capture initialized for session {session_id}")
+            except Exception as e:
+                log.error(f"Failed to initialize log capture for session {session_id}: {e}")
+
         # Notify client that terminal is ready
         await sio_instance.emit(
             "terminal_ready", {"session": session_id, "status": "ready"}, room=sid
@@ -293,6 +312,15 @@ def broadcast_to_session(session_id, message):
     """Broadcast message to all clients connected to a session."""
     if sio_instance:
         import asyncio
+
+        # Capture terminal output for log processing
+        if log_processing_manager and message:
+            try:
+                asyncio.create_task(
+                    log_processing_manager.capture_terminal_output(session_id, message)
+                )
+            except Exception as e:
+                log.error(f"Failed to capture terminal output: {e}")
 
         # Get the terminal to find connected clients
         terminal = AsyncioTerminal.sessions.get(session_id)
@@ -419,11 +447,146 @@ async def get_wrapper_sessions(sid, data):
             room=sid,
         )
 
-    except Exception as e:
-        log.error(f"Error handling wrapper sessions request: {e}")
+
+async def log_monitor_subscribe(sid, data):
+    """Subscribe to log monitoring updates."""
+    try:
+        terminal_id = data.get("terminal_id")
+        log.info(f"Client {sid} subscribing to log monitor for terminal {terminal_id}")
+        
+        # Join log monitoring room
+        await sio_instance.enter_room(sid, f"log_monitor_{terminal_id}")
+        
+        if log_processing_manager:
+            # Get current statistics
+            stats = await log_processing_manager.get_terminal_statistics(terminal_id)
+            await sio_instance.emit(
+                "log_monitor_stats",
+                {"terminal_id": terminal_id, "stats": stats},
+                room=sid
+            )
+        
         await sio_instance.emit(
-            "wrapper_sessions_response", {"status": "error", "error": str(e)}, room=sid
+            "log_monitor_subscribed",
+            {"status": "success", "terminal_id": terminal_id},
+            room=sid
         )
+    except Exception as e:
+        log.error(f"Error subscribing to log monitor: {e}")
+        await sio_instance.emit(
+            "log_monitor_error",
+            {"error": str(e)},
+            room=sid
+        )
+
+
+async def log_monitor_unsubscribe(sid, data):
+    """Unsubscribe from log monitoring updates."""
+    try:
+        terminal_id = data.get("terminal_id")
+        log.info(f"Client {sid} unsubscribing from log monitor for terminal {terminal_id}")
+        
+        # Leave log monitoring room
+        await sio_instance.leave_room(sid, f"log_monitor_{terminal_id}")
+        
+        await sio_instance.emit(
+            "log_monitor_unsubscribed",
+            {"status": "success", "terminal_id": terminal_id},
+            room=sid
+        )
+    except Exception as e:
+        log.error(f"Error unsubscribing from log monitor: {e}")
+
+
+async def log_monitor_search(sid, data):
+    """Handle log search requests."""
+    try:
+        query = data.get("query", "")
+        terminal_id = data.get("terminal_id")
+        limit = data.get("limit", 100)
+        
+        if log_processing_manager:
+            results = await log_processing_manager.search_logs(
+                query=query,
+                terminal_id=terminal_id,
+                limit=limit
+            )
+            
+            await sio_instance.emit(
+                "log_search_results",
+                {
+                    "query": query,
+                    "terminal_id": terminal_id,
+                    "results": results,
+                    "count": len(results)
+                },
+                room=sid
+            )
+        else:
+            await sio_instance.emit(
+                "log_search_results",
+                {
+                    "query": query,
+                    "terminal_id": terminal_id,
+                    "results": [],
+                    "count": 0,
+                    "error": "Log processing manager not available"
+                },
+                room=sid
+            )
+    except Exception as e:
+        log.error(f"Error handling log search: {e}")
+        await sio_instance.emit(
+            "log_search_error",
+            {"error": str(e)},
+            room=sid
+        )
+
+
+# Background task to broadcast log statistics
+async def broadcast_log_statistics():
+    """Broadcast log statistics to all subscribed clients."""
+    while True:
+        try:
+            if log_processing_manager and sio_instance:
+                # Get system-wide statistics
+                system_stats = await log_processing_manager.get_system_statistics()
+                
+                # Broadcast to all log monitor subscribers
+                await sio_instance.emit(
+                    "log_system_stats",
+                    {"stats": system_stats, "timestamp": asyncio.get_event_loop().time()},
+                    namespace="/"
+                )
+                
+                # Get individual terminal statistics
+                active_terminals = AsyncioTerminal.sessions.keys()
+                for terminal_id in active_terminals:
+                    try:
+                        terminal_stats = await log_processing_manager.get_terminal_statistics(terminal_id)
+                        await sio_instance.emit(
+                            "log_terminal_stats",
+                            {
+                                "terminal_id": terminal_id,
+                                "stats": terminal_stats,
+                                "timestamp": asyncio.get_event_loop().time()
+                            },
+                            room=f"log_monitor_{terminal_id}"
+                        )
+                    except Exception as e:
+                        log.error(f"Error getting stats for terminal {terminal_id}: {e}")
+                        
+        except Exception as e:
+            log.error(f"Error broadcasting log statistics: {e}")
+        
+        # Wait 5 seconds before next broadcast
+        await asyncio.sleep(5)
+
+
+def start_log_monitoring_background_task():
+    """Start the background task for log monitoring."""
+    if sio_instance:
+        asyncio.create_task(broadcast_log_statistics())
 
 
 async def unblock_request(sid, data):

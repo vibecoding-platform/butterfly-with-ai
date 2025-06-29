@@ -647,6 +647,7 @@ const terminalStore = useAetherTerminalServiceStore()
 const isLoading = ref(false)
 const autoRefresh = ref(true)
 const selectedTerminal = ref(null)
+const isConnectedToWebSocket = ref(false)
 const activeTab = ref('recent')
 const systemStats = ref({})
 const terminalStatistics = ref({})
@@ -1098,11 +1099,123 @@ const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleTimeString()
 }
 
+// WebSocket management
+const setupWebSocketConnection = () => {
+  if (!terminalStore.service || !terminalStore.service.socket) {
+    console.warn('Socket.IO not available for log monitoring')
+    return
+  }
+
+  const socket = terminalStore.service.socket
+
+  // Subscribe to log monitoring events
+  socket.on('log_system_stats', (data) => {
+    systemStats.value = data.stats
+  })
+
+  socket.on('log_terminal_stats', (data) => {
+    if (data.terminal_id && data.stats) {
+      terminalStatistics.value[data.terminal_id] = data.stats
+    }
+  })
+
+  socket.on('log_monitor_subscribed', (data) => {
+    console.log('Subscribed to log monitoring:', data)
+    isConnectedToWebSocket.value = true
+  })
+
+  socket.on('log_monitor_error', (data) => {
+    console.error('Log monitor error:', data.error)
+    isConnectedToWebSocket.value = false
+  })
+
+  socket.on('log_search_results', (data) => {
+    if (data.query === searchQuery.value) {
+      searchResults.value = data.results
+    }
+  })
+
+  // Subscribe to log monitoring for all terminals
+  socket.emit('log_monitor_subscribe', { terminal_id: 'all' })
+  
+  isConnectedToWebSocket.value = true
+}
+
+const cleanupWebSocketConnection = () => {
+  if (!terminalStore.service || !terminalStore.service.socket) {
+    return
+  }
+
+  const socket = terminalStore.service.socket
+
+  // Unsubscribe from log monitoring
+  socket.emit('log_monitor_unsubscribe', { terminal_id: 'all' })
+
+  // Remove event listeners
+  socket.off('log_system_stats')
+  socket.off('log_terminal_stats')
+  socket.off('log_monitor_subscribed')
+  socket.off('log_monitor_error')
+  socket.off('log_search_results')
+
+  isConnectedToWebSocket.value = false
+}
+
+// Enhanced search with WebSocket
+const performSearch = async () => {
+  if (!searchQuery.value.trim()) {
+    searchResults.value = []
+    return
+  }
+
+  isSearching.value = true
+
+  try {
+    if (isConnectedToWebSocket.value && terminalStore.service?.socket) {
+      // Use WebSocket for real-time search
+      terminalStore.service.socket.emit('log_monitor_search', {
+        query: searchQuery.value,
+        terminal_id: selectedTerminal.value || 'all',
+        limit: 100
+      })
+    } else {
+      // Fallback to REST API
+      const params = new URLSearchParams({
+        query: searchQuery.value,
+        limit: '100'
+      })
+
+      if (selectedTerminal.value) {
+        params.append('terminal_id', selectedTerminal.value)
+      }
+
+      const response = await fetch(`/api/log-processing/search?${params}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        searchResults.value = data.results || []
+      } else {
+        console.warn('Search API not available, using mock data')
+        searchResults.value = getMockSearchResults(searchQuery.value)
+      }
+    }
+  } catch (error) {
+    console.warn('Search failed, using mock data:', error)
+    searchResults.value = getMockSearchResults(searchQuery.value)
+  } finally {
+    isSearching.value = false
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   refreshStatistics()
   
-  if (autoRefresh.value) {
+  // Setup WebSocket connection
+  setupWebSocketConnection()
+  
+  // Only use polling if WebSocket is not connected
+  if (autoRefresh.value && !isConnectedToWebSocket.value) {
     refreshInterval = setInterval(refreshStatistics, 10000) // Refresh every 10 seconds
   }
 })
@@ -1111,6 +1224,9 @@ onUnmounted(() => {
   if (refreshInterval) {
     clearInterval(refreshInterval)
   }
+  
+  // Cleanup WebSocket connection
+  cleanupWebSocketConnection()
 })
 
 // Watch auto refresh setting
@@ -1120,7 +1236,20 @@ watch(autoRefresh, (newValue) => {
     refreshInterval = null
   }
   
-  if (newValue) {
+  // Only use polling if WebSocket is not connected
+  if (newValue && !isConnectedToWebSocket.value) {
+    refreshInterval = setInterval(refreshStatistics, 10000)
+  }
+})
+
+// Watch WebSocket connection status
+watch(isConnectedToWebSocket, (isConnected) => {
+  if (isConnected && refreshInterval) {
+    // Stop polling when WebSocket is connected
+    clearInterval(refreshInterval)
+    refreshInterval = null
+  } else if (!isConnected && autoRefresh.value) {
+    // Start polling when WebSocket is disconnected
     refreshInterval = setInterval(refreshStatistics, 10000)
   }
 })

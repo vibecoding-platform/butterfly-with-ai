@@ -527,6 +527,11 @@ def setup_app(**kwargs):
     sio.on("get_wrapper_sessions", socket_handlers.get_wrapper_sessions)
     sio.on("unblock_request", socket_handlers.unblock_request)
     sio.on("get_block_status", socket_handlers.get_block_status)
+    
+    # Register log monitoring handlers
+    sio.on("log_monitor_subscribe", socket_handlers.log_monitor_subscribe)
+    sio.on("log_monitor_unsubscribe", socket_handlers.log_monitor_unsubscribe)
+    sio.on("log_monitor_search", socket_handlers.log_monitor_search)
 
     # Set up auto-blocker integration
     from aetherterm.agentserver.auto_blocker import set_socket_io_instance
@@ -558,6 +563,9 @@ def setup_app(**kwargs):
     async def startup():
         await startup_inventory_service()
         await startup_log_processing()
+        
+        # Start log monitoring background task
+        socket_handlers.start_log_monitoring_background_task()
 
     # Add shutdown event handler
     @asgi_app.on_event("shutdown")
