@@ -1,0 +1,213 @@
+// AetherTerm Design System Variables
+
+// =============================================================================
+// Color Palette
+// =============================================================================
+
+// Primary Colors
+$color-primary: #4caf50;
+$color-primary-dark: #45a049;
+$color-primary-light: rgba(76, 175, 80, 0.1);
+
+// Secondary Colors
+$color-secondary: #2196f3;
+$color-secondary-dark: #1976d2;
+$color-secondary-light: rgba(33, 150, 243, 0.1);
+
+// Accent Colors
+$color-accent-purple: #9c27b0;
+$color-accent-purple-dark: #7b1fa2;
+$color-accent-purple-light: rgba(156, 39, 176, 0.1);
+
+$color-accent-orange: #ff9800;
+$color-accent-red: #f44336;
+$color-accent-yellow: #e5e510;
+$color-accent-cyan: #0dc2c2;
+
+// Background Colors
+$color-bg-primary: #1e1e1e;
+$color-bg-secondary: #2d2d2d;
+$color-bg-tertiary: #3d3d3d;
+$color-bg-elevated: #4d4d4d;
+
+// Text Colors
+$color-text-primary: #ffffff;
+$color-text-secondary: #e0e0e0;
+$color-text-muted: #ccc;
+$color-text-disabled: #888;
+$color-text-subtle: #666;
+
+// Border Colors
+$color-border-primary: #444;
+$color-border-secondary: #555;
+$color-border-focus: $color-primary;
+
+// Status Colors
+$color-status-success: #4caf50;
+$color-status-warning: #ff9800;
+$color-status-error: #f44336;
+$color-status-info: #2196f3;
+
+// Terminal Specific Colors
+$color-terminal-bg: #1e1e1e;
+$color-terminal-fg: #ffffff;
+$color-terminal-cursor: #ffffff;
+$color-terminal-selection: rgba(255, 255, 255, 0.3);
+
+// Terminal ANSI Colors
+$color-ansi-black: #000000;
+$color-ansi-red: #cd3131;
+$color-ansi-green: #0dbc79;
+$color-ansi-yellow: #e5e510;
+$color-ansi-blue: #3b78ff;
+$color-ansi-magenta: #bc3fbc;
+$color-ansi-cyan: #0dc2c2;
+$color-ansi-white: #e5e5e5;
+
+$color-ansi-bright-black: #666666;
+$color-ansi-bright-red: #f14c4c;
+$color-ansi-bright-green: #23d18b;
+$color-ansi-bright-yellow: #f5f543;
+$color-ansi-bright-blue: #3b8eea;
+$color-ansi-bright-magenta: #d670d6;
+$color-ansi-bright-cyan: #29b8db;
+$color-ansi-bright-white: #ffffff;
+
+// =============================================================================
+// Typography
+// =============================================================================
+
+// Font Families
+$font-family-mono: 'Courier New', monospace;
+$font-family-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+// Font Sizes
+$font-size-xs: 10px;
+$font-size-sm: 12px;
+$font-size-base: 14px;
+$font-size-md: 16px;
+$font-size-lg: 18px;
+$font-size-xl: 20px;
+$font-size-2xl: 24px;
+
+// Font Weights
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// Line Heights
+$line-height-tight: 1.2;
+$line-height-normal: 1.4;
+$line-height-relaxed: 1.6;
+
+// =============================================================================
+// Spacing
+// =============================================================================
+
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 12px;
+$spacing-lg: 16px;
+$spacing-xl: 20px;
+$spacing-2xl: 24px;
+$spacing-3xl: 32px;
+$spacing-4xl: 40px;
+
+// =============================================================================
+// Border & Radius
+// =============================================================================
+
+$border-width: 1px;
+$border-radius-sm: 2px;
+$border-radius-base: 4px;
+$border-radius-md: 6px;
+$border-radius-lg: 8px;
+$border-radius-xl: 12px;
+
+// =============================================================================
+// Shadows
+// =============================================================================
+
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+$shadow-base: 0 2px 4px rgba(0, 0, 0, 0.2);
+$shadow-md: 0 4px 8px rgba(0, 0, 0, 0.2);
+$shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3);
+$shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+// =============================================================================
+// Layout
+// =============================================================================
+
+$header-height: 40px;
+$sidebar-width: 300px;
+$sidebar-width-collapsed: 60px;
+
+// Breakpoints
+$breakpoint-sm: 640px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 1024px;
+$breakpoint-xl: 1280px;
+
+// Z-Index Stack
+$z-index-dropdown: 1000;
+$z-index-sticky: 1020;
+$z-index-fixed: 1030;
+$z-index-modal-backdrop: 1040;
+$z-index-modal: 1050;
+$z-index-popover: 1060;
+$z-index-tooltip: 1070;
+
+// =============================================================================
+// Animation & Transitions
+// =============================================================================
+
+$transition-duration-fast: 0.15s;
+$transition-duration-base: 0.2s;
+$transition-duration-slow: 0.3s;
+
+$transition-timing-function: ease;
+$transition-timing-function-in: ease-in;
+$transition-timing-function-out: ease-out;
+$transition-timing-function-in-out: ease-in-out;
+
+// Common transitions
+$transition-all: all $transition-duration-base $transition-timing-function;
+$transition-colors: color $transition-duration-base $transition-timing-function,
+                   background-color $transition-duration-base $transition-timing-function,
+                   border-color $transition-duration-base $transition-timing-function;
+
+// =============================================================================
+// Component Specific
+// =============================================================================
+
+// Buttons
+$button-height-sm: 28px;
+$button-height-base: 32px;
+$button-height-lg: 40px;
+
+$button-padding-x-sm: $spacing-sm;
+$button-padding-x-base: $spacing-md;
+$button-padding-x-lg: $spacing-lg;
+
+// Inputs
+$input-height-sm: 28px;
+$input-height-base: 32px;
+$input-height-lg: 40px;
+
+$input-padding-x: $spacing-sm;
+$input-padding-y: $spacing-xs;
+
+// Tabs
+$tab-height: 40px;
+$tab-min-width: 120px;
+$tab-max-width: 200px;
+
+// Context Menu
+$context-menu-width: 320px;
+$context-menu-max-height: 400px;
+$context-menu-item-height: 36px;
+
+// Search
+$search-input-height: 36px;
+$search-result-item-height: 64px;

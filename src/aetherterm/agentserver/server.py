@@ -439,6 +439,7 @@ async def start_server(**kwargs):
 
 # Factory functions for ASGI servers (uvicorn/hypercorn compatibility)
 
+
 def create_app(**kwargs):
     """Create the AetherTerm AgentServer ASGI application with dependency injection."""
     import socketio
@@ -476,6 +477,7 @@ def create_app(**kwargs):
 
     # Configure the dependency injection container
     from aetherterm.agentserver.containers import configure_container
+
     container = configure_container(config)
 
     # Create FastAPI application
@@ -486,6 +488,7 @@ def create_app(**kwargs):
 
     # Include router
     from aetherterm.agentserver.routes import router
+
     fastapi_app.include_router(router)
 
     # Create Socket.IO server
@@ -504,14 +507,12 @@ def create_app(**kwargs):
 
 def setup_app(**kwargs):
     """Setup the application and prepare it for running."""
-    # Handle certificate generation first
-    prepare_ssl_certs(**kwargs)
-
     # Create and return the ASGI app
     asgi_app, sio, container, config = create_app(**kwargs)
 
     # Set the socket.io instance in handlers module
     from aetherterm.agentserver import socket_handlers
+
     socket_handlers.set_sio_instance(sio)
 
     # Register Socket.IO event handlers
@@ -529,7 +530,45 @@ def setup_app(**kwargs):
 
     # Set up auto-blocker integration
     from aetherterm.agentserver.auto_blocker import set_socket_io_instance
+
     set_socket_io_instance(sio)
+
+    # Initialize inventory service
+    async def startup_inventory_service():
+        try:
+            from aetherterm.agentserver.services.inventory_service import inventory_service
+
+            await inventory_service.initialize()
+            log.info("Inventory service initialized successfully")
+        except Exception as e:
+            log.warning(f"Failed to initialize inventory service: {e}")
+
+    # Initialize log processing
+    async def startup_log_processing():
+        try:
+            from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+
+            await AsyncioTerminal.start_log_processing()
+            log.info("Log processing service started successfully")
+        except Exception as e:
+            log.warning(f"Failed to start log processing service: {e}")
+
+    # Add startup event handler
+    @asgi_app.on_event("startup")
+    async def startup():
+        await startup_inventory_service()
+        await startup_log_processing()
+
+    # Add shutdown event handler
+    @asgi_app.on_event("shutdown")
+    async def shutdown():
+        try:
+            from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+
+            await AsyncioTerminal.stop_log_processing()
+            log.info("Log processing service stopped")
+        except Exception as e:
+            log.warning(f"Error stopping log processing service: {e}")
 
     log.info("AetherTerm AgentServer application setup complete")
 
@@ -557,7 +596,9 @@ def create_asgi_app():
     config["login"] = os.getenv("AETHERTERM_LOGIN", "").lower() in ("true", "1", "yes")
     config["pam_profile"] = os.getenv("AETHERTERM_PAM_PROFILE", "")
     config["ai_mode"] = os.getenv("AETHERTERM_AI_MODE", "streaming")
-    config["ai_provider"] = os.getenv("AETHERTERM_AI_PROVIDER", "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock")
+    config["ai_provider"] = os.getenv(
+        "AETHERTERM_AI_PROVIDER", "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock"
+    )
     config["ai_api_key"] = os.getenv("ANTHROPIC_API_KEY")
     config["ai_model"] = os.getenv("AETHERTERM_AI_MODEL", "claude-3-5-sonnet-20241022")
 

@@ -28,7 +28,32 @@
           <span v-if="message.streaming" class="streaming-content"
             >{{ message.content }}<span class="cursor">|</span></span
           >
-          <span v-else>{{ message.content }}</span>
+          <div v-else>
+            {{ message.content }}
+            
+            <!-- Command suggestions for AI messages -->
+            <div v-if="message.type === 'ai' && extractCommands(message.content).length > 0" class="command-suggestions">
+              <div class="commands-header">
+                <span>🤖 Suggested Commands:</span>
+              </div>
+              <div class="commands-list">
+                <div 
+                  v-for="(command, index) in extractCommands(message.content)" 
+                  :key="index"
+                  class="command-item"
+                >
+                  <code class="command-text">{{ command }}</code>
+                  <button 
+                    @click="sendCommandToTerminal(command)"
+                    class="send-command-btn"
+                    :title="`Send '${command}' to terminal`"
+                  >
+                    📤 Send
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -50,19 +75,19 @@
         v-model="newMessage"
         @keydown.ctrl.enter="sendMessage"
         @keydown.meta.enter="sendMessage"
-        placeholder="Type a message... (Ctrl+Enter to send)"
-        :disabled="!terminalStore.connectionState.isConnected"
+        :placeholder="placeholderText"
+        :disabled="!isInputAvailable"
         class="message-input"
         rows="3"
         ref="messageTextarea"
       ></textarea>
       <div class="input-actions">
         <div class="input-help">
-          <small>Ctrl+Enter to send</small>
+          <small>{{ helpText }}</small>
         </div>
         <button
           @click="sendMessage"
-          :disabled="!newMessage.trim() || !terminalStore.connectionState.isConnected"
+          :disabled="!newMessage.trim() || !isInputAvailable"
           class="send-button"
         >
           Send
@@ -73,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-  import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+  import { nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
   import { useAetherTerminalServiceStore } from '../stores/aetherTerminalServiceStore'
 
   interface ChatMessage {
@@ -107,6 +132,31 @@
     status: 'disconnected',
   })
 
+  // Computed properties for input availability and dynamic text
+  const isInputAvailable = computed(() => {
+    return terminalStore.connectionState.isConnected && aiInfo.value.available
+  })
+
+  const placeholderText = computed(() => {
+    if (!terminalStore.connectionState.isConnected) {
+      return 'Terminal disconnected - cannot send messages'
+    }
+    if (!aiInfo.value.available) {
+      return 'AI unavailable - please wait for connection'
+    }
+    return 'Type a message... (Ctrl+Enter to send)'
+  })
+
+  const helpText = computed(() => {
+    if (!terminalStore.connectionState.isConnected) {
+      return 'Connect to terminal first'
+    }
+    if (!aiInfo.value.available) {
+      return 'Waiting for AI connection'
+    }
+    return 'Ctrl+Enter to send'
+  })
+
   const addMessage = (
     username: string,
     content: string,
@@ -133,7 +183,15 @@
   }
 
   const sendMessage = () => {
-    if (!newMessage.value.trim() || !terminalStore.connectionState.isConnected) return
+    if (!newMessage.value.trim() || !isInputAvailable.value) {
+      // Provide appropriate error messages when unable to send
+      if (!terminalStore.connectionState.isConnected) {
+        addMessage('System', 'Cannot send message: Terminal not connected', 'system')
+      } else if (!aiInfo.value.available) {
+        addMessage('System', 'Cannot send message: AI service unavailable', 'system')
+      }
+      return
+    }
 
     const userMessage = newMessage.value.trim()
 
@@ -157,6 +215,13 @@
   const sendAIMessage = async (userMessage: string) => {
     if (!terminalStore.socket || !terminalStore.connectionState.isConnected) {
       console.warn('Socket not available for AI chat')
+      addMessage('System', 'Cannot send message: Terminal connection unavailable', 'system')
+      return
+    }
+
+    if (!aiInfo.value.available) {
+      console.warn('AI service not available')
+      addMessage('System', 'Cannot send message: AI service unavailable. Please wait for AI to connect.', 'system')
       return
     }
 
@@ -179,6 +244,22 @@
     })
   }
 
+  // Handle external messages (Ask AI from terminal selection)
+  const handleExternalMessage = (message: string) => {
+    console.log('SimpleChatComponent: Received external message:', message)
+    
+    // Add user message to local display
+    addMessage('Terminal Selection', message, 'user')
+    
+    // Send to AI for response
+    sendAIMessage(message)
+  }
+
+  // Expose method for external use
+  defineExpose({
+    handleExternalMessage
+  })
+
   // Handle AI streaming responses
   onMounted(() => {
     // Add welcome message
@@ -192,6 +273,13 @@
     terminalStore.onChatMessage((data: any) => {
       console.log('Received chat message:', data)
       addMessage(data.username || 'Unknown User', data.message || data.content, 'user')
+    })
+
+    // Listen for Ask AI events from Spine
+    terminalStore.onAskAI((selectedText: string) => {
+      console.log('SimpleChatComponent: Received Ask AI event:', selectedText)
+      const message = `Please analyze this terminal output: "${selectedText}"`
+      handleExternalMessage(message)
     })
 
     // Set up AI Event Listeners when socket becomes available
@@ -296,6 +384,7 @@
     onUnmounted(() => {
       clearInterval(connectionWatcher)
       terminalStore.offChatMessage()
+      terminalStore.offAskAI()
 
       // Clean up socket listeners
       if (terminalStore.socket) {
@@ -326,6 +415,85 @@
     if (terminalStore.socket && terminalStore.connectionState.isConnected) {
       terminalStore.socket.emit('ai_get_info', {})
     }
+  }
+
+  // Extract command suggestions from AI message content
+  const extractCommands = (content: string): string[] => {
+    if (!content) return []
+    
+    const commands: string[] = []
+    
+    // Look for code blocks with common command patterns
+    const codeBlockPattern = /```(?:bash|shell|sh)?\s*\n?(.*?)\n?```/gis
+    const matches = content.match(codeBlockPattern)
+    
+    if (matches) {
+      matches.forEach(match => {
+        // Remove the code block markers and get the content
+        const cleanMatch = match.replace(/```(?:bash|shell|sh)?\s*\n?|\n?```/gi, '').trim()
+        if (cleanMatch && isValidCommand(cleanMatch)) {
+          // Split by lines and add each non-empty line as a command
+          const lines = cleanMatch.split('\n').map(line => line.trim()).filter(line => line)
+          commands.push(...lines)
+        }
+      })
+    }
+    
+    // Also look for inline code with command patterns
+    const inlineCodePattern = /`([^`]+)`/g
+    let inlineMatch
+    while ((inlineMatch = inlineCodePattern.exec(content)) !== null) {
+      const cmd = inlineMatch[1].trim()
+      if (isValidCommand(cmd) && !commands.includes(cmd)) {
+        commands.push(cmd)
+      }
+    }
+    
+    return commands.slice(0, 5) // Limit to 5 commands max
+  }
+
+  // Check if a string looks like a valid terminal command
+  const isValidCommand = (cmd: string): boolean => {
+    if (!cmd || cmd.length < 2 || cmd.length > 200) return false
+    
+    // Common command patterns
+    const commonCommands = [
+      'ls', 'cd', 'pwd', 'mkdir', 'rmdir', 'rm', 'cp', 'mv', 'touch', 'cat', 'less', 'more',
+      'grep', 'find', 'which', 'whereis', 'locate', 'du', 'df', 'ps', 'top', 'htop',
+      'kill', 'killall', 'jobs', 'nohup', 'screen', 'tmux', 'chmod', 'chown', 'chgrp',
+      'tar', 'gzip', 'gunzip', 'zip', 'unzip', 'wget', 'curl', 'ssh', 'scp', 'rsync',
+      'git', 'docker', 'npm', 'yarn', 'pip', 'apt', 'yum', 'brew', 'systemctl', 'service',
+      'sudo', 'su', 'whoami', 'id', 'groups', 'history', 'echo', 'printf', 'date',
+      'uptime', 'uname', 'hostname', 'w', 'who', 'last', 'crontab', 'at', 'watch'
+    ]
+    
+    // Get the first word (command name)
+    const firstWord = cmd.split(/\s+/)[0].toLowerCase()
+    
+    // Check if it starts with a common command or contains typical command characters
+    return commonCommands.some(cmd => firstWord.startsWith(cmd)) ||
+           /^[a-zA-Z][a-zA-Z0-9_-]*(\s|$)/.test(cmd) ||
+           /^\.\/[a-zA-Z0-9_.-]+/.test(cmd) ||
+           /^~?\/[a-zA-Z0-9_.-/]+/.test(cmd)
+  }
+
+  // Send command to terminal
+  const sendCommandToTerminal = (command: string) => {
+    if (!terminalStore.connectionState.isConnected) {
+      addMessage('System', 'Cannot send command: Terminal not connected', 'system')
+      return
+    }
+
+    // Add the command with a newline to execute it
+    const commandWithNewline = command + '\r'
+    
+    // Send the command to terminal
+    terminalStore.sendInput(commandWithNewline)
+    
+    // Add a confirmation message to the chat
+    addMessage('System', `Command sent to terminal: ${command}`, 'system')
+    
+    console.log('Command sent to terminal:', command)
   }
 </script>
 
@@ -479,6 +647,8 @@
   .message-input:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    background-color: #1a1a1a;
+    border-color: #333;
   }
 
   .input-actions {
@@ -494,6 +664,15 @@
 
   .input-help small {
     font-size: 12px;
+  }
+
+  /* Enhanced styling for disabled input help */
+  .chat-input:has(.message-input:disabled) .input-help {
+    color: #888;
+  }
+
+  .chat-input:has(.message-input:disabled) .input-help small {
+    font-style: italic;
   }
 
   .send-button {
@@ -634,5 +813,89 @@
 
   .message.system .username {
     color: #ff9800;
+  }
+
+  /* Command suggestions styling */
+  .command-suggestions {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    border-left: 3px solid #4caf50;
+  }
+
+  .commands-header {
+    font-size: 12px;
+    font-weight: bold;
+    color: #4caf50;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .commands-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .command-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .command-text {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #e0e0e0;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 4px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    word-break: break-all;
+  }
+
+  .send-command-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .send-command-btn:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .send-command-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Command item hover effect */
+  .command-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(76, 175, 80, 0.3);
+  }
+
+  .command-item:hover .command-text {
+    background-color: rgba(0, 0, 0, 0.4);
+    border-color: rgba(76, 175, 80, 0.4);
   }
 </style>

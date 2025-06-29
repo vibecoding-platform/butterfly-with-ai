@@ -24,9 +24,14 @@ import string
 import struct
 import sys  # Import sys
 import termios
+import time
+import json
+import re
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Set
 from logging import getLogger
 
-from aetherterm import utils
+from aetherterm.agentserver import utils
 
 from .base_terminal import BaseTerminal
 
@@ -37,6 +42,38 @@ class AsyncioTerminal(BaseTerminal):
     sessions = {}
     closed_sessions = set()  # Track closed session IDs
     session_owners = {}  # Track session owners: {session_id: user_info}
+
+    # Log processing infrastructure
+    log_buffer = []  # Global log buffer for all sessions
+    log_processing_task = None  # Background task for log processing
+    log_patterns = {
+        "error": [
+            r"error|ERROR|Error",
+            r"failed|FAILED|Failed",
+            r"exception|EXCEPTION|Exception",
+            r"fatal|FATAL|Fatal",
+            r"panic|PANIC|Panic",
+        ],
+        "warning": [
+            r"warning|WARNING|Warning",
+            r"warn|WARN|Warn",
+            r"deprecated|DEPRECATED|Deprecated",
+        ],
+        "info": [
+            r"info|INFO|Info",
+            r"notice|NOTICE|Notice",
+            r"starting|Starting|STARTING",
+            r"stopping|Stopping|STOPPING",
+        ],
+        "success": [
+            r"success|SUCCESS|Success",
+            r"complete|COMPLETE|Complete",
+            r"done|DONE|Done",
+            r"ok|OK|Ok",
+        ],
+    }
+    processed_logs = []  # Processed and categorized logs
+    log_subscribers = set()  # WebSocket clients subscribed to log updates
 
     def __init__(
         self, user, path, session, socket, uri, render_string, broadcast, login, pam_profile
@@ -98,6 +135,10 @@ class AsyncioTerminal(BaseTerminal):
             self.history += message
             if len(self.history) > self.history_size:
                 self.history = self.history[-self.history_size :]
+
+            # Add to log buffer for processing
+            self.add_to_log_buffer(message)
+
         self.broadcast(self.session, message)
 
     async def start_pty(self):
@@ -492,3 +533,237 @@ class AsyncioTerminal(BaseTerminal):
             import traceback
 
             log.error(traceback.format_exc())
+
+    @classmethod
+    async def start_log_processing(cls):
+        """Start the global log processing task."""
+        if cls.log_processing_task is None:
+            cls.log_processing_task = asyncio.create_task(cls._log_processing_loop())
+            log.info("Log processing task started")
+
+    @classmethod
+    async def stop_log_processing(cls):
+        """Stop the global log processing task."""
+        if cls.log_processing_task:
+            cls.log_processing_task.cancel()
+            try:
+                await cls.log_processing_task
+            except asyncio.CancelledError:
+                pass
+            cls.log_processing_task = None
+            log.info("Log processing task stopped")
+
+    @classmethod
+    async def _log_processing_loop(cls):
+        """Main log processing loop that runs periodically."""
+        log.info("Starting log processing loop")
+
+        while True:
+            try:
+                await asyncio.sleep(5)  # Process logs every 5 seconds
+
+                if cls.log_buffer:
+                    # Process accumulated logs
+                    logs_to_process = cls.log_buffer.copy()
+                    cls.log_buffer.clear()
+
+                    processed_batch = await cls._process_log_batch(logs_to_process)
+
+                    if processed_batch:
+                        # Add to processed logs with size limit
+                        cls.processed_logs.extend(processed_batch)
+
+                        # Keep only the last 1000 processed logs
+                        if len(cls.processed_logs) > 1000:
+                            cls.processed_logs = cls.processed_logs[-1000:]
+
+                        # Broadcast to subscribers
+                        await cls._broadcast_log_updates(processed_batch)
+
+                        log.debug(f"Processed {len(processed_batch)} log entries")
+
+            except asyncio.CancelledError:
+                log.info("Log processing loop cancelled")
+                break
+            except Exception as e:
+                log.error(f"Error in log processing loop: {e}")
+                # Continue processing despite errors
+
+    @classmethod
+    async def _process_log_batch(cls, logs: List[Dict]) -> List[Dict]:
+        """Process a batch of logs and categorize them."""
+        processed = []
+
+        for log_entry in logs:
+            try:
+                # Extract text content
+                text = log_entry.get("content", "").strip()
+                if not text:
+                    continue
+
+                # Categorize log entry
+                category = cls._categorize_log(text)
+
+                # Extract timestamp or use current time
+                timestamp = log_entry.get("timestamp", datetime.now().isoformat())
+
+                # Create processed log entry
+                processed_entry = {
+                    "id": f"{log_entry.get('session_id', 'unknown')}_{int(time.time() * 1000)}_{len(processed)}",
+                    "session_id": log_entry.get("session_id", "unknown"),
+                    "timestamp": timestamp,
+                    "content": text,
+                    "category": category,
+                    "severity": cls._get_severity(category),
+                    "metadata": {
+                        "length": len(text),
+                        "lines": text.count("\n") + 1,
+                        "has_ansi": bool(re.search(r"\x1b\[[0-9;]*m", text)),
+                    },
+                }
+
+                processed.append(processed_entry)
+
+            except Exception as e:
+                log.error(f"Error processing log entry: {e}")
+                continue
+
+        return processed
+
+    @classmethod
+    def _categorize_log(cls, text: str) -> str:
+        """Categorize log text based on patterns."""
+        text_lower = text.lower()
+
+        # Check each category
+        for category, patterns in cls.log_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, text, re.IGNORECASE):
+                    return category
+
+        # Check for command patterns
+        if re.match(r"^\$|\#", text.strip()):
+            return "command"
+
+        # Check for system messages
+        if any(keyword in text_lower for keyword in ["system", "kernel", "daemon"]):
+            return "system"
+
+        return "general"
+
+    @classmethod
+    def _get_severity(cls, category: str) -> int:
+        """Get numeric severity for a category."""
+        severity_map = {
+            "error": 5,
+            "warning": 4,
+            "info": 3,
+            "success": 2,
+            "command": 1,
+            "system": 3,
+            "general": 1,
+        }
+        return severity_map.get(category, 1)
+
+    @classmethod
+    async def _broadcast_log_updates(cls, new_logs: List[Dict]):
+        """Broadcast log updates to subscribed WebSocket clients."""
+        if not cls.log_subscribers or not new_logs:
+            return
+
+        # Prepare broadcast message
+        message = {
+            "type": "log_update",
+            "logs": new_logs,
+            "timestamp": datetime.now().isoformat(),
+            "total_count": len(cls.processed_logs),
+        }
+
+        # Broadcast to all subscribers
+        disconnected_subscribers = set()
+
+        for subscriber in cls.log_subscribers:
+            try:
+                if hasattr(subscriber, "send") and callable(subscriber.send):
+                    await subscriber.send(json.dumps(message))
+            except Exception as e:
+                log.warning(f"Failed to send log update to subscriber: {e}")
+                disconnected_subscribers.add(subscriber)
+
+        # Remove disconnected subscribers
+        cls.log_subscribers -= disconnected_subscribers
+
+    def add_to_log_buffer(self, content: str):
+        """Add terminal output to the global log buffer."""
+        if content and content.strip():
+            log_entry = {
+                "session_id": self.session,
+                "content": content,
+                "timestamp": datetime.now().isoformat(),
+                "user": self.user.name if self.user else "unknown",
+                "source": "terminal",
+            }
+
+            self.log_buffer.append(log_entry)
+
+            # Limit buffer size
+            if len(self.log_buffer) > 10000:
+                self.log_buffer = self.log_buffer[-5000:]  # Keep last 5000 entries
+
+    @classmethod
+    def subscribe_to_logs(cls, subscriber):
+        """Subscribe a WebSocket client to log updates."""
+        cls.log_subscribers.add(subscriber)
+        log.info(f"New log subscriber added. Total: {len(cls.log_subscribers)}")
+
+    @classmethod
+    def unsubscribe_from_logs(cls, subscriber):
+        """Unsubscribe a WebSocket client from log updates."""
+        cls.log_subscribers.discard(subscriber)
+        log.info(f"Log subscriber removed. Total: {len(cls.log_subscribers)}")
+
+    @classmethod
+    def get_recent_logs(cls, limit: int = 100, category: Optional[str] = None) -> List[Dict]:
+        """Get recent processed logs with optional category filtering."""
+        logs = cls.processed_logs
+
+        if category:
+            logs = [log for log in logs if log.get("category") == category]
+
+        return logs[-limit:] if logs else []
+
+    @classmethod
+    def get_log_statistics(cls) -> Dict:
+        """Get statistics about processed logs."""
+        if not cls.processed_logs:
+            return {
+                "total": 0,
+                "by_category": {},
+                "by_severity": {},
+                "sessions": [],
+                "latest_timestamp": None,
+            }
+
+        # Count by category
+        by_category = {}
+        by_severity = {}
+        sessions = set()
+
+        for log_entry in cls.processed_logs:
+            category = log_entry.get("category", "unknown")
+            severity = log_entry.get("severity", 1)
+            session_id = log_entry.get("session_id", "unknown")
+
+            by_category[category] = by_category.get(category, 0) + 1
+            by_severity[severity] = by_severity.get(severity, 0) + 1
+            sessions.add(session_id)
+
+        return {
+            "total": len(cls.processed_logs),
+            "by_category": by_category,
+            "by_severity": by_severity,
+            "sessions": list(sessions),
+            "latest_timestamp": cls.processed_logs[-1].get("timestamp")
+            if cls.processed_logs
+            else None,
+        }

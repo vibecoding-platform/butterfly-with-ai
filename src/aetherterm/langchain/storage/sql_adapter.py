@@ -86,7 +86,7 @@ class ConversationModel(Base):
     conversation_type = Column(String(50), nullable=False)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    metadata = Column(JSON, default={})
+    meta_data = Column(JSON, default={})
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
@@ -128,7 +128,7 @@ class SessionModel(Base):
     total_tokens = Column(Integer, nullable=False, default=0)
 
     # メタデータ
-    metadata = Column(JSON, default={})
+    meta_data = Column(JSON, default={})
     tags = Column(JSON, default=[])
     settings = Column(JSON, default={})
     environment_info = Column(JSON, default={})
@@ -164,7 +164,7 @@ class SummaryModel(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # メタデータ
-    metadata = Column(JSON, default={})
+    meta_data = Column(JSON, default={})
 
     # インデックス
     __table_args__ = (
@@ -270,7 +270,7 @@ class SQLStorageAdapter(
                     conversation_type=entry.conversation_type.value,
                     role=entry.role.value,
                     content=entry.content,
-                    metadata=entry.metadata,
+                    meta_data=entry.metadata,
                     timestamp=entry.timestamp,
                     created_at=datetime.utcnow(),
                     parent_id=str(entry.parent_id) if entry.parent_id else None,
@@ -319,7 +319,7 @@ class SQLStorageAdapter(
                         conversation_type=ConversationType(conv.conversation_type),
                         role=MessageRole(conv.role),
                         content=conv.content,
-                        metadata=conv.metadata or {},
+                        metadata=conv.meta_data or {},
                         timestamp=conv.timestamp,
                         parent_id=conv.parent_id if conv.parent_id else None,
                         thread_id=conv.thread_id,
@@ -364,7 +364,7 @@ class SQLStorageAdapter(
                         conversation_type=ConversationType(conv.conversation_type),
                         role=MessageRole(conv.role),
                         content=conv.content,
-                        metadata=conv.metadata or {},
+                        metadata=conv.meta_data or {},
                         timestamp=conv.timestamp,
                         parent_id=conv.parent_id if conv.parent_id else None,
                         thread_id=conv.thread_id,
@@ -480,7 +480,7 @@ class SQLStorageAdapter(
                             command_count=context.command_count,
                             error_count=context.error_count,
                             total_tokens=context.total_tokens,
-                            metadata=context.metadata,
+                            meta_data=context.metadata,
                             tags=context.tags,
                             settings=context.settings,
                             environment_info=context.environment_info,
@@ -501,7 +501,7 @@ class SQLStorageAdapter(
                         command_count=context.command_count,
                         error_count=context.error_count,
                         total_tokens=context.total_tokens,
-                        metadata=context.metadata,
+                        meta_data=context.metadata,
                         tags=context.tags,
                         settings=context.settings,
                         environment_info=context.environment_info,
@@ -541,7 +541,7 @@ class SQLStorageAdapter(
                     command_count=session_model.command_count,
                     error_count=session_model.error_count,
                     total_tokens=session_model.total_tokens,
-                    metadata=session_model.metadata or {},
+                    metadata=session_model.meta_data or {},
                     tags=session_model.tags or [],
                     settings=session_model.settings or {},
                     environment_info=session_model.environment_info or {},
@@ -602,7 +602,7 @@ class SQLStorageAdapter(
                         command_count=session_model.command_count,
                         error_count=session_model.error_count,
                         total_tokens=session_model.total_tokens,
-                        metadata=session_model.metadata or {},
+                        metadata=session_model.meta_data or {},
                         tags=session_model.tags or [],
                         settings=session_model.settings or {},
                         environment_info=session_model.environment_info or {},
@@ -674,7 +674,7 @@ class SQLStorageAdapter(
                     start_time=summary.start_time,
                     end_time=summary.end_time,
                     created_at=summary.created_at,
-                    metadata=summary.metadata,
+                    meta_data=summary.metadata,
                 )
 
                 session.add(summary_model)
@@ -720,7 +720,7 @@ class SQLStorageAdapter(
                         start_time=summary_model.start_time,
                         end_time=summary_model.end_time,
                         created_at=summary_model.created_at,
-                        metadata=summary_model.metadata or {},
+                        metadata=summary_model.meta_data or {},
                     )
                     summaries.append(summary)
 
@@ -761,7 +761,7 @@ class SQLStorageAdapter(
                         start_time=summary_model.start_time,
                         end_time=summary_model.end_time,
                         created_at=summary_model.created_at,
-                        metadata=summary_model.metadata or {},
+                        metadata=summary_model.meta_data or {},
                     )
                     summaries.append(summary)
 

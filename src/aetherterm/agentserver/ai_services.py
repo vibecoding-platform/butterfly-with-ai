@@ -23,7 +23,7 @@ class AIService(ABC):
         self,
         messages: list[dict[str, str]],
         terminal_context: Optional[str] = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncGenerator[str, None]:
         """Generate AI chat completion."""
 
@@ -45,6 +45,7 @@ class AnthropicService(AIService):
         if self._client is None:
             try:
                 import anthropic
+
                 self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
                 log.info(f"Initialized Anthropic client with model: {self.model}")
             except ImportError:
@@ -65,9 +66,7 @@ class AnthropicService(AIService):
             client = await self._get_client()
             # Test with a minimal request
             await client.messages.create(
-                model=self.model,
-                max_tokens=1,
-                messages=[{"role": "user", "content": "test"}]
+                model=self.model, max_tokens=1, messages=[{"role": "user", "content": "test"}]
             )
             return True
         except Exception as e:
@@ -78,7 +77,7 @@ class AnthropicService(AIService):
         self,
         messages: list[dict[str, str]],
         terminal_context: Optional[str] = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncGenerator[str, None]:
         """Generate streaming chat completion using Anthropic Claude."""
 
@@ -102,31 +101,32 @@ Be concise, helpful, and practical in your responses. When suggesting commands, 
             anthropic_messages = []
             for msg in messages:
                 if msg.get("role") in ["user", "assistant"]:
-                    anthropic_messages.append({
-                        "role": msg["role"],
-                        "content": msg["content"]
-                    })
+                    anthropic_messages.append({"role": msg["role"], "content": msg["content"]})
 
             if stream:
-                log.info(f"Starting streaming chat completion with {len(anthropic_messages)} messages")
+                log.info(
+                    f"Starting streaming chat completion with {len(anthropic_messages)} messages"
+                )
 
                 async with client.messages.stream(
                     model=self.model,
                     max_tokens=4096,
                     system=system_content,
-                    messages=anthropic_messages
+                    messages=anthropic_messages,
                 ) as stream:
                     async for text in stream.text_stream:
                         yield text
 
             else:
-                log.info(f"Starting non-streaming chat completion with {len(anthropic_messages)} messages")
+                log.info(
+                    f"Starting non-streaming chat completion with {len(anthropic_messages)} messages"
+                )
 
                 response = await client.messages.create(
                     model=self.model,
                     max_tokens=4096,
                     system=system_content,
-                    messages=anthropic_messages
+                    messages=anthropic_messages,
                 )
 
                 yield response.content[0].text
@@ -146,7 +146,7 @@ class MockAIService(AIService):
         self,
         messages: list[dict[str, str]],
         terminal_context: Optional[str] = None,
-        stream: bool = True
+        stream: bool = True,
     ) -> AsyncGenerator[str, None]:
         """Generate mock responses for testing."""
 
@@ -173,9 +173,7 @@ class MockAIService(AIService):
 
 
 def create_ai_service(
-    provider: str = "mock",
-    api_key: Optional[str] = None,
-    model: Optional[str] = None
+    provider: str = "mock", api_key: Optional[str] = None, model: Optional[str] = None
 ) -> AIService:
     """Factory function to create AI service instances."""
 

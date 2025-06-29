@@ -100,9 +100,11 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   const eventCallbacks = ref<{
     onShellOutput: ((data: string) => void)[]
     onChatMessage: ((data: any) => void)[]
+    onAskAI: ((text: string) => void)[]
   }>({
     onShellOutput: [],
     onChatMessage: [],
+    onAskAI: [],
   })
 
   // Getters
@@ -415,6 +417,27 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     }
   }
 
+  // Ask AI Event Handling
+  const onAskAI = (callback: (text: string) => void) => {
+    eventCallbacks.value.onAskAI.push(callback)
+  }
+
+  const offAskAI = (callback?: (text: string) => void) => {
+    if (callback) {
+      const index = eventCallbacks.value.onAskAI.indexOf(callback)
+      if (index !== -1) {
+        eventCallbacks.value.onAskAI.splice(index, 1)
+      }
+    } else {
+      eventCallbacks.value.onAskAI = []
+    }
+  }
+
+  const triggerAskAI = (selectedText: string) => {
+    console.log('AetherTerminalServiceStore: Triggering Ask AI with text:', selectedText)
+    eventCallbacks.value.onAskAI.forEach(callback => callback(selectedText))
+  }
+
   // Terminal Actions
   const initializeSession = (sessionId: string) => {
     session.value.id = sessionId
@@ -603,10 +626,15 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     // Event Registration
     onShellOutput,
     onChatMessage,
+    onAskAI,
 
     // Event Cleanup
     offShellOutput,
     offChatMessage,
+    offAskAI,
+
+    // Ask AI Actions
+    triggerAskAI,
 
     // Terminal Actions
     initializeSession,

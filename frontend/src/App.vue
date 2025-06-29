@@ -6,13 +6,16 @@
   import SimpleChatComponent from './components/SimpleChatComponent.vue'
   import TerminalComponent from './components/TerminalComponent.vue'
   import DevJWTRegister from './components/DevJWTRegister.vue'
+  import ServerInventoryPanel from './components/ServerInventoryPanel.vue'
   import { useChatStore } from './stores/chatStore'
+  import { useAetherTerminalServiceStore } from './stores/aetherTerminalServiceStore'
   import { enableJWTDevRegister } from './config/environment'
 
   const chatStore = useChatStore()
-  const activeTab = ref('chat') // 'supervisor', 'chat', or 'dev-auth'
+  const terminalStore = useAetherTerminalServiceStore()
+  const activeTab = ref('chat') // 'chat', 'inventory', 'supervisor', or 'debug'
   const isSupervisorPanelFloating = ref(false)
-  const isSupervisorPanelVisible = ref(true)
+  const isSupervisorPanelVisible = ref(false)
 
   // Panel width management
   const panelWidth = ref(320) // デフォルト幅
@@ -151,6 +154,15 @@
   onMounted(() => {
     loadPanelWidth()
     loadPanelVisibility()
+
+    // Listen for Ask AI events from Spine and auto-show side panel
+    terminalStore.onAskAI((selectedText: string) => {
+      console.log('App.vue: Ask AI triggered, showing side panel and switching to assistant tab')
+      
+      // Switch to assistant tab and show panel
+      activeTab.value = 'chat'
+      isSupervisorPanelVisible.value = true
+    })
   })
 
   onUnmounted(() => {
@@ -158,6 +170,9 @@
     document.removeEventListener('mouseup', stopDrag)
     document.removeEventListener('mousemove', onResize)
     document.removeEventListener('mouseup', stopResize)
+    
+    // Clean up Spine event listeners
+    terminalStore.offAskAI()
   })
 
   watch(chatStore.activeMessages, (newMessages) => {
@@ -209,17 +224,27 @@
       </div>
       <!-- Tab Navigation -->
       <div class="tab-navigation">
-        <button :class="{ active: activeTab === 'chat' }" @click="activeTab = 'chat'">Chat</button>
+        <button 
+          @click="togglePanelVisibility"
+          class="panel-close-btn"
+          title="Close Panel"
+        >
+          »
+        </button>
+        <button :class="{ active: activeTab === 'chat' }" @click="activeTab = 'chat'">Assistant</button>
+        <button :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">
+          🖥️ Inventory
+        </button>
         <button :class="{ active: activeTab === 'supervisor' }" @click="activeTab = 'supervisor'">
-          Supervisor Control
+          👮 Admin
         </button>
         <button
           v-if="enableJWTDevRegister"
-          :class="{ active: activeTab === 'dev-auth' }"
-          @click="activeTab = 'dev-auth'"
-          class="dev-tab"
+          :class="{ active: activeTab === 'debug' }"
+          @click="activeTab = 'debug'"
+          class="debug-tab"
         >
-          🔧 Dev Auth
+          🔧 Debug
         </button>
       </div>
 
@@ -227,30 +252,60 @@
       <div v-if="activeTab === 'chat'" class="tab-content chat-tab">
         <SimpleChatComponent />
       </div>
+      <div v-if="activeTab === 'inventory'" class="tab-content inventory-tab">
+        <ServerInventoryPanel />
+      </div>
       <div v-if="activeTab === 'supervisor'" class="tab-content supervisor-tab">
         <SupervisorControlPanel />
       </div>
-      <div v-if="activeTab === 'dev-auth'" class="tab-content dev-auth-tab">
+      <div v-if="activeTab === 'debug'" class="tab-content debug-tab">
         <DevJWTRegister />
       </div>
     </div>
 
-    <!-- Panel Toggle Button -->
+    <!-- Sidebar (when panel is hidden) -->
     <div
-      class="panel-toggle-container"
-      :style="{
-        right: isSupervisorPanelVisible && !isSupervisorPanelFloating ? panelWidth + 'px' : '0px',
-      }"
+      v-show="!isSupervisorPanelVisible"
+      class="sidebar"
     >
-      <button
-        @click="togglePanelVisibility"
-        class="panel-toggle-btn"
-        :class="{ 'panel-hidden': !isSupervisorPanelVisible }"
-        :title="isSupervisorPanelVisible ? 'Hide Chat Panel' : 'Show Chat Panel'"
-      >
-        {{ isSupervisorPanelVisible ? '→' : '←' }}
-      </button>
+      <div class="sidebar-content">
+        <!-- Panel Toggle Button -->
+        <button 
+          @click="togglePanelVisibility"
+          class="sidebar-toggle-btn"
+          :title="isSupervisorPanelVisible ? 'Hide Panel' : 'Show Panel'"
+        >
+          {{ isSupervisorPanelVisible ? '→' : '←' }}
+        </button>
+        
+        <!-- Sidebar Navigation Buttons -->
+        <button 
+          @click="activeTab = 'chat'; togglePanelVisibility()"
+          class="sidebar-tab-btn"
+          :class="{ active: activeTab === 'chat' }"
+          title="Open Assistant"
+        >
+          🤖
+        </button>
+        <button 
+          @click="activeTab = 'inventory'; togglePanelVisibility()"
+          class="sidebar-tab-btn"
+          :class="{ active: activeTab === 'inventory' }"
+          title="Open Server Inventory"
+        >
+          🖥️
+        </button>
+      </div>
     </div>
+
+    <!-- Debug Info -->
+    <div v-if="false" class="debug-info" style="position: fixed; top: 100px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; z-index: 9999; font-size: 12px;">
+      <div>Panel Visible: {{ isSupervisorPanelVisible }}</div>
+      <div>Active Tab: {{ activeTab }}</div>
+      <div>Panel Floating: {{ isSupervisorPanelFloating }}</div>
+      <div>Sidebar Should Show: {{ !isSupervisorPanelVisible }}</div>
+    </div>
+
   </div>
 </template>
 
@@ -277,7 +332,7 @@
     color: white;
   }
 
-  .tab-navigation button.dev-tab {
+  .tab-navigation button.debug-tab {
     border-left: 1px solid #444;
     border-right: 1px solid #444;
     background-color: #2a2a2a;
@@ -285,11 +340,11 @@
     font-size: 12px;
   }
 
-  .tab-navigation button.dev-tab:hover {
+  .tab-navigation button.debug-tab:hover {
     background-color: #333;
   }
 
-  .tab-navigation button.dev-tab.active {
+  .tab-navigation button.debug-tab.active {
     background-color: #ff9800;
     color: white;
   }
@@ -302,18 +357,41 @@
     flex-direction: column;
   }
 
-  /* チャット専用のレイアウト調整 */
+  /* アシスタント専用のレイアウト調整 */
   .tab-content.chat-tab {
-    padding: 0; /* チャットは独自のパディングを持つ */
+    padding: 0; /* アシスタントは独自のパディングを持つ */
   }
 
   .tab-content.supervisor-tab {
     /* Supervisorタブは通常のパディング */
   }
 
-  .tab-content.dev-auth-tab {
-    /* Development Authタブは通常のパディング */
+  .tab-content.debug-tab {
+    /* Debugタブは通常のパディング */
     padding: 0; /* DevJWTRegisterコンポーネントが独自のパディングを持つ */
+  }
+
+
+
+  .tab-navigation button.panel-close-btn {
+    background-color: #1e1e1e;
+    color: #999;
+    border-right: 1px solid #444;
+    padding: 10px 12px;
+    font-size: 18px;
+    font-weight: bold;
+    min-width: auto;
+    line-height: 1;
+  }
+
+  .tab-navigation button.panel-close-btn:hover {
+    background-color: #333;
+    color: #4caf50;
+  }
+
+  .tab-content.inventory-tab {
+    /* Inventoryタブはパディングなし */
+    padding: 0; /* InventorySearchPanelコンポーネントが独自のパディングを持つ */
   }
 
   html,
@@ -753,6 +831,96 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
+  /* Sidebar Styles */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 60px;
+    background-color: #1e1e1e;
+    border-left: 1px solid #444;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 20px;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .sidebar-toggle-btn {
+    width: 40px;
+    height: 30px;
+    background-color: #4caf50;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    margin-bottom: 10px;
+  }
+
+  .sidebar-toggle-btn:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+  }
+
+  .sidebar-tab-btn {
+    width: 40px;
+    height: 40px;
+    background: none;
+    border: 2px solid #444;
+    border-radius: 8px;
+    color: #ccc;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sidebar-tab-btn:hover {
+    background-color: #333;
+    border-color: #4caf50;
+    color: #4caf50;
+    transform: scale(1.05);
+  }
+
+  .sidebar-tab-btn.active {
+    background-color: #4caf50;
+    border-color: #4caf50;
+    color: white;
+  }
+
+  .sidebar-tab-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(76, 175, 80, 0.3), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .sidebar-tab-btn:hover::before {
+    left: 100%;
+  }
+
   /* モバイル画面での調整 */
   @media (max-width: 900px) {
     .panel-toggle-container {
@@ -769,6 +937,17 @@
 
     .panel-toggle-btn.panel-hidden {
       border-radius: 0 0 6px 6px;
+    }
+
+    .sidebar {
+      width: 50px;
+      padding-top: 60px; /* トグルボタンの下に配置 */
+    }
+
+    .sidebar-tab-btn {
+      width: 35px;
+      height: 35px;
+      font-size: 14px;
     }
   }
 </style>

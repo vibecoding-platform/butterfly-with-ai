@@ -1,0 +1,276 @@
+// AetherTerm Theme System
+
+@import './variables.scss';
+
+// =============================================================================
+// Base Theme (Dark Theme - Default)
+// =============================================================================
+
+:root {
+  // Color Scheme
+  --color-scheme: dark;
+  
+  // Primary Colors
+  --color-primary: #{$color-primary};
+  --color-primary-dark: #{$color-primary-dark};
+  --color-primary-light: #{$color-primary-light};
+  
+  // Secondary Colors  
+  --color-secondary: #{$color-secondary};
+  --color-secondary-dark: #{$color-secondary-dark};
+  --color-secondary-light: #{$color-secondary-light};
+  
+  // Background Colors
+  --color-bg-primary: #{$color-bg-primary};
+  --color-bg-secondary: #{$color-bg-secondary};
+  --color-bg-tertiary: #{$color-bg-tertiary};
+  --color-bg-elevated: #{$color-bg-elevated};
+  
+  // Text Colors
+  --color-text-primary: #{$color-text-primary};
+  --color-text-secondary: #{$color-text-secondary};
+  --color-text-muted: #{$color-text-muted};
+  --color-text-disabled: #{$color-text-disabled};
+  --color-text-subtle: #{$color-text-subtle};
+  
+  // Border Colors
+  --color-border-primary: #{$color-border-primary};
+  --color-border-secondary: #{$color-border-secondary};
+  --color-border-focus: #{$color-border-focus};
+  
+  // Status Colors
+  --color-status-success: #{$color-status-success};
+  --color-status-warning: #{$color-status-warning};
+  --color-status-error: #{$color-status-error};
+  --color-status-info: #{$color-status-info};
+  
+  // Terminal Colors
+  --color-terminal-bg: #{$color-terminal-bg};
+  --color-terminal-fg: #{$color-terminal-fg};
+  --color-terminal-cursor: #{$color-terminal-cursor};
+  --color-terminal-selection: #{$color-terminal-selection};
+}
+
+// =============================================================================
+// Light Theme (Optional)
+// =============================================================================
+
+[data-theme="light"] {
+  --color-scheme: light;
+  
+  // Background Colors (inverted for light theme)
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-bg-tertiary: #e0e0e0;
+  --color-bg-elevated: #ffffff;
+  
+  // Text Colors (inverted for light theme)
+  --color-text-primary: #000000;
+  --color-text-secondary: #333333;
+  --color-text-muted: #666666;
+  --color-text-disabled: #999999;
+  --color-text-subtle: #aaaaaa;
+  
+  // Border Colors
+  --color-border-primary: #e0e0e0;
+  --color-border-secondary: #cccccc;
+  
+  // Terminal Colors (adjusted for light theme)
+  --color-terminal-bg: #ffffff;
+  --color-terminal-fg: #000000;
+  --color-terminal-cursor: #000000;
+  --color-terminal-selection: rgba(0, 0, 0, 0.2);
+}
+
+// =============================================================================
+// High Contrast Theme (Accessibility)
+// =============================================================================
+
+[data-theme="high-contrast"] {
+  --color-scheme: dark;
+  
+  // Enhanced contrast colors
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #1a1a1a;
+  --color-bg-tertiary: #333333;
+  --color-bg-elevated: #404040;
+  
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #ffffff;
+  --color-text-muted: #cccccc;
+  
+  --color-border-primary: #666666;
+  --color-border-secondary: #888888;
+  
+  // High contrast status colors
+  --color-status-success: #00ff00;
+  --color-status-warning: #ffff00;
+  --color-status-error: #ff0000;
+  --color-status-info: #00ffff;
+  
+  --color-primary: #00ff00;
+  --color-primary-dark: #00cc00;
+}
+
+// =============================================================================
+// Terminal Color Themes
+// =============================================================================
+
+// Solarized Dark Theme
+[data-terminal-theme="solarized-dark"] {
+  --color-terminal-bg: #002b36;
+  --color-terminal-fg: #839496;
+  --color-terminal-cursor: #93a1a1;
+  --color-terminal-selection: rgba(147, 161, 161, 0.3);
+  
+  // ANSI colors for Solarized Dark
+  --color-ansi-black: #073642;
+  --color-ansi-red: #dc322f;
+  --color-ansi-green: #859900;
+  --color-ansi-yellow: #b58900;
+  --color-ansi-blue: #268bd2;
+  --color-ansi-magenta: #d33682;
+  --color-ansi-cyan: #2aa198;
+  --color-ansi-white: #eee8d5;
+}
+
+// Monokai Theme
+[data-terminal-theme="monokai"] {
+  --color-terminal-bg: #272822;
+  --color-terminal-fg: #f8f8f2;
+  --color-terminal-cursor: #f8f8f0;
+  --color-terminal-selection: rgba(248, 248, 242, 0.3);
+  
+  // ANSI colors for Monokai
+  --color-ansi-black: #272822;
+  --color-ansi-red: #f92672;
+  --color-ansi-green: #a6e22e;
+  --color-ansi-yellow: #f4bf75;
+  --color-ansi-blue: #66d9ef;
+  --color-ansi-magenta: #ae81ff;
+  --color-ansi-cyan: #a1efe4;
+  --color-ansi-white: #f8f8f2;
+}
+
+// Dracula Theme
+[data-terminal-theme="dracula"] {
+  --color-terminal-bg: #282a36;
+  --color-terminal-fg: #f8f8f2;
+  --color-terminal-cursor: #f8f8f0;
+  --color-terminal-selection: rgba(248, 248, 242, 0.3);
+  
+  // ANSI colors for Dracula
+  --color-ansi-black: #21222c;
+  --color-ansi-red: #ff5555;
+  --color-ansi-green: #50fa7b;
+  --color-ansi-yellow: #f1fa8c;
+  --color-ansi-blue: #bd93f9;
+  --color-ansi-magenta: #ff79c6;
+  --color-ansi-cyan: #8be9fd;
+  --color-ansi-white: #f8f8f2;
+}
+
+// =============================================================================
+// Theme Utilities
+// =============================================================================
+
+// Mixin to use CSS custom properties
+@mixin theme-color($property, $color-name) {
+  #{$property}: var(--color-#{$color-name});
+}
+
+// Component theme mixins
+@mixin themed-background($level: 'primary') {
+  background-color: var(--color-bg-#{$level});
+}
+
+@mixin themed-text($level: 'primary') {
+  color: var(--color-text-#{$level});
+}
+
+@mixin themed-border($level: 'primary') {
+  border-color: var(--color-border-#{$level});
+}
+
+// =============================================================================
+// Dark/Light Mode Toggle Support
+// =============================================================================
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    // Auto light theme when system preference is light
+    // (Only if no theme is explicitly set)
+    --color-scheme: light;
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f5f5f5;
+    --color-bg-tertiary: #e0e0e0;
+    --color-text-primary: #000000;
+    --color-text-secondary: #333333;
+    --color-text-muted: #666666;
+    --color-border-primary: #e0e0e0;
+    --color-border-secondary: #cccccc;
+  }
+}
+
+// =============================================================================
+// Animation Preferences
+// =============================================================================
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-duration-fast: 0s;
+    --transition-duration-base: 0s;
+    --transition-duration-slow: 0s;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// =============================================================================
+// Theme Application Classes
+// =============================================================================
+
+.theme-primary {
+  @include themed-background('primary');
+  @include themed-text('primary');
+}
+
+.theme-secondary {
+  @include themed-background('secondary');
+  @include themed-text('secondary');
+}
+
+.theme-elevated {
+  @include themed-background('elevated');
+  @include themed-text('primary');
+  border: 1px solid var(--color-border-primary);
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-base;
+}
+
+.theme-status-success {
+  background-color: var(--color-status-success);
+  color: var(--color-text-primary);
+}
+
+.theme-status-warning {
+  background-color: var(--color-status-warning);
+  color: var(--color-bg-primary);
+}
+
+.theme-status-error {
+  background-color: var(--color-status-error);
+  color: var(--color-text-primary);
+}
+
+.theme-status-info {
+  background-color: var(--color-status-info);
+  color: var(--color-text-primary);
+}

@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client'
-import { socketUrl } from '../config/environment'
+import { socketUrl, apiBaseUrl } from '../config/environment'
+import type { InventoryItem, InventorySummary } from '../types/inventory'
 
 interface VueTermWebSockets {
   shellWs: WebSocket | null
@@ -191,6 +192,150 @@ class AetherTermService {
   offError(callback?: (error: any) => void): void {
     if (this.socket) {
       this.socket.off('connect_error', callback)
+    }
+  }
+
+  // Inventory HTTP methods (REST API calls)
+  
+  /**
+   * Make HTTP request to inventory API
+   */
+  private async makeInventoryRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${apiBaseUrl}/api/inventory${endpoint}`
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }))
+        throw new Error(`HTTP ${response.status}: ${errorData.detail || errorData.message || 'Request failed'}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error(`Inventory API request failed [${endpoint}]:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Get inventory summary via HTTP
+   */
+  async getInventorySummary(): Promise<InventorySummary> {
+    return this.makeInventoryRequest<InventorySummary>('/summary')
+  }
+
+  /**
+   * Get inventory resources via HTTP
+   */
+  async getInventoryResources(options: {
+    limit?: number
+    provider?: string
+    resource_type?: string
+  } = {}): Promise<InventoryItem[]> {
+    const params = new URLSearchParams()
+    
+    if (options.limit) params.append('limit', options.limit.toString())
+    if (options.provider) params.append('provider', options.provider)
+    if (options.resource_type) params.append('resource_type', options.resource_type)
+    
+    const endpoint = `/resources${params.toString() ? `?${params.toString()}` : ''}`
+    return this.makeInventoryRequest<InventoryItem[]>(endpoint)
+  }
+
+  /**
+   * Search inventory via HTTP
+   */
+  async searchInventory(searchTerm: string, providerFilter?: string): Promise<InventoryItem[]> {
+    return this.makeInventoryRequest<InventoryItem[]>('/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        search_term: searchTerm,
+        provider_filter: providerFilter
+      })
+    })
+  }
+
+  /**
+   * Get service status via HTTP
+   */
+  async getInventoryServiceStatus(): Promise<any> {
+    return this.makeInventoryRequest('/status')
+  }
+
+  /**
+   * Trigger inventory sync via HTTP
+   */
+  async syncInventory(): Promise<any> {
+    return this.makeInventoryRequest('/sync', {
+      method: 'POST'
+    })
+  }
+
+  // Socket.IO inventory events
+
+  /**
+   * Listen for inventory update events
+   */
+  onInventoryUpdate(callback: (data: any) => void): void {
+    if (this.socket) {
+      this.socket.on('inventory_update', callback)
+    }
+  }
+
+  /**
+   * Listen for inventory sync status
+   */
+  onInventorySyncStatus(callback: (data: { status: string; progress: number; message: string }) => void): void {
+    if (this.socket) {
+      this.socket.on('inventory_sync_status', callback)
+    }
+  }
+
+  /**
+   * Request inventory refresh via socket
+   */
+  requestInventoryRefresh(): void {
+    if (this.socket) {
+      this.socket.emit('request_inventory_refresh')
+    }
+  }
+
+  /**
+   * Subscribe to inventory resource updates
+   */
+  subscribeToResourceUpdates(resourceId: string): void {
+    if (this.socket) {
+      this.socket.emit('subscribe_resource_updates', { resource_id: resourceId })
+    }
+  }
+
+  /**
+   * Unsubscribe from inventory resource updates
+   */
+  unsubscribeFromResourceUpdates(resourceId: string): void {
+    if (this.socket) {
+      this.socket.emit('unsubscribe_resource_updates', { resource_id: resourceId })
+    }
+  }
+
+  // Cleanup methods for inventory events
+
+  offInventoryUpdate(callback?: (data: any) => void): void {
+    if (this.socket) {
+      this.socket.off('inventory_update', callback)
+    }
+  }
+
+  offInventorySyncStatus(callback?: (data: any) => void): void {
+    if (this.socket) {
+      this.socket.off('inventory_sync_status', callback)
     }
   }
 }

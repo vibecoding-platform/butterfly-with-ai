@@ -52,6 +52,12 @@ dependencies = [
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "tiktoken>=0.5.0",
+    # Steampipe統合用 (PostgreSQL経由)
+    "psutil>=5.9.0",
+    "boto3>=1.26.0",
+    "azure-identity>=1.12.0",
+    "google-cloud-core>=2.3.0",
+    "kubernetes>=24.0.0",
 ]
 
 [project.optional-dependencies]
@@ -85,6 +91,7 @@ aetherterm-controlserver = "aetherterm.controlserver.main:main"
 aetherterm-shell-monitor = "aetherterm.agentshell.pty_monitor.main:main"
 aetherterm-dummy-ai = "aetherterm.agentshell.pty_monitor.dummy_ai_server:main"
 aetherterm-generate-ssl = "aetherterm.scripts.generate_ssl_certs:main"
+aetherterm-ssl-setup = "aetherterm.agentserver.ssl_setup:main"
 
 [tool.setuptools]
 

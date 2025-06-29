@@ -1,0 +1,464 @@
+// AetherTerm Design System Mixins
+
+@import './variables.scss';
+
+// =============================================================================
+// Layout Mixins
+// =============================================================================
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin flex-start {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+@mixin flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+@mixin flex-column-center {
+  @include flex-column;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin absolute-full {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+@mixin fixed-full {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+// =============================================================================
+// Text & Typography Mixins
+// =============================================================================
+
+@mixin text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin text-multiline-truncate($lines: 2) {
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@mixin font-mono {
+  font-family: $font-family-mono;
+}
+
+@mixin font-sans {
+  font-family: $font-family-sans;
+}
+
+// =============================================================================
+// Visual Effect Mixins
+// =============================================================================
+
+@mixin card-style {
+  background-color: $color-bg-secondary;
+  border: $border-width solid $color-border-primary;
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-base;
+}
+
+@mixin elevated-card {
+  @include card-style;
+  background-color: $color-bg-tertiary;
+  box-shadow: $shadow-lg;
+}
+
+@mixin button-reset {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+@mixin input-reset {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+// =============================================================================
+// Interactive State Mixins
+// =============================================================================
+
+@mixin hover-lift {
+  transition: transform $transition-duration-fast $transition-timing-function;
+  
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@mixin focus-ring($color: $color-primary) {
+  &:focus-visible {
+    outline: 2px solid $color;
+    outline-offset: 2px;
+  }
+}
+
+@mixin disabled-state {
+  &:disabled,
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}
+
+// =============================================================================
+// Button Mixins
+// =============================================================================
+
+@mixin button-base {
+  @include button-reset;
+  @include flex-center;
+  @include focus-ring;
+  
+  height: $button-height-base;
+  padding: 0 $button-padding-x-base;
+  border-radius: $border-radius-base;
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
+  transition: $transition-colors;
+  user-select: none;
+  
+  @include disabled-state;
+}
+
+@mixin button-primary {
+  @include button-base;
+  
+  background-color: $color-primary;
+  color: $color-text-primary;
+  
+  &:hover:not(:disabled) {
+    background-color: $color-primary-dark;
+  }
+}
+
+@mixin button-secondary {
+  @include button-base;
+  
+  background-color: $color-bg-secondary;
+  color: $color-text-secondary;
+  border: $border-width solid $color-border-primary;
+  
+  &:hover:not(:disabled) {
+    background-color: $color-bg-tertiary;
+    border-color: $color-border-secondary;
+  }
+}
+
+@mixin button-ghost {
+  @include button-base;
+  
+  background-color: transparent;
+  color: $color-text-muted;
+  
+  &:hover:not(:disabled) {
+    background-color: $color-bg-secondary;
+    color: $color-text-secondary;
+  }
+}
+
+@mixin button-danger {
+  @include button-base;
+  
+  background-color: $color-status-error;
+  color: $color-text-primary;
+  
+  &:hover:not(:disabled) {
+    background-color: darken($color-status-error, 10%);
+  }
+}
+
+// =============================================================================
+// Input Mixins
+// =============================================================================
+
+@mixin input-base {
+  @include input-reset;
+  @include focus-ring;
+  
+  height: $input-height-base;
+  padding: $input-padding-y $input-padding-x;
+  background-color: $color-bg-secondary;
+  border: $border-width solid $color-border-primary;
+  border-radius: $border-radius-base;
+  color: $color-text-primary;
+  font-size: $font-size-base;
+  transition: $transition-colors;
+  
+  &::placeholder {
+    color: $color-text-subtle;
+  }
+  
+  &:hover:not(:disabled) {
+    border-color: $color-border-secondary;
+  }
+  
+  &:focus {
+    border-color: $color-primary;
+    background-color: $color-bg-tertiary;
+  }
+  
+  @include disabled-state;
+}
+
+@mixin search-input {
+  @include input-base;
+  
+  padding-left: $spacing-3xl; // Space for search icon
+  
+  &::placeholder {
+    color: $color-text-muted;
+  }
+}
+
+// =============================================================================
+// Tab Mixins
+// =============================================================================
+
+@mixin tab-base {
+  @include flex-center;
+  
+  height: $tab-height;
+  min-width: $tab-min-width;
+  max-width: $tab-max-width;
+  padding: 0 $spacing-md;
+  background-color: $color-bg-secondary;
+  border-right: $border-width solid $color-border-primary;
+  cursor: pointer;
+  transition: $transition-colors;
+  user-select: none;
+  
+  &:hover {
+    background-color: $color-bg-tertiary;
+  }
+}
+
+@mixin tab-active($color: $color-primary) {
+  background-color: $color;
+  color: $color-text-primary;
+  
+  &:hover {
+    background-color: $color;
+  }
+}
+
+@mixin tab-indicator($color: $color-primary) {
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: $color;
+  }
+}
+
+// =============================================================================
+// Animation Mixins
+// =============================================================================
+
+@mixin fade-in($duration: $transition-duration-base) {
+  animation: fadeIn $duration $transition-timing-function;
+}
+
+@mixin slide-in-up($duration: $transition-duration-base) {
+  animation: slideInUp $duration $transition-timing-function;
+}
+
+@mixin slide-in-down($duration: $transition-duration-base) {
+  animation: slideInDown $duration $transition-timing-function;
+}
+
+@mixin pulse($duration: 2s) {
+  animation: pulse $duration infinite;
+}
+
+@mixin blink($duration: 1s) {
+  animation: blink $duration infinite;
+}
+
+// =============================================================================
+// Responsive Mixins
+// =============================================================================
+
+@mixin mobile-only {
+  @media (max-width: #{$breakpoint-md - 1px}) {
+    @content;
+  }
+}
+
+@mixin tablet-up {
+  @media (min-width: $breakpoint-md) {
+    @content;
+  }
+}
+
+@mixin desktop-up {
+  @media (min-width: $breakpoint-lg) {
+    @content;
+  }
+}
+
+@mixin large-desktop-up {
+  @media (min-width: $breakpoint-xl) {
+    @content;
+  }
+}
+
+// =============================================================================
+// Terminal Specific Mixins
+// =============================================================================
+
+@mixin terminal-container {
+  @include flex-column;
+  
+  height: 100%;
+  background-color: $color-terminal-bg;
+  color: $color-terminal-fg;
+  font-family: $font-family-mono;
+  min-height: 400px;
+}
+
+@mixin terminal-status-bar {
+  padding: $spacing-sm $spacing-md;
+  background-color: $color-bg-secondary;
+  border-bottom: $border-width solid $color-border-primary;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+}
+
+@mixin status-connected {
+  color: $color-status-success;
+}
+
+@mixin status-connecting {
+  color: $color-status-warning;
+}
+
+@mixin status-disconnected {
+  color: $color-status-error;
+}
+
+@mixin status-error {
+  color: $color-status-error;
+}
+
+// =============================================================================
+// Context Menu Mixins
+// =============================================================================
+
+@mixin context-menu {
+  position: absolute;
+  min-width: $context-menu-width;
+  max-height: $context-menu-max-height;
+  background-color: $color-bg-secondary;
+  border: $border-width solid $color-border-primary;
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-lg;
+  z-index: $z-index-popover;
+  overflow: hidden;
+}
+
+@mixin context-menu-item {
+  @include flex-start;
+  
+  width: 100%;
+  height: $context-menu-item-height;
+  padding: 0 $spacing-md;
+  background: none;
+  border: none;
+  color: $color-text-secondary;
+  font-size: $font-size-base;
+  cursor: pointer;
+  transition: $transition-colors;
+  text-align: left;
+  
+  &:hover {
+    background-color: $color-bg-tertiary;
+    color: $color-text-primary;
+  }
+}
+
+@mixin context-menu-separator {
+  height: 1px;
+  background-color: $color-border-primary;
+  margin: $spacing-xs 0;
+}
+
+// =============================================================================
+// Search Result Mixins
+// =============================================================================
+
+@mixin search-result-item {
+  @include flex-between;
+  
+  height: $search-result-item-height;
+  padding: $spacing-sm $spacing-md;
+  background-color: $color-bg-secondary;
+  border: $border-width solid $color-border-primary;
+  border-radius: $border-radius-base;
+  cursor: pointer;
+  transition: $transition-colors;
+  margin-bottom: $spacing-xs;
+  
+  &:hover {
+    background-color: $color-bg-tertiary;
+    border-color: $color-border-secondary;
+  }
+  
+  &.highlighted {
+    background-color: $color-primary-light;
+    border-color: $color-primary;
+  }
+}
+
+@mixin search-highlight {
+  background-color: $color-accent-yellow;
+  color: $color-bg-primary;
+  font-weight: $font-weight-semibold;
+  padding: 1px 2px;
+  border-radius: 2px;
+}

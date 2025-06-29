@@ -516,17 +516,19 @@ def get_terminal_context(session_id):
         context_parts = []
 
         # Add terminal history if available
-        if hasattr(terminal, 'history') and terminal.history:
+        if hasattr(terminal, "history") and terminal.history:
             # Get last 1000 characters of terminal history to avoid overwhelming the AI
-            recent_history = terminal.history[-1000:] if len(terminal.history) > 1000 else terminal.history
+            recent_history = (
+                terminal.history[-1000:] if len(terminal.history) > 1000 else terminal.history
+            )
             context_parts.append(f"Recent terminal output:\n{recent_history}")
 
         # Add current working directory if available
-        if hasattr(terminal, 'path') and terminal.path:
+        if hasattr(terminal, "path") and terminal.path:
             context_parts.append(f"Current directory: {terminal.path}")
 
         # Add user information if available
-        if hasattr(terminal, 'user') and terminal.user:
+        if hasattr(terminal, "user") and terminal.user:
             context_parts.append(f"User: {terminal.user.name}")
 
         return "\n\n".join(context_parts) if context_parts else None
@@ -537,9 +539,9 @@ def get_terminal_context(session_id):
 async def ai_chat_message(sid, data):
     """Handle AI chat messages with terminal context."""
     try:
-        message = data.get('message', '')
-        message_id = data.get('message_id', '')
-        terminal_session = data.get('terminal_session')
+        message = data.get("message", "")
+        message_id = data.get("message_id", "")
+        terminal_session = data.get("terminal_session")
 
         if not message:
             log.warning("Empty message received for AI chat")
@@ -551,10 +553,11 @@ async def ai_chat_message(sid, data):
         ai_service = get_ai_service()
 
         if not await ai_service.is_available():
-            await sio_instance.emit('ai_chat_error', {
-                'message_id': message_id,
-                'error': 'AI service is not available'
-            }, room=sid)
+            await sio_instance.emit(
+                "ai_chat_error",
+                {"message_id": message_id, "error": "AI service is not available"},
+                room=sid,
+            )
             return
 
         # Get terminal context if session is provided
@@ -569,46 +572,44 @@ async def ai_chat_message(sid, data):
         try:
             response_chunks = []
             async for chunk in ai_service.chat_completion(
-                messages=messages,
-                terminal_context=terminal_context,
-                stream=True
+                messages=messages, terminal_context=terminal_context, stream=True
             ):
                 response_chunks.append(chunk)
-                await sio_instance.emit('ai_chat_chunk', {
-                    'message_id': message_id,
-                    'chunk': chunk
-                }, room=sid)
+                await sio_instance.emit(
+                    "ai_chat_chunk", {"message_id": message_id, "chunk": chunk}, room=sid
+                )
 
             # Send completion signal
-            full_response = ''.join(response_chunks)
-            await sio_instance.emit('ai_chat_complete', {
-                'message_id': message_id,
-                'full_response': full_response
-            }, room=sid)
+            full_response = "".join(response_chunks)
+            await sio_instance.emit(
+                "ai_chat_complete",
+                {"message_id": message_id, "full_response": full_response},
+                room=sid,
+            )
 
             log.info(f"AI chat completed for message_id: {message_id}")
 
         except Exception as e:
             log.error(f"Error during AI streaming: {e}")
-            await sio_instance.emit('ai_chat_error', {
-                'message_id': message_id,
-                'error': str(e)
-            }, room=sid)
+            await sio_instance.emit(
+                "ai_chat_error", {"message_id": message_id, "error": str(e)}, room=sid
+            )
 
     except Exception as e:
         log.error(f"Error handling AI chat message: {e}")
-        await sio_instance.emit('ai_chat_error', {
-            'message_id': data.get('message_id', ''),
-            'error': 'Internal server error'
-        }, room=sid)
+        await sio_instance.emit(
+            "ai_chat_error",
+            {"message_id": data.get("message_id", ""), "error": "Internal server error"},
+            room=sid,
+        )
 
 
 async def ai_terminal_analysis(sid, data):
     """Analyze terminal commands and provide AI suggestions."""
     try:
-        command = data.get('command', '')
-        terminal_session = data.get('terminal_session')
-        analysis_id = data.get('analysis_id', '')
+        command = data.get("command", "")
+        terminal_session = data.get("terminal_session")
+        analysis_id = data.get("analysis_id", "")
 
         if not command:
             log.warning("Empty command received for AI analysis")
@@ -620,10 +621,11 @@ async def ai_terminal_analysis(sid, data):
         ai_service = get_ai_service()
 
         if not await ai_service.is_available():
-            await sio_instance.emit('ai_analysis_error', {
-                'analysis_id': analysis_id,
-                'error': 'AI service is not available'
-            }, room=sid)
+            await sio_instance.emit(
+                "ai_analysis_error",
+                {"analysis_id": analysis_id, "error": "AI service is not available"},
+                room=sid,
+            )
             return
 
         # Get terminal context
@@ -648,39 +650,36 @@ Keep the response concise and practical."""
         try:
             response_chunks = []
             async for chunk in ai_service.chat_completion(
-                messages=messages,
-                terminal_context=terminal_context,
-                stream=True
+                messages=messages, terminal_context=terminal_context, stream=True
             ):
                 response_chunks.append(chunk)
-                await sio_instance.emit('ai_analysis_chunk', {
-                    'analysis_id': analysis_id,
-                    'chunk': chunk
-                }, room=sid)
+                await sio_instance.emit(
+                    "ai_analysis_chunk", {"analysis_id": analysis_id, "chunk": chunk}, room=sid
+                )
 
             # Send completion signal
-            full_analysis = ''.join(response_chunks)
-            await sio_instance.emit('ai_analysis_complete', {
-                'analysis_id': analysis_id,
-                'command': command,
-                'analysis': full_analysis
-            }, room=sid)
+            full_analysis = "".join(response_chunks)
+            await sio_instance.emit(
+                "ai_analysis_complete",
+                {"analysis_id": analysis_id, "command": command, "analysis": full_analysis},
+                room=sid,
+            )
 
             log.info(f"AI command analysis completed for analysis_id: {analysis_id}")
 
         except Exception as e:
             log.error(f"Error during AI analysis: {e}")
-            await sio_instance.emit('ai_analysis_error', {
-                'analysis_id': analysis_id,
-                'error': str(e)
-            }, room=sid)
+            await sio_instance.emit(
+                "ai_analysis_error", {"analysis_id": analysis_id, "error": str(e)}, room=sid
+            )
 
     except Exception as e:
         log.error(f"Error handling AI terminal analysis: {e}")
-        await sio_instance.emit('ai_analysis_error', {
-            'analysis_id': data.get('analysis_id', ''),
-            'error': 'Internal server error'
-        }, room=sid)
+        await sio_instance.emit(
+            "ai_analysis_error",
+            {"analysis_id": data.get("analysis_id", ""), "error": "Internal server error"},
+            room=sid,
+        )
 
 
 async def ai_get_info(sid, data):
@@ -692,28 +691,38 @@ async def ai_get_info(sid, data):
         provider = "unknown"
         model = "unknown"
 
-        if hasattr(ai_service, 'model'):
+        if hasattr(ai_service, "model"):
             model = ai_service.model
-        if hasattr(ai_service, '__class__'):
-            provider = ai_service.__class__.__name__.lower().replace('service', '')
+        if hasattr(ai_service, "__class__"):
+            provider = ai_service.__class__.__name__.lower().replace("service", "")
 
         is_available = await ai_service.is_available()
 
-        await sio_instance.emit('ai_info_response', {
-            'provider': provider,
-            'model': model,
-            'available': is_available,
-            'status': 'connected' if is_available else 'disconnected'
-        }, room=sid)
+        await sio_instance.emit(
+            "ai_info_response",
+            {
+                "provider": provider,
+                "model": model,
+                "available": is_available,
+                "status": "connected" if is_available else "disconnected",
+            },
+            room=sid,
+        )
 
-        log.info(f"AI info requested from {sid}: provider={provider}, model={model}, available={is_available}")
+        log.info(
+            f"AI info requested from {sid}: provider={provider}, model={model}, available={is_available}"
+        )
 
     except Exception as e:
         log.error(f"Error getting AI info: {e}")
-        await sio_instance.emit('ai_info_response', {
-            'provider': 'error',
-            'model': 'error',
-            'available': False,
-            'status': 'error',
-            'error': str(e)
-        }, room=sid)
+        await sio_instance.emit(
+            "ai_info_response",
+            {
+                "provider": "error",
+                "model": "error",
+                "available": False,
+                "status": "error",
+                "error": str(e),
+            },
+            room=sid,
+        )

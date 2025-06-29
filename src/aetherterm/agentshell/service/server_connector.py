@@ -367,56 +367,52 @@ class ServerConnector:
     async def send_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """
         エージェントメッセージを送信
-        
+
         Args:
             message: 送信するメッセージ
-            
+
         Returns:
             Optional[AgentMessage]: 応答メッセージ（同期的な場合）
         """
         if not self.is_connected():
             logger.warning("サーバーに接続されていません。メッセージを送信できません。")
             return None
-        
+
         try:
             # メッセージを送信
             await self._socket_client.emit("agent_message", message.to_dict())
             logger.debug(f"エージェントメッセージを送信しました: {message.message_type}")
-            
+
             # 同期的な応答は現時点では実装しない（非同期通信のため）
             return None
-            
+
         except Exception as e:
             logger.error(f"メッセージ送信中にエラーが発生しました: {e}")
             return None
-    
+
     def register_handler(
-        self,
-        message_type: MessageType,
-        handler: Callable[[AgentMessage], None]
+        self, message_type: MessageType, handler: Callable[[AgentMessage], None]
     ) -> None:
         """
         メッセージハンドラーを登録
-        
+
         Args:
             message_type: メッセージタイプ
             handler: ハンドラー関数
         """
         if message_type not in self._message_handlers:
             self._message_handlers[message_type] = []
-        
+
         if handler not in self._message_handlers[message_type]:
             self._message_handlers[message_type].append(handler)
             logger.debug(f"メッセージハンドラーを登録しました: {message_type}")
-    
+
     def unregister_handler(
-        self,
-        message_type: MessageType,
-        handler: Callable[[AgentMessage], None]
+        self, message_type: MessageType, handler: Callable[[AgentMessage], None]
     ) -> None:
         """
         メッセージハンドラーを解除
-        
+
         Args:
             message_type: メッセージタイプ
             handler: ハンドラー関数
@@ -425,20 +421,20 @@ class ServerConnector:
             if handler in self._message_handlers[message_type]:
                 self._message_handlers[message_type].remove(handler)
                 logger.debug(f"メッセージハンドラーを解除しました: {message_type}")
-    
+
     async def _handle_agent_message(self, message: AgentMessage) -> None:
         """
         受信したエージェントメッセージを処理
-        
+
         Args:
             message: 受信したメッセージ
         """
         handlers = self._message_handlers.get(message.message_type, [])
-        
+
         if not handlers:
             logger.warning(f"未処理のメッセージタイプ: {message.message_type}")
             return
-        
+
         # すべてのハンドラーを実行
         for handler in handlers:
             try:

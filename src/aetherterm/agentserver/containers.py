@@ -106,10 +106,15 @@ def configure_container(config=None):
     try:
         ai_service_instance = container.ai_service()
         set_ai_service(ai_service_instance)
-        logging.getLogger("aetherterm.agentserver.containers").info(f"AI service initialized with provider: {final_config.get('ai_provider', 'unknown')}")
+        logging.getLogger("aetherterm.agentserver.containers").info(
+            f"AI service initialized with provider: {final_config.get('ai_provider', 'unknown')}"
+        )
     except Exception as e:
-        logging.getLogger("aetherterm.agentserver.containers").error(f"Failed to initialize AI service: {e}")
+        logging.getLogger("aetherterm.agentserver.containers").error(
+            f"Failed to initialize AI service: {e}"
+        )
         # Fallback to mock service
         from aetherterm.agentserver.ai_services import MockAIService
+
         set_ai_service(MockAIService())
     return container
