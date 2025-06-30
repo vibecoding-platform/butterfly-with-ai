@@ -21,7 +21,7 @@
     <div 
       :id="`terminal-${tabId}`" 
       class="xterm-container"
-      @click="$emit('click')"
+      @click="handleTerminalClick"
     ></div>
   </div>
 </template>
@@ -84,16 +84,21 @@ const initializeTerminal = async () => {
     visibility: getComputedStyle(terminalEl.value).visibility
   })
 
-  // Create xterm.js instance
+  // Create xterm.js instance with enhanced configuration
   terminal.value = new Terminal({
     fontSize: 14,
-    fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace',
+    fontFamily: '"SF Mono", Monaco, Menlo, "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace',
+    fontWeight: 'normal',
+    fontWeightBold: 'bold',
+    letterSpacing: 0,
+    lineHeight: 1.0,
     theme: {
       background: '#1e1e1e',
       foreground: '#cccccc',
       cursor: '#ffffff',
       cursorAccent: '#000000',
-      selection: '#264f78',
+      selectionBackground: '#264f78',
+      selectionForeground: '#ffffff',
       black: '#000000',
       red: '#cd3131',
       green: '#0dbc79',
@@ -113,11 +118,21 @@ const initializeTerminal = async () => {
     } as ITheme,
     cursorBlink: true,
     cursorStyle: 'block',
-    scrollback: 1000,
+    cursorWidth: 1,
+    scrollback: 10000,
     tabStopWidth: 4,
     convertEol: true,
     disableStdin: false,
-    allowTransparency: true
+    allowTransparency: false,
+    allowProposedApi: true,
+    altClickMovesCursor: true,
+    macOptionIsMeta: true,
+    rightClickSelectsWord: true,
+    screenReaderMode: false,
+    scrollOnUserInput: true,
+    fastScrollModifier: 'alt',
+    fastScrollSensitivity: 5,
+    wordSeparator: ' ()[]{}\'"`.,;'
   })
 
   // Create and attach fit addon
@@ -150,7 +165,12 @@ const initializeTerminal = async () => {
   console.log('🔧 Connecting to backend...')
   if (terminalStore.socket && terminalStore.session.id) {
     console.log('Using existing session:', terminalStore.session.id)
-    connectTerminal()
+    // Only connect if callback isn't already registered
+    if (!callbackRegistered.value) {
+      connectTerminal()
+    } else {
+      console.log('ℹ️ Callback already registered, skipping connect')
+    }
   } else {
     console.log('Creating new connection for tab:', props.tabId)
     await terminalStore.connect()
@@ -158,8 +178,16 @@ const initializeTerminal = async () => {
   }
   console.log('✅ Backend connection initiated')
   
-  // Emit terminal initialized event
+  // Focus the terminal and emit initialized event
   if (terminal.value) {
+    // Focus terminal after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      if (terminal.value) {
+        terminal.value.focus()
+        console.log('🎯 Terminal focused')
+      }
+    }, 100)
+    
     emit('terminal-initialized', terminal.value)
     console.log('📡 Terminal initialized event emitted')
   }
@@ -170,11 +198,11 @@ const setupTerminalEventHandlers = () => {
 
   // Handle terminal resize
   terminal.value.onResize((dimensions) => {
-    console.log('Terminal resized:', dimensions)
+    console.log('📐 Terminal resized:', dimensions)
     
     if (terminalStore.socket && terminalStore.session.id) {
-      terminalStore.socket.emit('resize', {
-        sessionId: terminalStore.session.id,
+      terminalStore.socket.emit('terminal_resize', {
+        session: terminalStore.session.id,
         cols: dimensions.cols,
         rows: dimensions.rows
       })
@@ -184,54 +212,103 @@ const setupTerminalEventHandlers = () => {
   // Handle user input
   terminal.value.onData((data) => {
     if (terminalStore.socket && terminalStore.session.id) {
-      terminalStore.socket.emit('input', {
-        sessionId: terminalStore.session.id,
+      console.log('📤 Sending terminal input:', { session: terminalStore.session.id, data: data.substring(0, 20) + '...' })
+      terminalStore.socket.emit('terminal_input', {
+        session: terminalStore.session.id,
         data: data
       })
+    } else {
+      console.warn('⚠️ Cannot send input - no socket or session')
     }
   })
 }
+
+// Track if callback is already registered to prevent duplicates
+const callbackRegistered = ref(false)
+const outputCallbackRef = ref<((data: string) => void) | null>(null)
+const sessionRequested = ref(false)
 
 const connectTerminal = () => {
   console.log('=== CONNECTING TERMINAL ===')
   console.log('Socket exists:', !!terminalStore.socket)
   console.log('Terminal exists:', !!terminal.value)
+  console.log('Callback already registered:', callbackRegistered.value)
   
   if (!terminalStore.socket || !terminal.value) {
     console.error('❌ Cannot connect - missing socket or terminal')
     return
   }
 
-  console.log('🔧 Setting up output callback...')
-  // Register callback for terminal output via store
-  terminalStore.onShellOutput((data: string) => {
-    if (terminal.value) {
-      console.log('✅ Writing data to terminal via callback')
-      terminal.value.write(data)
+  // Only register callback once per component instance
+  if (!callbackRegistered.value) {
+    console.log('🔧 Setting up output callback...')
+    const outputCallback = (data: string) => {
+      if (terminal.value) {
+        console.log('✅ Writing data to terminal via callback:', data.substring(0, 50) + '...')
+        terminal.value.write(data)
+      }
     }
-  })
+    
+    terminalStore.onShellOutput(outputCallback)
+    callbackRegistered.value = true
+    
+    // Store callback reference for cleanup
+    outputCallbackRef.value = outputCallback
+    console.log('✅ Callback registered and stored')
+  } else {
+    console.log('ℹ️ Callback already registered, skipping')
+  }
 
-  console.log('🔧 Requesting new session...')
-  // Request new session for this tab
-  terminalStore.socket.emit('createSession', {
-    tabId: props.tabId,
-    subType: props.subType
-  })
-  console.log('✅ Session request sent')
+  // Only request session once per component instance
+  if (!sessionRequested.value) {
+    console.log('🔧 Requesting new session...')
+    terminalStore.socket.emit('create_terminal', {
+      tabId: props.tabId,
+      subType: props.subType,
+      cols: terminal.value?.cols || 80,
+      rows: terminal.value?.rows || 24
+    })
+    sessionRequested.value = true
+    console.log('✅ Session request sent')
+  } else {
+    console.log('ℹ️ Session already requested, skipping')
+  }
 }
 
-// Watch for session changes
+const handleTerminalClick = () => {
+  if (terminal.value) {
+    terminal.value.focus()
+  }
+  emit('click')
+}
+
+// Watch for session changes (only when initializing)
 watch(() => terminalStore.session.id, (newSessionId, oldSessionId) => {
   console.log('🔄 Session ID changed:', {
     old: oldSessionId,
     new: newSessionId,
-    terminalExists: !!terminal.value
+    terminalExists: !!terminal.value,
+    callbackAlreadyRegistered: callbackRegistered.value,
+    sessionRequested: sessionRequested.value
   })
-  if (newSessionId && terminal.value) {
-    console.log('✅ Reconnecting terminal with new session:', newSessionId)
-    connectTerminal()
+  
+  // Only register callback once when we first get a valid session
+  if (newSessionId && terminal.value && !callbackRegistered.value && !sessionRequested.value) {
+    console.log('✅ First session received, registering callback only:', newSessionId)
+    
+    const outputCallback = (data: string) => {
+      if (terminal.value) {
+        console.log('✅ Writing data to terminal via callback:', data.substring(0, 50) + '...')
+        terminal.value.write(data)
+      }
+    }
+    
+    terminalStore.onShellOutput(outputCallback)
+    callbackRegistered.value = true
+    outputCallbackRef.value = outputCallback
+    console.log('✅ Callback registered for session:', newSessionId)
   } else {
-    console.warn('⚠️ Cannot reconnect - missing session or terminal')
+    console.log('ℹ️ Skipping session change handling - already initialized or missing requirements')
   }
 })
 
@@ -244,6 +321,16 @@ onUnmounted(() => {
   console.log('🔴 TerminalTab UNMOUNTED for tab:', props.tabId)
   
   try {
+    // Clean up callback registration
+    if (outputCallbackRef.value && terminalStore) {
+      console.log('🔧 Cleaning up output callback')
+      terminalStore.offShellOutput(outputCallbackRef.value)
+      outputCallbackRef.value = null
+      callbackRegistered.value = false
+      sessionRequested.value = false
+      console.log('✅ Callback cleaned up')
+    }
+    
     // Dispose fitAddon first if it exists and is loaded
     if (fitAddon.value && terminal.value) {
       try {
