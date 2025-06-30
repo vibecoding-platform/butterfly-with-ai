@@ -409,6 +409,49 @@ async def start_server(**kwargs):
     sio.on("unblock_request", socket_handlers.unblock_request)
     sio.on("get_block_status", socket_handlers.get_block_status)
 
+    # P0 緊急対応: MainAgent-SubAgent通信ハンドラーを登録
+    # DEPRECATED: 後方互換性のため一時的に保持（将来削除予定）
+    # sio.on("response_request", socket_handlers.response_request)
+    # sio.on("response_reply", socket_handlers.response_reply)
+    
+    # 現在使用中のハンドラー
+    sio.on("agent_start_request", socket_handlers.agent_start_request)
+    sio.on("control_message", socket_handlers.control_message)
+    
+    # 仕様インプットシステム
+    sio.on("spec_upload", socket_handlers.spec_upload)
+    sio.on("spec_query", socket_handlers.spec_query)
+    
+    # エージェント登録・初期化
+    sio.on("agent_hello", socket_handlers.agent_hello)
+    
+    # ログ監視・解析
+    sio.on("log_monitor_subscribe", socket_handlers.log_monitor_subscribe)
+    sio.on("log_monitor_unsubscribe", socket_handlers.log_monitor_unsubscribe)
+    sio.on("log_monitor_search", socket_handlers.log_monitor_search)
+    
+    # コンテキスト推論
+    sio.on("context_inference_subscribe", socket_handlers.context_inference_subscribe)
+    sio.on("predict_next_commands", socket_handlers.predict_next_commands)
+    sio.on("get_operation_analytics", socket_handlers.get_operation_analytics)
+
+    # ログ監視バックグラウンドタスクを開始
+    socket_handlers.start_log_monitoring_background_task()
+    
+    # 短期記憶機能とControlServer接続を初期化
+    from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+    from aetherterm.agentserver.control_server_client import ControlServerClient
+    
+    # エージェントIDを生成（ホスト:ポートベース）
+    agent_id = f"agentserver_{host}_{port}"
+    
+    # 短期記憶機能を初期化
+    await AsyncioTerminal.initialize_short_term_memory(agent_id)
+    
+    # ControlServer接続を開始
+    control_client = ControlServerClient(agent_id=agent_id)
+    await control_client.start()
+
     # Mount the FastAPI router onto the main ASGI app
     app.other_asgi_app.include_router(router, prefix=uri_root_path)
 
@@ -543,6 +586,22 @@ def setup_app(**kwargs):
     sio.on("context_inference_subscribe", socket_handlers.context_inference_subscribe)
     sio.on("predict_next_commands", socket_handlers.predict_next_commands)
     sio.on("get_operation_analytics", socket_handlers.get_operation_analytics)
+    
+    # P0 緊急対応: MainAgent-SubAgent通信ハンドラー
+    # DEPRECATED: 後方互換性のため一時的に保持（将来削除予定）
+    # sio.on("response_request", socket_handlers.response_request)
+    # sio.on("response_reply", socket_handlers.response_reply)
+    
+    # 現在使用中のハンドラー
+    sio.on("agent_start_request", socket_handlers.agent_start_request)
+    sio.on("control_message", socket_handlers.control_message)
+    
+    # 仕様ドキュメント管理ハンドラー
+    sio.on("spec_upload", socket_handlers.spec_upload)
+    sio.on("spec_query", socket_handlers.spec_query)
+    
+    # エージェント初期化ハンドラー
+    sio.on("agent_hello", socket_handlers.agent_hello)
 
     # Set up auto-blocker integration
     from aetherterm.agentserver.auto_blocker import set_socket_io_instance

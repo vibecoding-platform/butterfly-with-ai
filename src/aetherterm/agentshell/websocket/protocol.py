@@ -40,6 +40,13 @@ class MessageType(str, Enum):
     TERMINAL_ASSIGN_AGENT = "terminal_assign_agent"
     TERMINAL_READY = "terminal_ready"
     TERMINAL_CLOSED = "terminal_closed"
+    
+    # P0 緊急対応: MainAgent-SubAgent通信
+    RESPONSE_REQUEST = "response_request"          # SubAgent→MainAgent応答要請
+    RESPONSE_REPLY = "response_reply"              # MainAgent→SubAgent応答返信
+    AGENT_START_REQUEST = "agent_start_request"    # エージェント起動要請
+    AGENT_START_RESPONSE = "agent_start_response"  # エージェント起動結果
+    CONTROL_MESSAGE = "control_message"            # システム制御メッセージ
 
 
 @dataclass

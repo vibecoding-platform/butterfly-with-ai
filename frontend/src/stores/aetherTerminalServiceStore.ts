@@ -250,7 +250,8 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
     // Connection events
     socketInstance.on('connect', () => {
-      console.log('Socket connected, setting up listeners')
+      console.log('🟢 STORE: Socket connected successfully!')
+      console.log('🟢 STORE: Socket ID:', socketInstance.id)
       connectionState.value.isConnected = true
       connectionState.value.isConnecting = false
       connectionState.value.isReconnecting = false
@@ -261,11 +262,13 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
       addToOutput('[SYSTEM] Connected to AetherTerm service')
 
       // Create terminal session after connection
+      console.log('🔧 STORE: Emitting create_terminal event...')
       socketInstance.emit('create_terminal', {
         session: session.value.id || '',
         user: '',
         path: '',
       })
+      console.log('✅ STORE: create_terminal event sent')
     })
 
     socketInstance.on('disconnect', (reason: string) => {
@@ -313,9 +316,14 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     })
 
     socketInstance.on('terminal_ready', (data: any) => {
-      console.log('Terminal ready:', data)
+      console.log('🟢 STORE: Terminal ready event received:', data)
+      console.log('🔧 STORE: Setting session ID to:', data.session)
       session.value.id = data.session || ''
       session.value.isActive = true
+      console.log('✅ STORE: Session updated:', {
+        id: session.value.id,
+        isActive: session.value.isActive
+      })
     })
 
     socketInstance.on('terminal_error', (data: any) => {
@@ -371,21 +379,36 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
   }
 
   const connect = () => {
+    console.log('🔌 STORE: Connect function called')
+    console.log('🔌 STORE: Current state:', {
+      isConnected: connectionState.value.isConnected,
+      isConnecting: connectionState.value.isConnecting,
+      socketExists: !!socket.value,
+      socketConnected: socket.value?.connected
+    })
+    
     if (connectionState.value.isConnected || connectionState.value.isConnecting) {
+      console.log('⚠️ STORE: Already connected or connecting, returning')
       return
     }
 
     connectionState.value.isConnecting = true
     addToOutput('[SYSTEM] Connecting to AetherTerm service...')
-    console.log('connect function called')
+    console.log('🔧 STORE: Setting connecting state to true')
 
     // Setup socket listeners and initiate connection if socket exists
     if (socket.value) {
+      console.log('🔧 STORE: Socket exists, setting up listeners...')
       setupSocketListeners()
       // Explicitly connect if not already connected
       if (!socket.value.connected) {
+        console.log('🔧 STORE: Socket not connected, initiating connection...')
         socket.value.connect()
+      } else {
+        console.log('✅ STORE: Socket already connected')
       }
+    } else {
+      console.error('❌ STORE: No socket available!')
     }
   }
 

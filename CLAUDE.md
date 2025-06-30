@@ -1,8 +1,8 @@
 # AetherTerm - AI Terminal Platform
 
-**Components**: AgentServer (web terminal + AI control), AgentShell (AI-assisted terminal), ControlServer (central mgmt)  
+**Components**: AgentServer (web terminal + MainAgent control), ControlServer (central mgmt)  
 **Tech**: Python FastAPI + SocketIO, Vue 3 + TypeScript frontend, LangChain AI integration  
-**Features**: Real-time command analysis, hierarchical memory, multi-agent coordination, comprehensive security
+**Features**: MainAgent-controlled agent startup, hierarchical memory, multi-agent coordination, comprehensive security
 
 ## Quick Start
 
@@ -17,14 +17,14 @@ cd frontend && pnpm install && pnpm dev
 
 ## Key Files
 
-**Entry Points**: `src/aetherterm/{agentserver,agentshell,controlserver}/main.py`  
+**Entry Points**: `src/aetherterm/{agentserver,controlserver}/main.py`  
 **Frontend**: `frontend/src/main.ts`, `components/TerminalComponent.vue`  
 **Config**: `pyproject.toml`, `frontend/package.json`
 
 ## Architecture
 
-**Flow**: ControlServer (8765) → AgentServer (57575) → AgentShell → LangChain AI  
-**Features**: PTY monitoring, AI analysis, hierarchical memory, log summarization
+**Flow**: ControlServer (8765) ← AgentServer (57575) → MainAgent → SubAgents  
+**Features**: MainAgent startup control, specification input, hierarchical memory, ControlServer log summarization
 
 ## Development Notes
 

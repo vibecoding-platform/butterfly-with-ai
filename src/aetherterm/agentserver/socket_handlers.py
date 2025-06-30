@@ -1,6 +1,7 @@
 import logging
 from uuid import uuid4
 import asyncio
+from datetime import datetime
 
 from dependency_injector.wiring import Provide, inject
 
@@ -123,11 +124,17 @@ async def create_terminal(
     config_pam_profile: str = Provide[ApplicationContainer.config.pam_profile],
     config_uri_root_path: str = Provide[ApplicationContainer.config.uri_root_path],
 ):
-    """Handle the creation of a new terminal session."""
+    """Handle the creation of a new terminal session with optional agent configuration."""
     try:
         session_id = data.get("session", str(uuid4()))
         user_name = data.get("user", "")
         path = data.get("path", "")
+        
+        # P0 緊急対応: エージェント起動設定
+        launch_mode = data.get("launch_mode", "default")  # default, agent
+        agent_config = data.get("agent_config", {})
+        agent_type = agent_config.get("agent_type")  # developer, reviewer, tester, architect, researcher
+        requester_agent_id = data.get("requester_agent_id")  # MainAgentからの要請の場合
 
         # Check if this is a request for a specific session (not a new random one)
         is_specific_session_request = "session" in data and data["session"] != ""
@@ -226,8 +233,15 @@ async def create_terminal(
                 log.warning(f"Invalid user: {user_name}, falling back to default user.")
                 terminal_user = User()  # Fallback to current user
 
-        # Create terminal instance directly (not using factory since it has issues)
-        log.debug("Creating AsyncioTerminal instance")
+        # Create terminal instance with agent configuration
+        log.debug(f"Creating AsyncioTerminal instance with launch_mode: {launch_mode}")
+        
+        # P0 緊急対応: エージェント起動コマンドの準備
+        startup_command = None
+        if launch_mode == "agent" and agent_type:
+            # 特定エージェント起動コマンド
+            startup_command = _build_agent_command(agent_type, agent_config)
+        
         terminal_instance = AsyncioTerminal(
             user=terminal_user,
             path=path,
@@ -239,6 +253,18 @@ async def create_terminal(
             login=config_login,
             pam_profile=config_pam_profile,
         )
+        
+        # Store agent configuration for tracking
+        if launch_mode in ["agentshell", "agent"]:
+            terminal_instance.agent_config = {
+                "launch_mode": launch_mode,
+                "agent_type": agent_type,
+                "agent_config": agent_config,
+                "requester_agent_id": requester_agent_id,
+                "startup_command": startup_command,
+                "agent_hierarchy": "sub" if requester_agent_id else "main",
+                "parent_agent_id": requester_agent_id
+            }
 
         # Associate terminal with client using the new client set
         terminal_instance.client_sids.add(sid)
@@ -247,6 +273,61 @@ async def create_terminal(
         log.debug("Starting PTY")
         await terminal_instance.start_pty()
         log.info(f"PTY started successfully for session {session_id}")
+
+        # P0 緊急対応: エージェント自動起動
+        if startup_command and launch_mode in ["agentshell", "agent"]:
+            try:
+                log.info(f"Auto-starting {launch_mode} with command: {startup_command}")
+                await asyncio.sleep(1)  # PTY初期化待ち
+                await terminal_instance.write(startup_command + "\n")
+                
+                # MainAgentに通知（ブロードキャスト形式）
+                if requester_agent_id:
+                    await sio_instance.emit(
+                        "agent_message",
+                        {
+                            "message_type": "agent_start_response",
+                            "requester_agent_id": requester_agent_id,
+                            "session_id": session_id,
+                            "agent_type": agent_type,
+                            "agent_id": agent_config.get("agent_id"),
+                            "status": "started",
+                            "launch_mode": launch_mode,
+                            "hierarchy": "sub",
+                            "parent_agent_id": requester_agent_id,
+                            "working_directory": agent_config.get("working_directory"),
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
+                    )
+                
+                # 新しく起動したエージェントに初期情報を送信
+                await asyncio.sleep(2)  # エージェントの初期化待ち
+                await sio_instance.emit(
+                    "agent_message",
+                    {
+                        "message_type": "agent_initialization",
+                        "to_agent_id": agent_config.get("agent_id"),
+                        "agent_info": {
+                            "agent_id": agent_config.get("agent_id"),
+                            "agent_type": agent_type,
+                            "role": "sub_agent",
+                            "hierarchy": "sub" if requester_agent_id else "main",
+                            "parent_agent_id": requester_agent_id,
+                            "working_directory": agent_config.get("working_directory"),
+                            "session_id": session_id,
+                            "launch_mode": launch_mode,
+                            "server_info": {
+                                "websocket_url": "ws://localhost:57575",
+                                "rest_api_base": "http://localhost:57575/api/v1"
+                            },
+                            "capabilities": _get_agent_capabilities(agent_type),
+                            "instructions": _get_agent_instructions(agent_type, requester_agent_id)
+                        },
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
+            except Exception as e:
+                log.error(f"Failed to auto-start agent: {e}")
 
         # Initialize log capture for this terminal
         if log_processing_manager:
@@ -257,9 +338,15 @@ async def create_terminal(
                 log.error(f"Failed to initialize log capture for session {session_id}: {e}")
 
         # Notify client that terminal is ready
-        await sio_instance.emit(
-            "terminal_ready", {"session": session_id, "status": "ready"}, room=sid
-        )
+        response_data = {"session": session_id, "status": "ready"}
+        if launch_mode in ["agentshell", "agent"]:
+            response_data.update({
+                "launch_mode": launch_mode,
+                "agent_type": agent_type,
+                "agent_config": agent_config
+            })
+            
+        await sio_instance.emit("terminal_ready", response_data, room=sid)
         log.debug(f"Sent terminal_ready event to client {sid}")
 
     except Exception as e:
@@ -370,6 +457,681 @@ def broadcast_to_session(session_id, message):
                 )
     else:
         log.warning("sio_instance is None, cannot broadcast message")
+
+
+def _build_agent_command(agent_type: str, agent_config: dict) -> str:
+    """
+    MainAgentの指示に基づいて起動コマンドを構築
+    
+    Args:
+        agent_type: エージェントタイプ (developer, reviewer, tester, architect, researcher)
+        agent_config: エージェント設定
+    
+    Returns:
+        起動コマンド文字列
+    """
+    agent_id = agent_config.get("agent_id", f"{agent_type}_agent")
+    working_dir = agent_config.get("working_directory", ".")
+    requester_agent_id = agent_config.get("requester_agent_id")
+    startup_method = agent_config.get("startup_method", "claude_cli")
+    custom_startup_command = agent_config.get("custom_startup_command")
+    custom_env_vars = agent_config.get("custom_environment_vars", {})
+    
+    # 共通の環境変数設定
+    base_env_vars = [
+        f"AGENT_ID={agent_id}",
+        f"AGENT_TYPE={agent_type}",
+        f"AGENT_ROLE=sub_agent",
+        f"AETHERTERM_SERVER=ws://localhost:57575",
+    ]
+    
+    # 要求元エージェントがある場合は追加
+    if requester_agent_id:
+        base_env_vars.append(f"PARENT_AGENT_ID={requester_agent_id}")
+        base_env_vars.append(f"AGENT_HIERARCHY=sub")
+    else:
+        base_env_vars.append(f"AGENT_HIERARCHY=main")
+    
+    # MainAgentが指定したカスタム環境変数を追加
+    for key, value in custom_env_vars.items():
+        base_env_vars.append(f"{key}={value}")
+    
+    env_vars_str = " ".join(base_env_vars)
+    
+    # MainAgentがカスタム起動コマンドを指定している場合
+    if custom_startup_command:
+        # プレースホルダーを置換
+        command = custom_startup_command.format(
+            agent_id=agent_id,
+            agent_type=agent_type,
+            working_directory=working_dir,
+            parent_agent_id=requester_agent_id or ""
+        )
+        return f"cd {working_dir} && {env_vars_str} {command}"
+    
+    # 起動メソッド別のコマンド構築
+    if startup_method == "docker":
+        # Dockerコンテナでエージェントを起動
+        docker_image = agent_config.get("docker_image", f"aether-agent-{agent_type}:latest")
+        return f"cd {working_dir} && {env_vars_str} docker run --rm -v $(pwd):/workspace -e AGENT_ID={agent_id} -e AGENT_TYPE={agent_type} {docker_image}"
+    
+    elif startup_method == "custom_script":
+        # カスタムスクリプトで起動
+        script_path = agent_config.get("script_path", f"./scripts/start-{agent_type}-agent.sh")
+        return f"cd {working_dir} && {env_vars_str} {script_path} {agent_id}"
+    
+    else:  # startup_method == "claude_cli" or default
+        # エージェントタイプ別のClaude CLIコマンド構築
+        if agent_type == "developer":
+            return f"cd {working_dir} && {env_vars_str} claude --name {agent_id} --role developer --sub-agent"
+        elif agent_type == "reviewer":
+            return f"cd {working_dir} && {env_vars_str} claude --name {agent_id} --role reviewer --mode review --sub-agent"
+        elif agent_type == "tester":
+            return f"cd {working_dir} && {env_vars_str} claude --name {agent_id} --role tester --mode test --sub-agent"
+        elif agent_type == "architect":
+            return f"cd {working_dir} && {env_vars_str} claude --name {agent_id} --role architect --mode design --sub-agent"
+        elif agent_type == "researcher":
+            return f"cd {working_dir} && {env_vars_str} claude --name {agent_id} --role researcher --mode analyze --sub-agent"
+        else:
+            return f"cd {working_dir} && {env_vars_str} claude --name {agent_id} --sub-agent"
+
+
+# P0 緊急対応: MainAgent-SubAgent通信ハンドラー
+async def response_request(sid, data):
+    """
+    【廃止予定】SubAgentからMainAgentへの応答要請を処理
+    
+    注意: この関数は廃止予定です。代わりに agent_message イベントを直接使用してください。
+    現在は後方互換性のため agent_message にリダイレクトしています。
+    
+    メッセージフォーマット:
+    {
+        "from_agent_id": "claude_tester_001",
+        "to_agent_id": "claude_main_001", 
+        "request_type": "code_review",
+        "content": "Please review this implementation",
+        "data": {
+            "file_path": "src/components/Login.vue",
+            "changes": "..."
+        },
+        "priority": "high",
+        "timeout": 300
+    }
+    """
+    try:
+        # 廃止警告ログ
+        log.warning("DEPRECATED: response_request event is deprecated. Use agent_message with message_type='response_request' instead.")
+        
+        from_agent_id = data.get("from_agent_id")
+        to_agent_id = data.get("to_agent_id")
+        request_type = data.get("request_type")
+        content = data.get("content", "")
+        request_data = data.get("data", {})
+        priority = data.get("priority", "medium")
+        timeout = data.get("timeout", 120)
+        
+        log.info(f"Response request from {from_agent_id} to {to_agent_id}: {request_type}")
+        
+        # 全エージェントにブロードキャスト（メッセージタイプで区別）
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "response_request",
+                "message_id": data.get("message_id", str(uuid4())),
+                "from_agent_id": from_agent_id,
+                "to_agent_id": to_agent_id,
+                "request_type": request_type,
+                "content": content,
+                "data": request_data,
+                "priority": priority,
+                "timeout": timeout,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+    except Exception as e:
+        log.error(f"Error handling response request: {e}")
+        await sio_instance.emit("error", {"message": f"Response request failed: {str(e)}"}, room=sid)
+
+
+async def response_reply(sid, data):
+    """
+    【廃止予定】MainAgentからSubAgentへの応答返信を処理
+    
+    注意: この関数は廃止予定です。代わりに agent_message イベントを直接使用してください。
+    現在は後方互換性のため agent_message にリダイレクトしています。
+    
+    メッセージフォーマット:
+    {
+        "message_id": "uuid-of-original-request",
+        "from_agent_id": "claude_main_001",
+        "to_agent_id": "claude_tester_001",
+        "status": "completed",
+        "response": "The code looks good, but please add error handling",
+        "data": {
+            "suggestions": [...],
+            "modified_files": [...]
+        }
+    }
+    """
+    try:
+        # 廃止警告ログ
+        log.warning("DEPRECATED: response_reply event is deprecated. Use agent_message with message_type='response_reply' instead.")
+        
+        message_id = data.get("message_id")
+        from_agent_id = data.get("from_agent_id")
+        to_agent_id = data.get("to_agent_id")
+        status = data.get("status", "completed")
+        response = data.get("response", "")
+        response_data = data.get("data", {})
+        
+        log.info(f"Response reply from {from_agent_id} to {to_agent_id} for request {message_id}")
+        
+        # 全エージェントにブロードキャスト（メッセージタイプで区別）
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "response_reply",
+                "message_id": message_id,
+                "from_agent_id": from_agent_id,
+                "to_agent_id": to_agent_id,
+                "status": status,
+                "response": response,
+                "data": response_data,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+    except Exception as e:
+        log.error(f"Error handling response reply: {e}")
+        await sio_instance.emit("error", {"message": f"Response reply failed: {str(e)}"}, room=sid)
+
+
+async def agent_start_request(sid, data):
+    """
+    エージェント起動要請を処理
+    
+    メッセージフォーマット:
+    {
+        "requester_agent_id": "claude_main_001",
+        "agent_type": "tester",
+        "agent_id": "claude_tester_002",
+        "working_directory": "/workspace/project",
+        "launch_mode": "agent",
+        "startup_method": "claude_cli",  # claude_cli, docker, custom_script
+        "startup_command": "claude --name {agent_id} --role {agent_type} --sub-agent",  # MainAgentが指定
+        "environment_vars": {  # MainAgentが指定する環境変数
+            "CUSTOM_VAR": "value",
+            "PROJECT_NAME": "myproject"
+        },
+        "config": {
+            "role": "tester",
+            "mode": "test"
+        }
+    }
+    """
+    try:
+        requester_agent_id = data.get("requester_agent_id")
+        agent_type = data.get("agent_type")
+        agent_id = data.get("agent_id", f"{agent_type}_agent")
+        working_directory = data.get("working_directory", ".")
+        launch_mode = data.get("launch_mode", "agent")
+        
+        # MainAgentが指定する起動方法
+        startup_method = data.get("startup_method", "claude_cli")  # デフォルトはClaude CLI
+        custom_startup_command = data.get("startup_command")  # MainAgentが指定するコマンド
+        custom_env_vars = data.get("environment_vars", {})  # 追加環境変数
+        
+        config = data.get("config", {})
+        
+        log.info(f"Agent start request from {requester_agent_id}: {agent_type}:{agent_id} via {startup_method}")
+        
+        # 新しいターミナルセッションを作成
+        session_id = str(uuid4())
+        
+        # エージェント設定に起動情報を追加
+        agent_config = {
+            "agent_type": agent_type,
+            "agent_id": agent_id,
+            "working_directory": working_directory,
+            "startup_method": startup_method,
+            "custom_startup_command": custom_startup_command,
+            "custom_environment_vars": custom_env_vars,
+            "requester_agent_id": requester_agent_id,
+            **config
+        }
+        
+        # create_terminal関数を呼び出してエージェント用ターミナルを作成
+        await create_terminal(
+            sid,
+            {
+                "session": session_id,
+                "path": working_directory,
+                "launch_mode": launch_mode,
+                "agent_config": agent_config,
+                "requester_agent_id": requester_agent_id
+            }
+        )
+        
+        log.info(f"Agent start request processed: session {session_id} created for {agent_type}:{agent_id}")
+        
+    except Exception as e:
+        log.error(f"Error handling agent start request: {e}")
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "agent_start_response",
+                "requester_agent_id": data.get("requester_agent_id"),
+                "status": "failed",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+
+
+async def spec_upload(sid, data):
+    """
+    エージェント向け仕様ドキュメントのアップロード・配信
+    
+    メッセージフォーマット:
+    {
+        "from_agent_id": "claude_main_001",
+        "spec_type": "project_requirements",  # project_requirements, api_spec, design_doc, user_story
+        "title": "ユーザー認証システム仕様",
+        "content": "...",  # 仕様内容
+        "target_agents": ["claude_dev_001", "claude_test_001"],  # 対象エージェント（空の場合は全員）
+        "priority": "high",
+        "format": "markdown",  # markdown, json, yaml, plain
+        "metadata": {
+            "version": "1.0",
+            "author": "Product Manager",
+            "last_updated": "2025-01-29"
+        }
+    }
+    """
+    try:
+        from_agent_id = data.get("from_agent_id")
+        spec_type = data.get("spec_type")
+        title = data.get("title")
+        content = data.get("content")
+        target_agents = data.get("target_agents", [])  # 空の場合は全エージェント
+        priority = data.get("priority", "medium")
+        format_type = data.get("format", "markdown")
+        metadata = data.get("metadata", {})
+        
+        log.info(f"Spec upload from {from_agent_id}: {spec_type} - {title}")
+        
+        # 仕様ドキュメントをベクトルストレージに保存（検索可能にする）
+        try:
+            from aetherterm.langchain.storage.vector_adapter import VectorStorageAdapter
+            # TODO: VectorStorageAdapterへの保存実装
+        except ImportError:
+            log.warning("VectorStorageAdapter not available for spec storage")
+        
+        # 全エージェントまたは指定エージェントに配信
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "spec_document",
+                "from_agent_id": from_agent_id,
+                "target_agents": target_agents,
+                "spec_type": spec_type,
+                "title": title,
+                "content": content,
+                "priority": priority,
+                "format": format_type,
+                "metadata": metadata,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+        log.info(f"Spec document '{title}' distributed to {len(target_agents) if target_agents else 'all'} agents")
+        
+    except Exception as e:
+        log.error(f"Error handling spec upload: {e}")
+        await sio_instance.emit("error", {"message": f"Spec upload failed: {str(e)}"}, room=sid)
+
+
+async def spec_query(sid, data):
+    """
+    エージェントによる仕様問い合わせ
+    
+    メッセージフォーマット:
+    {
+        "from_agent_id": "claude_dev_001",
+        "query": "ユーザー認証のAPIエンドポイント仕様は？",
+        "spec_types": ["api_spec", "project_requirements"],  # 検索対象の仕様タイプ
+        "context": "現在LoginForm.vueの実装中"
+    }
+    """
+    try:
+        from_agent_id = data.get("from_agent_id")
+        query = data.get("query")
+        spec_types = data.get("spec_types", [])
+        context = data.get("context", "")
+        
+        log.info(f"Spec query from {from_agent_id}: {query}")
+        
+        # TODO: ベクトル検索で関連仕様を取得
+        # 現在はモックレスポンス
+        search_results = [
+            {
+                "title": "ユーザー認証API仕様",
+                "spec_type": "api_spec",
+                "content": "POST /api/auth/login - ユーザーログイン処理...",
+                "relevance_score": 0.95
+            }
+        ]
+        
+        # 検索結果を返信
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "spec_query_response",
+                "to_agent_id": from_agent_id,
+                "query": query,
+                "results": search_results,
+                "total_results": len(search_results),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+    except Exception as e:
+        log.error(f"Error handling spec query: {e}")
+        await sio_instance.emit("error", {"message": f"Spec query failed: {str(e)}"}, room=sid)
+
+
+async def control_message(sid, data):
+    """
+    システム制御メッセージを処理
+    
+    メッセージフォーマット:
+    {
+        "from_agent_id": "claude_main_001",
+        "control_type": "pause_all",  # pause_all, resume_all, shutdown_agent, restart_agent
+        "target_agent_id": "claude_tester_001",  # 特定エージェント対象の場合
+        "data": {}
+    }
+    """
+    try:
+        from_agent_id = data.get("from_agent_id")
+        control_type = data.get("control_type")
+        target_agent_id = data.get("target_agent_id")
+        control_data = data.get("data", {})
+        
+        log.info(f"Control message from {from_agent_id}: {control_type} -> {target_agent_id or 'all'}")
+        
+        # システム制御メッセージをブロードキャスト
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "control_message",
+                "from_agent_id": from_agent_id,
+                "control_type": control_type,
+                "target_agent_id": target_agent_id,
+                "data": control_data,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+    except Exception as e:
+        log.error(f"Error handling control message: {e}")
+        await sio_instance.emit("error", {"message": f"Control message failed: {str(e)}"}, room=sid)
+
+
+def _get_agent_capabilities(agent_type: str) -> list:
+    """
+    エージェントタイプ別の能力一覧を取得
+    """
+    capabilities_map = {
+        "developer": [
+            "code_generation",
+            "debugging",
+            "refactoring",
+            "api_implementation",
+            "frontend_development",
+            "backend_development",
+            "git_operations"
+        ],
+        "reviewer": [
+            "code_review",
+            "security_analysis",
+            "performance_analysis",
+            "best_practices_check",
+            "documentation_review",
+            "test_coverage_analysis"
+        ],
+        "tester": [
+            "test_generation",
+            "unit_testing",
+            "integration_testing",
+            "e2e_testing",
+            "test_automation",
+            "bug_reporting",
+            "test_coverage_measurement"
+        ],
+        "architect": [
+            "system_design",
+            "architecture_analysis",
+            "technology_selection",
+            "scalability_planning",
+            "database_design",
+            "api_design",
+            "documentation_generation"
+        ],
+        "researcher": [
+            "information_gathering",
+            "technology_research",
+            "best_practices_research",
+            "competitive_analysis",
+            "documentation_analysis",
+            "trend_analysis"
+        ]
+    }
+    
+    return capabilities_map.get(agent_type, ["general_assistance"])
+
+
+def _get_agent_instructions(agent_type: str, parent_agent_id: str = None) -> dict:
+    """
+    エージェントタイプ別の初期指示を取得
+    """
+    base_instructions = {
+        "role_description": f"You are a {agent_type} agent in the AetherTerm platform.",
+        "hierarchy_info": "You are a sub-agent" if parent_agent_id else "You are a main agent",
+        "communication_protocol": {
+            "websocket_events": [
+                "agent_message",
+                "response_request",
+                "response_reply",
+                "spec_query",
+                "control_message"
+            ],
+            "message_filtering": "Filter messages by to_agent_id or process broadcasts",
+            "parent_communication": f"Report to parent agent: {parent_agent_id}" if parent_agent_id else None
+        },
+        "server_integration": {
+            "websocket_url": "ws://localhost:57575",
+            "api_base": "http://localhost:57575/api/v1",
+            "spec_query_endpoint": "/api/v1/specs/query",
+            "agent_status_endpoint": "/api/v1/agents/status"
+        }
+    }
+    
+    type_specific_instructions = {
+        "developer": {
+            "primary_tasks": [
+                "Implement features based on specifications",
+                "Write clean, maintainable code",
+                "Follow coding standards and best practices",
+                "Collaborate with other agents for reviews and testing"
+            ],
+            "collaboration_pattern": [
+                "Request code reviews from reviewer agents",
+                "Coordinate with tester agents for test cases",
+                "Consult architect agents for design decisions"
+            ]
+        },
+        "reviewer": {
+            "primary_tasks": [
+                "Review code for quality and security",
+                "Provide constructive feedback",
+                "Ensure compliance with standards",
+                "Identify potential issues and improvements"
+            ],
+            "collaboration_pattern": [
+                "Respond to review requests from developer agents",
+                "Coordinate with architect agents for design reviews",
+                "Work with tester agents on test strategy"
+            ]
+        },
+        "tester": {
+            "primary_tasks": [
+                "Generate comprehensive test cases",
+                "Execute automated and manual tests",
+                "Report bugs and issues",
+                "Measure and improve test coverage"
+            ],
+            "collaboration_pattern": [
+                "Coordinate with developer agents for test requirements",
+                "Work with reviewer agents on test strategies",
+                "Report findings to all relevant agents"
+            ]
+        },
+        "architect": {
+            "primary_tasks": [
+                "Design system architecture",
+                "Make technology decisions",
+                "Create technical documentation",
+                "Guide implementation decisions"
+            ],
+            "collaboration_pattern": [
+                "Provide guidance to developer agents",
+                "Collaborate with reviewer agents on design reviews",
+                "Work with researcher agents on technology selection"
+            ]
+        },
+        "researcher": {
+            "primary_tasks": [
+                "Research technologies and best practices",
+                "Analyze requirements and constraints",
+                "Provide recommendations",
+                "Gather relevant documentation"
+            ],
+            "collaboration_pattern": [
+                "Provide research findings to all agent types",
+                "Support architect agents with technology analysis",
+                "Assist developer agents with implementation research"
+            ]
+        }
+    }
+    
+    base_instructions.update(type_specific_instructions.get(agent_type, {}))
+    
+    # 親エージェントがいる場合の追加指示
+    if parent_agent_id:
+        base_instructions["parent_agent_communication"] = {
+            "reporting_schedule": "Report progress regularly to parent agent",
+            "escalation_rules": "Escalate blocking issues to parent agent",
+            "completion_notification": "Notify parent agent when tasks are completed",
+            "parent_agent_id": parent_agent_id
+        }
+    
+    return base_instructions
+
+
+async def agent_hello(sid, data):
+    """
+    エージェントからの初期接続メッセージを処理
+    
+    メッセージフォーマット:
+    {
+        "agent_id": "claude_dev_001",
+        "agent_type": "developer",
+        "version": "1.0.0",
+        "capabilities": [...],
+        "request_initialization": true
+    }
+    """
+    try:
+        agent_id = data.get("agent_id")
+        agent_type = data.get("agent_type")
+        version = data.get("version", "unknown")
+        capabilities = data.get("capabilities", [])
+        
+        log.info(f"Agent hello from {agent_id} ({agent_type}) version {version}")
+        
+        # エージェント情報を登録/更新
+        agent_info = {
+            "agent_id": agent_id,
+            "agent_type": agent_type,
+            "version": version,
+            "capabilities": capabilities,
+            "status": "connected",
+            "connected_at": datetime.utcnow().isoformat(),
+            "last_seen": datetime.utcnow().isoformat()
+        }
+        
+        # エージェント情報をグローバルストレージに保存（TODO: 実装）
+        # store_agent_info(agent_id, agent_info)
+        
+        # 既存のターミナルセッションからエージェント情報を取得
+        parent_agent_id = None
+        agent_hierarchy = "main"
+        
+        # ターミナルセッションからエージェント設定を検索
+        from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+        for session_id, terminal in AsyncioTerminal.sessions.items():
+            if hasattr(terminal, 'agent_config') and terminal.agent_config:
+                agent_config = terminal.agent_config.get("agent_config", {})
+                if agent_config.get("agent_id") == agent_id:
+                    parent_agent_id = terminal.agent_config.get("parent_agent_id")
+                    agent_hierarchy = terminal.agent_config.get("agent_hierarchy", "main")
+                    break
+        
+        # エージェントに初期化情報を送信
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "agent_initialization",
+                "to_agent_id": agent_id,
+                "agent_info": {
+                    "agent_id": agent_id,
+                    "agent_type": agent_type,
+                    "role": "sub_agent" if parent_agent_id else "main_agent",
+                    "hierarchy": agent_hierarchy,
+                    "parent_agent_id": parent_agent_id,
+                    "server_info": {
+                        "websocket_url": "ws://localhost:57575",
+                        "rest_api_base": "http://localhost:57575/api/v1"
+                    },
+                    "capabilities": _get_agent_capabilities(agent_type),
+                    "instructions": _get_agent_instructions(agent_type, parent_agent_id)
+                },
+                "welcome_message": f"Welcome {agent_id}! You are a {agent_hierarchy} {agent_type} agent.",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+        # 他のエージェントに新しいエージェントの参加を通知
+        await sio_instance.emit(
+            "agent_message",
+            {
+                "message_type": "agent_joined",
+                "agent_info": {
+                    "agent_id": agent_id,
+                    "agent_type": agent_type,
+                    "hierarchy": agent_hierarchy,
+                    "capabilities": capabilities
+                },
+                "announcement": f"Agent {agent_id} ({agent_type}) has joined the workspace.",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+    except Exception as e:
+        log.error(f"Error handling agent hello: {e}")
+        await sio_instance.emit("error", {"message": f"Agent hello failed: {str(e)}"}, room=sid)
 
 
 async def wrapper_session_sync(sid, data):

@@ -1,150 +1,35 @@
 # AetherTerm Documentation
 
-AetherTermの包括的なドキュメンテーション - ユーザーと開発者向けに分離されています。
+## 📖 Current Documentation
 
-## 📚 ドキュメント構造
+### Core Integration
+- **[AGENT_INTEGRATION.md](../AGENT_INTEGRATION.md)** - MainAgent制御によるエージェント統合システム
+  - P0 Priority Features - Agent Communication Protocol  
+  - MainAgent-Controlled Startup Methods
+  - 仕様インプットシステム
+  - Max Plan環境連携
 
-### 👥 [ユーザー向けドキュメント](./users/) 
-**AetherTermを使う方へ** - 利用方法、運用管理、ビジネス活用
+### Quick Start
+- **[CLAUDE.md](../CLAUDE.md)** - プロジェクト設定とコマンド
+- **[README.md](../README.md)** - 基本情報
 
-#### 🏢 [ビジネスレベル](./users/business/)
-**対象**: 経営層・事業責任者・プロジェクトマネージャー
-- 📋 AetherPlatform概要・価値提案
-- 💼 ビジネスユースケース・活用事例
-- 📈 ROI・導入効果・投資対効果
-- 🎯 導入戦略・ロードマップ
+### Archived Documentation
+- **[archived/](./archived/)** - 廃止されたAgentShell関連の古いドキュメント
 
-#### 🛡️ [情シス・管理レベル](./users/operations/)
-**対象**: 情報システム部門・セキュリティ管理者・コンプライアンス担当
-- 🔍 監査・ログ管理・トレーサビリティ
-- 👷 工事監督・承認フロー・ガバナンス
-- 🤖 AI支援管理機能・異常検知
-- 🛡️ セキュリティ・コンプライアンス対応
-- ⚙️ システム運用管理・監視
+## 🚀 Quick Reference
 
-#### 👨‍💻 [エンジニアレベル](./users/engineering/)
-**対象**: システム利用者・技術者・運用エンジニア
-- 🚀 環境構築・セットアップ
-- 🤖 AI支援機能の活用方法
-- 🔧 カスタマイズ・設定管理
-- 📡 API利用・統合方法
-- 🧪 テスト・トラブルシューティング
+### Development Commands
+```bash
+# Backend setup  
+uv sync && make build-frontend
+make run-agentserver ARGS="--host=localhost --port=57575 --unsecure --debug"
 
----
-
-### 🔧 [開発者向けドキュメント](./developers/)
-**AetherTermを作る方へ** - 内部設計、開発ガイド、コントリビューション
-
-#### 🏗️ システム設計
-- アーキテクチャ全体設計
-- モジュール間の通信設計
-- パッケージ構造・依存関係
-
-#### 🛠️ 開発ガイド
-- 開発環境セットアップ
-- コーディング規約・スタイル
-- テスト戦略・CI/CD
-
-#### 🔌 内部仕様
-- 内部API・インターフェース
-- データベース設計
-- プロトコル・通信仕様
-
-#### 🤝 コントリビューション
-- 貢献方法・プルリクエスト
-- リリースプロセス
-- 課題管理・ロードマップ
-
-## 🗺️ 読者別ナビゲーション
-
-### 🎯 あなたの立場に応じた推奨パス
-
-| あなたの立場 | 開始点 | 推奨ドキュメント |
-|-------------|--------|-----------------|
-| 🏢 **経営層・マネジメント** | [ビジネス概要](./users/business/) | 価値提案 → ユースケース → ROI |
-| 🛡️ **情シス・管理者** | [運用管理](./users/operations/) | システム運用 → セキュリティ → 監査 |
-| 👨‍💻 **利用エンジニア** | [エンジニア向け](./users/engineering/) | セットアップ → カスタマイズ → API |
-| 🔧 **AetherTerm開発者** | [開発者向け](./developers/) | アーキテクチャ → 開発環境 → コントリビューション |
-
-### 🔍 よくある質問とドキュメント対応
-
-| 質問 | ドキュメント | レベル |
-|------|-------------|--------|
-| AetherPlatformとは？ | [ビジネス概要](./users/business/) | 🏢 ビジネス |
-| 導入効果は？ | [ROI・効果](./users/business/) | 🏢 ビジネス |
-| セキュリティは？ | [セキュリティ](./users/operations/) | 🛡️ 運用・管理 |
-| 監査ログは？ | [監査・ログ](./users/operations/) | 🛡️ 運用・管理 |
-| 使い方は？ | [エンジニア向け](./users/engineering/) | 👨‍💻 エンジニア |
-| 開発に参加したい | [開発者向け](./developers/) | 🔧 開発者 |
-| バグを見つけた | [コントリビューション](./developers/) | 🔧 開発者 |
-
-## 🚀 クイックスタート
-
-### 初めてAetherTermを使う方
-1. 📋 [AetherPlatform概要](./users/business/) で全体像を把握
-2. 🚀 [環境構築](./users/engineering/) でセットアップ
-3. 🤖 [AI機能活用](./users/engineering/) で基本操作を習得
-
-### AetherTerm開発に参加したい方
-1. 🏗️ [システム設計](./developers/) でアーキテクチャを理解
-2. 🛠️ [開発環境](./developers/) をセットアップ
-3. 🤝 [コントリビューション](./developers/) で参加方法を確認
-
-## 🌟 最新機能（2025年実装）
-
-### ✅ 実装済み新機能
-- **LangChain階層化メモリシステム**: 3層メモリ（短期・中期・長期）による高度なコンテキスト管理
-- **リアルタイムコマンド分析**: SAFE/CAUTION/DANGEROUS/CRITICAL の4段階リスク評価
-- **マルチエージェント協調システム**: 複数AIエージェントの自動調整と衝突回避
-- **Enhanced Vue 3 フロントエンド**: TypeScript + Pinia による現代的なUI/UX
-- **包括的AI統合**: OpenAI、Anthropic、ローカルLLMの統一インターフェース
-
-### 🚧 開発中の機能
-- **音声コマンド入力**: 音声認識による自然なインタラクション
-- **画像・図表生成**: AI による視覚的コンテンツ生成
-- **高度ワークフロー自動化**: 複雑なタスクの完全自動化
-- **モバイル対応UI**: タブレット・スマートフォン最適化
-
-## ⚡ 技術仕様（V2.0）
-
-### システム要件
-- **Python**: 3.12+ (最新LangChain対応)
-- **Node.js**: 18+ (Vue 3.5 + Vite 6対応)
-- **Redis**: 5.0+ (リアルタイムメモリ管理)
-- **PostgreSQL**: 13+ (永続化ストレージ)
-- **Vector DB**: ChromaDB / FAISS (AI知識ベース)
-
-### アーキテクチャ概要
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  ControlServer  │◄───►│   AgentServer   │◄───►│   AgentShell    │
-│   (中央制御)     │    │  (Web Terminal) │    │   (AI エージェント) │
-│   Port: 8765    │    │   Port: 57575   │    │   (リアルタイム分析) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   LangChain     │    │    Frontend     │    │   Memory Store  │
-│  (AI メモリ)     │    │ (Vue3+TypeScript)│    │ (Redis+Vector)  │
-│  (階層化管理)    │    │   (Real-time)   │    │  (永続化)       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+# Frontend development
+cd frontend && pnpm install && pnpm dev
 ```
 
-## 📝 ドキュメント管理方針
+### Architecture
+**Flow**: ControlServer (8765) → AgentServer (57575) → MainAgent → SubAgents  
+**Key**: MainAgent controls all startup methods and agent coordination
 
-### 更新・メンテナンス
-- **ユーザー向け**: 機能リリースに合わせて更新
-- **開発者向け**: コード変更に合わせてリアルタイム更新
-- **相互参照**: 各レベル間の整合性を定期的にチェック
-
-### 貢献方法
-- ドキュメントの改善提案はIssuesで受付
-- 誤記・不明な点の報告も歓迎
-- 新機能のドキュメント化も積極的に
-
----
-
-🔗 **関連リンク**:
-- [GitHub Repository](https://github.com/aether-platform/aetherterm)
-- [Issue Tracker](https://github.com/aether-platform/aetherterm/issues)
-- [Discussions](https://github.com/aether-platform/aetherterm/discussions)
+For detailed implementation and usage, see [AGENT_INTEGRATION.md](../AGENT_INTEGRATION.md).

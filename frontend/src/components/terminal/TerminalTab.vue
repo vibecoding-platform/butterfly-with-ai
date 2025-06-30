@@ -60,15 +60,28 @@ const terminalTabStore = useTerminalTabStore()
 
 // Terminal initialization
 const initializeTerminal = async () => {
+  console.log('=== INITIALIZING TERMINAL ===')
+  console.log('Tab ID:', props.tabId)
+  console.log('Sub Type:', props.subType)
+  
   await nextTick()
   terminalEl.value = document.getElementById(`terminal-${props.tabId}`)
   
   if (!terminalEl.value) {
-    console.error('Terminal element not found:', `terminal-${props.tabId}`)
+    console.error('❌ Terminal element not found:', `terminal-${props.tabId}`)
+    console.log('All available elements with "terminal" in ID:', 
+      Array.from(document.querySelectorAll('[id*="terminal"]')).map(el => el.id)
+    )
     return
   }
   
-  console.log('Terminal element found:', terminalEl.value, 'for tab:', props.tabId)
+  console.log('✅ Terminal element found:', terminalEl.value, 'for tab:', props.tabId)
+  console.log('Element dimensions:', {
+    width: terminalEl.value.offsetWidth,
+    height: terminalEl.value.offsetHeight,
+    display: getComputedStyle(terminalEl.value).display,
+    visibility: getComputedStyle(terminalEl.value).visibility
+  })
 
   // Create xterm.js instance
   terminal.value = new Terminal({
@@ -110,28 +123,39 @@ const initializeTerminal = async () => {
   fitAddon.value = new FitAddon()
   terminal.value.loadAddon(fitAddon.value)
 
+  console.log('🔧 Opening terminal in DOM element...')
   // Open terminal in the container
   terminal.value.open(terminalEl.value)
+  console.log('✅ Terminal opened')
   
   // Fit terminal to container
   setTimeout(() => {
     if (fitAddon.value) {
+      console.log('🔧 Fitting terminal to container...')
       fitAddon.value.fit()
+      console.log('✅ Terminal fitted, dimensions:', {
+        cols: terminal.value?.cols,
+        rows: terminal.value?.rows
+      })
     }
   }, 100)
 
   // Setup event handlers
+  console.log('🔧 Setting up terminal event handlers...')
   setupTerminalEventHandlers()
+  console.log('✅ Event handlers set up')
   
   // Connect to backend
+  console.log('🔧 Connecting to backend...')
   if (terminalStore.socket && terminalStore.session.id) {
-    console.log('Connecting terminal to existing session:', terminalStore.session.id)
+    console.log('Using existing session:', terminalStore.session.id)
     connectTerminal()
   } else {
-    console.log('Connecting to terminal service for tab:', props.tabId)
+    console.log('Creating new connection for tab:', props.tabId)
     await terminalStore.connect()
     connectTerminal()
   }
+  console.log('✅ Backend connection initiated')
 }
 
 const setupTerminalEventHandlers = () => {
@@ -162,39 +186,59 @@ const setupTerminalEventHandlers = () => {
 }
 
 const connectTerminal = () => {
-  if (!terminalStore.socket || !terminal.value) return
+  console.log('=== CONNECTING TERMINAL ===')
+  console.log('Socket exists:', !!terminalStore.socket)
+  console.log('Terminal exists:', !!terminal.value)
+  
+  if (!terminalStore.socket || !terminal.value) {
+    console.error('❌ Cannot connect - missing socket or terminal')
+    return
+  }
 
-  // Listen for terminal output
-  terminalStore.socket.on('output', (data: { sessionId: string, data: string }) => {
-    if (data.sessionId === terminalStore.session.id && terminal.value) {
-      terminal.value.write(data.data)
+  console.log('🔧 Setting up output callback...')
+  // Register callback for terminal output via store
+  terminalStore.onShellOutput((data: string) => {
+    if (terminal.value) {
+      console.log('✅ Writing data to terminal via callback')
+      terminal.value.write(data)
     }
   })
 
+  console.log('🔧 Requesting new session...')
   // Request new session for this tab
   terminalStore.socket.emit('createSession', {
     tabId: props.tabId,
     subType: props.subType
   })
+  console.log('✅ Session request sent')
 }
 
 // Watch for session changes
-watch(() => terminalStore.session.id, (newSessionId) => {
+watch(() => terminalStore.session.id, (newSessionId, oldSessionId) => {
+  console.log('🔄 Session ID changed:', {
+    old: oldSessionId,
+    new: newSessionId,
+    terminalExists: !!terminal.value
+  })
   if (newSessionId && terminal.value) {
-    console.log('Session ID changed, reconnecting terminal:', newSessionId)
+    console.log('✅ Reconnecting terminal with new session:', newSessionId)
     connectTerminal()
+  } else {
+    console.warn('⚠️ Cannot reconnect - missing session or terminal')
   }
 })
 
 onMounted(() => {
-  console.log('TerminalTab mounted for:', props.tabId)
+  console.log('🟢 TerminalTab MOUNTED for tab:', props.tabId, 'subType:', props.subType)
   initializeTerminal()
 })
 
 onUnmounted(() => {
-  console.log('TerminalTab unmounted for:', props.tabId)
+  console.log('🔴 TerminalTab UNMOUNTED for tab:', props.tabId)
   if (terminal.value) {
+    console.log('🔧 Disposing terminal instance')
     terminal.value.dispose()
+    console.log('✅ Terminal disposed')
   }
 })
 </script>

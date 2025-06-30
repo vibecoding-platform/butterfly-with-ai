@@ -1,5 +1,10 @@
 <template>
-  <div class="terminal-tab-bar" @contextmenu.prevent>
+  <div 
+    class="terminal-tab-bar" 
+    :class="{ 'sidebar-closed': !sidebarOpen, 'sidebar-open': sidebarOpen }" 
+    @contextmenu.prevent
+    :data-sidebar-state="sidebarOpen ? 'open' : 'closed'"
+  >
     <!-- Existing Tabs -->
     <div class="tab-list">
       <div
@@ -54,15 +59,38 @@
         <span class="tab-title">Log Monitor</span>
       </div>
     </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref, onUnmounted, watch, nextTick } from 'vue'
 import { useTerminalTabStore } from '../stores/terminalTabStore'
 import TabCreationMenu from './terminal/tabs/TabCreationMenu.vue'
 
 const tabStore = useTerminalTabStore()
+
+// リアクティブなサイドバー状態（DOM検出のみ）
+const isSidebarOpen = ref(false)
+
+// DOM監視でサイドバー状態を更新
+const updateSidebarState = () => {
+  if (typeof window !== 'undefined') {
+    const supervisorPanel = document.getElementById('supervisor-container')
+    // supervisor-containerが存在する = サイドバーが開いている
+    // supervisor-containerが存在しない = サイドバーが閉じている
+    const newState = supervisorPanel !== null
+    if (newState !== isSidebarOpen.value) {
+      isSidebarOpen.value = newState
+    }
+  }
+}
+
+// Reactiveなサイドバー状態 - DOM検出のみ使用
+const sidebarOpen = computed(() => {
+  // DOM検出の結果のみを使用
+  return isSidebarOpen.value
+})
 
 // Check if log monitor tab is active
 const isLogMonitorActive = computed(() => {
@@ -75,12 +103,44 @@ const switchToLogMonitor = () => {
 }
 
 const addNewTab = (type: 'terminal' | 'ai-agent', subType?: 'pure' | 'inventory') => {
-  tabStore.createTab(type, undefined, subType)
+  console.log('🔥 ADD NEW TAB CALLED:', { type, subType })
+  const newTab = tabStore.createTab(type, undefined, subType)
+  console.log('🔥 NEW TAB CREATED:', newTab)
 }
 
-onMounted(() => {
+
+// MutationObserverでDOM変更を監視
+let observer: MutationObserver | null = null
+
+onMounted(async () => {
   // Initialize default tab if none exist
   tabStore.initializeDefaultTab()
+  
+  // DOMの準備を待つ
+  await nextTick()
+  
+  // 初期状態を設定
+  updateSidebarState()
+  
+  // DOM変更を監視してサイドバー状態を追跡
+  observer = new MutationObserver(() => {
+    updateSidebarState()
+  })
+  
+  // bodyの子要素の変更を監視
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['id', 'class']
+  })
+  
+})
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect()
+  }
 })
 </script>
 
@@ -94,6 +154,15 @@ onMounted(() => {
   position: relative;
   overflow-x: auto;
   overflow-y: visible;
+}
+
+/* サイドバーが閉じているときのみ右マージンを追加 */
+.terminal-tab-bar.sidebar-open {
+  margin-right: 0 !important; /* サイドバーが開いているときは余白なし */
+}
+
+.terminal-tab-bar.sidebar-closed {
+  margin-right: 40px !important; /* サイドバーが閉じているときのみ余白を追加 */
 }
 
 .tab-list {
@@ -172,6 +241,11 @@ onMounted(() => {
   border-left: 2px solid #444;
   background-color: #1a1a1a;
   position: relative;
+}
+
+/* サイドバーが閉じているときのみFixed tabに右側余白を追加 */
+.terminal-tab-bar.sidebar-closed .terminal-tab.fixed-tab {
+  margin-right: 20px; /* 右側に追加余白 */
 }
 
 .terminal-tab.fixed-tab:hover {

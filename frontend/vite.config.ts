@@ -34,7 +34,7 @@ export default defineConfig({
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
           'vuetify': ['vuetify'],
-          'terminal': ['vue-term', 'xterm'],
+          'terminal': ['@xterm/xterm', 'xterm'],
           'socket': ['socket.io-client']
         }
       }

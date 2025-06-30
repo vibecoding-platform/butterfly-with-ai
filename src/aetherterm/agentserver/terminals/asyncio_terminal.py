@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Set
 from logging import getLogger
 
 from aetherterm.agentserver import utils
+from aetherterm.agentserver.short_term_memory import ShortTermMemoryManager
 
 from .base_terminal import BaseTerminal
 
@@ -46,6 +47,9 @@ class AsyncioTerminal(BaseTerminal):
     # Log processing infrastructure
     log_buffer = []  # Global log buffer for all sessions
     log_processing_task = None  # Background task for log processing
+    
+    # Short-term memory management
+    short_term_memory_manager = None  # Shared across all sessions
     log_patterns = {
         "error": [
             r"error|ERROR|Error",
@@ -767,3 +771,58 @@ class AsyncioTerminal(BaseTerminal):
             if cls.processed_logs
             else None,
         }
+    
+    @classmethod
+    async def initialize_short_term_memory(cls, agent_id: str):
+        """短期記憶マネージャーを初期化"""
+        if cls.short_term_memory_manager is None:
+            cls.short_term_memory_manager = ShortTermMemoryManager(agent_id)
+            await cls.short_term_memory_manager.start()
+            log.info(f"Short-term memory manager initialized for agent {agent_id}")
+    
+    @classmethod
+    def set_control_server_connection(cls, websocket):
+        """ControlServer接続を設定"""
+        if cls.short_term_memory_manager:
+            cls.short_term_memory_manager.set_control_server_websocket(websocket)
+            log.info("ControlServer connection set for short-term memory")
+    
+    def record_command_execution(self, command: str, exit_code: int = None, execution_time: float = None):
+        """コマンド実行を短期記憶に記録"""
+        if self.short_term_memory_manager:
+            self.short_term_memory_manager.record_command_execution(
+                session_id=self.session,
+                command=command,
+                exit_code=exit_code,
+                execution_time=execution_time
+            )
+    
+    def record_user_interaction(self, interaction_type: str, details: str = None):
+        """ユーザーインタラクションを短期記憶に記録"""
+        if self.short_term_memory_manager:
+            self.short_term_memory_manager.record_user_interaction(
+                session_id=self.session,
+                interaction_type=interaction_type,
+                details=details
+            )
+    
+    def record_error_event(self, error_type: str, error_message: str, stack_trace: str = None):
+        """エラーイベントを短期記憶に記録"""
+        if self.short_term_memory_manager:
+            self.short_term_memory_manager.record_error_event(
+                session_id=self.session,
+                error_type=error_type,
+                error_message=error_message,
+                stack_trace=stack_trace
+            )
+    
+    def record_performance_metric(self, metric_name: str, value: float, unit: str = None, threshold_exceeded: bool = False):
+        """パフォーマンスメトリクスを短期記憶に記録"""
+        if self.short_term_memory_manager:
+            self.short_term_memory_manager.record_performance_metric(
+                session_id=self.session,
+                metric_name=metric_name,
+                value=value,
+                unit=unit,
+                threshold_exceeded=threshold_exceeded
+            )

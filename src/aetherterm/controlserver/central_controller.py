@@ -15,6 +15,8 @@ from typing import Dict, List, Optional, Set
 import websockets
 from websockets.server import WebSocketServerProtocol
 
+from .log_summary_manager import LogSummaryManager
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,17 +64,26 @@ class CentralController:
 
         # WebSocketサーバー
         self.server = None
+        
+        # ログサマリ管理
+        self.log_summary_manager = LogSummaryManager()
 
     async def start(self):
         """中央制御サーバー開始"""
         logger.info(f"Starting CentralController on {self.host}:{self.port}")
 
         self.server = await websockets.serve(self.handle_connection, self.host, self.port)
+        
+        # ログサマリ管理開始
+        await self.log_summary_manager.start()
 
         logger.info(f"CentralController started on ws://{self.host}:{self.port}")
 
     async def stop(self):
         """中央制御サーバー停止"""
+        # ログサマリ管理停止
+        await self.log_summary_manager.stop()
+        
         if self.server:
             self.server.close()
             await self.server.wait_closed()
@@ -171,6 +182,10 @@ class CentralController:
                 await self.send_current_status(websocket)
             elif message_type == "get_block_history":
                 await self.send_block_history(websocket)
+            elif message_type == "get_log_summaries":
+                await self.send_log_summaries(websocket, data)
+            elif message_type == "get_memory_statistics":
+                await self.send_memory_statistics(websocket)
             else:
                 logger.warning(f"Unknown admin message type: {message_type}")
 
@@ -191,6 +206,8 @@ class CentralController:
             await self.handle_block_confirmation(data, agent_id)
         elif message_type == "unblock_request":
             await self.handle_unblock_request(data, agent_id)
+        elif message_type == "short_term_memory":
+            await self.handle_short_term_memory(data, agent_id)
         else:
             logger.debug(f"Received message from {agent_id}: {message_type}")
 
@@ -457,13 +474,65 @@ class CentralController:
             }
         )
 
+    async def handle_short_term_memory(self, data: Dict, agent_id: str):
+        """AgentServerからの短期記憶データを処理"""
+        try:
+            # エージェントIDを追加してログサマリマネージャーに送信
+            memory_data = data.get("memory", {})
+            memory_data["agent_id"] = agent_id
+            
+            await self.log_summary_manager.receive_short_term_memory(memory_data)
+            
+            logger.debug(f"Received short-term memory from {agent_id}: {memory_data.get('memory_type')}")
+            
+        except Exception as e:
+            logger.error(f"Error processing short-term memory from {agent_id}: {e}")
+    
+    async def send_log_summaries(self, websocket: WebSocketServerProtocol, data: Dict):
+        """ログサマリを送信"""
+        try:
+            limit = data.get("limit", 10)
+            summaries = self.log_summary_manager.get_recent_summaries(limit)
+            
+            response = {
+                "type": "log_summaries",
+                "timestamp": datetime.now().isoformat(),
+                "summaries": summaries,
+                "total_count": len(summaries)
+            }
+            
+            await websocket.send(json.dumps(response))
+            
+        except Exception as e:
+            logger.error(f"Error sending log summaries: {e}")
+    
+    async def send_memory_statistics(self, websocket: WebSocketServerProtocol):
+        """メモリ統計を送信"""
+        try:
+            stats = self.log_summary_manager.get_memory_statistics()
+            
+            response = {
+                "type": "memory_statistics",
+                "timestamp": datetime.now().isoformat(),
+                "statistics": stats
+            }
+            
+            await websocket.send(json.dumps(response))
+            
+        except Exception as e:
+            logger.error(f"Error sending memory statistics: {e}")
+
     def get_status_summary(self) -> Dict:
         """状態サマリーを取得"""
+        memory_stats = self.log_summary_manager.get_memory_statistics()
+        
         return {
             "agent_servers_count": len(self.agent_servers),
             "admin_clients_count": len(self.admin_clients),
             "active_sessions_count": len(self.active_sessions),
             "active_blocks_count": len(self.active_blocks),
             "total_block_history": len(self.block_history),
+            "total_log_summaries": memory_stats.get("total_summaries", 0),
+            "total_memories": memory_stats.get("total_memories", 0),
             "last_activity": datetime.now().isoformat(),
         }

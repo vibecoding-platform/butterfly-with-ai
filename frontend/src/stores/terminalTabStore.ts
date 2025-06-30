@@ -63,6 +63,8 @@ export const useTerminalTabStore = defineStore('terminalTab', () => {
     subType?: 'pure' | 'inventory',
     serverContext?: ServerContext
   ): TerminalTab => {
+    console.log('📋 STORE: createTab called with:', { type, title, subType, serverContext })
+    
     const id = `tab-${nextTabId.value++}`
     let defaultTitle = type === 'terminal' 
       ? `Terminal ${terminalTabs.value.length + 1}` 
@@ -84,8 +86,11 @@ export const useTerminalTabStore = defineStore('terminalTab', () => {
       serverContext
     }
 
+    console.log('📋 STORE: Created new tab:', newTab)
     tabs.value.push(newTab)
     activeTabId.value = id
+    console.log('📋 STORE: Tab added to store, total tabs:', tabs.value.length)
+    console.log('📋 STORE: Active tab ID set to:', id)
 
     return newTab
   }
