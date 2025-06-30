@@ -72,14 +72,20 @@ async def agent_hello(sid, data, sio_instance):
         await sio_instance.emit("error", {"message": f"Agent hello failed: {e!s}"}, room=sid)
 
 
-async def spec_upload(sid, data, sio_instance):
+@inject
+async def spec_upload(
+    sid, 
+    data, 
+    sio_instance,
+    agent_service: AgentService = Provide[MainContainer.application.agent_service]
+):
     """Handle specification document upload."""
     try:
         spec_id = data.get("spec_id") or f"spec_{uuid4().hex[:8]}"
         content = data.get("content", "")
 
-        # Use application service for spec upload
-        result = await app_services.agents.upload_spec(spec_id, content)
+        # Use injected agent service for spec upload
+        result = await agent_service.upload_spec(spec_id, content)
 
         await sio_instance.emit("spec_upload_response", result, room=sid)
 
@@ -88,14 +94,20 @@ async def spec_upload(sid, data, sio_instance):
         await sio_instance.emit("error", {"message": f"Spec upload failed: {e!s}"}, room=sid)
 
 
-async def spec_query(sid, data, sio_instance):
+@inject
+async def spec_query(
+    sid, 
+    data, 
+    sio_instance,
+    agent_service: AgentService = Provide[MainContainer.application.agent_service]
+):
     """Handle specification document query."""
     try:
         spec_id = data.get("spec_id")
         query = data.get("query")
 
-        # Use application service for spec query
-        result = await app_services.agents.query_spec(spec_id, query)
+        # Use injected agent service for spec query
+        result = await agent_service.query_spec(spec_id, query)
 
         await sio_instance.emit("spec_query_response", result, room=sid)
 

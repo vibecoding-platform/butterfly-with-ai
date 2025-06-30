@@ -29,7 +29,7 @@ import webbrowser
 
 import uvicorn
 
-from aetherterm.agentserver import socket_handlers
+from aetherterm.agentserver.interfaces.web import socket_handlers
 from aetherterm.agentserver.infrastructure.config.legacy_containers import ApplicationContainer
 from aetherterm.agentserver.infrastructure.config.di_container import MainContainer, setup_di_container
 from aetherterm.agentserver.infrastructure import initialize_infra_services
@@ -563,7 +563,7 @@ def setup_app(**kwargs):
     asgi_app, sio, container, config = create_app(**kwargs)
 
     # Set the socket.io instance in handlers module
-    from aetherterm.agentserver import socket_handlers
+    from aetherterm.agentserver.interfaces.web import socket_handlers
     from aetherterm.core.container import DIContainer
 
     # Wire the DI container first

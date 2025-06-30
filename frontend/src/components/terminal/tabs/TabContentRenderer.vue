@@ -2,7 +2,7 @@
   <div class="tab-content-wrapper">
     <TerminalTabComponent 
       v-if="tab.type === 'terminal'" 
-      :tab-id="tab.id"
+      :id="tab.id"
       :sub-type="tab.subType"
       @click="$emit('click')"
     />

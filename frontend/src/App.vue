@@ -245,6 +245,9 @@
         <button :class="{ active: activeTab === 'supervisor' }" @click="activeTab = 'supervisor'">
           👮 Admin
         </button>
+        <button :class="{ active: activeTab === 'theme' }" @click="activeTab = 'theme'">
+          🎨 Theme
+        </button>
         <button
           v-if="enableJWTDevRegister"
           :class="{ active: activeTab === 'debug' }"
@@ -264,6 +267,9 @@
       </div>
       <div v-if="activeTab === 'supervisor'" class="tab-content supervisor-tab">
         <SupervisorControlPanel />
+      </div>
+      <div v-if="activeTab === 'theme'" class="tab-content theme-tab">
+        <ThemeSelector />
       </div>
       <div v-if="activeTab === 'debug'" class="tab-content debug-tab">
         <DevJWTRegister />

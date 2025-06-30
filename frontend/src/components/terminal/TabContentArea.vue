@@ -50,7 +50,7 @@
       <!-- Direct tab component usage based on type -->
       <TerminalTabComponent 
         v-if="tab.type === 'terminal'" 
-        :tab-id="tab.id"
+        :id="tab.id"
         :sub-type="tab.subType"
         @click="hideSelectionPopup"
       />

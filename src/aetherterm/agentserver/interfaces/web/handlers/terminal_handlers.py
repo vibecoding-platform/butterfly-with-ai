@@ -20,13 +20,17 @@ async def connect(sid, environ, sio_instance):
     await sio_instance.emit("connected", {"data": "Connected to Butterfly"}, room=sid)
 
 
-async def disconnect(sid, sio_instance):
+@inject
+async def disconnect(
+    sid, 
+    sio_instance,
+    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+):
     """Handle client disconnection."""
     log.info(f"Client disconnected: {sid}")
 
-    # Clean up client sessions
-    if app_services and app_services.workspace:
-        app_services.workspace.cleanup_client_sessions(sid)
+    # Clean up client sessions using injected service
+    workspace_service.cleanup_client_sessions(sid)
 
 
 @inject
@@ -61,14 +65,20 @@ async def create_terminal(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-async def resume_workspace(sid, data, sio_instance):
+@inject
+async def resume_workspace(
+    sid, 
+    data, 
+    sio_instance,
+    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+):
     """Resume a workspace with multiple terminals."""
     try:
         workspace_id = data.get("workspaceId", "default")
         tabs = data.get("tabs", [])
 
-        # Use application service for workspace resumption
-        result = await app_services.workspace.resume_workspace(
+        # Use injected workspace service for workspace resumption
+        result = await workspace_service.resume_workspace(
             client_sid=sid, workspace_id=workspace_id, tabs=tabs
         )
 
@@ -79,14 +89,20 @@ async def resume_workspace(sid, data, sio_instance):
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-async def terminal_input(sid, data, sio_instance):
+@inject
+async def terminal_input(
+    sid, 
+    data, 
+    sio_instance,
+    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+):
     """Handle terminal input."""
     try:
         session_id = data.get("session")
         input_data = data.get("data", "")
 
         if session_id:
-            success = await app_services.workspace.terminal_input(session_id, input_data)
+            success = await workspace_service.terminal_input(session_id, input_data)
             if not success:
                 await sio_instance.emit("error", {"message": "Failed to send input"}, room=sid)
 
@@ -95,7 +111,13 @@ async def terminal_input(sid, data, sio_instance):
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-async def terminal_resize(sid, data, sio_instance):
+@inject
+async def terminal_resize(
+    sid, 
+    data, 
+    sio_instance,
+    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+):
     """Handle terminal resize."""
     try:
         session_id = data.get("session")
@@ -103,7 +125,7 @@ async def terminal_resize(sid, data, sio_instance):
         rows = data.get("rows", 24)
 
         if session_id:
-            success = await app_services.workspace.terminal_resize(session_id, cols, rows)
+            success = await workspace_service.terminal_resize(session_id, cols, rows)
             if not success:
                 await sio_instance.emit("error", {"message": "Failed to resize terminal"}, room=sid)
 

@@ -28,9 +28,9 @@
           </div>
           <div class="agent-terminal">
             <TerminalTab 
-              :tab-id="agent.terminalId"
+              :id="agent.terminalId"
               :sub-type="'agent'"
-              @terminal-initialized="onAgentTerminalInitialized(agent.id, $event)"
+              @terminal-initialized="() => onAgentTerminalInitialized(agent.id)"
             />
           </div>
         </div>
@@ -61,9 +61,9 @@
       </div>
       <div class="main-agent-terminal">
         <TerminalTab 
-          :tab-id="mainAgentTerminalId"
+          :id="mainAgentTerminalId"
           :sub-type="'main-agent'"
-          @terminal-initialized="onMainAgentTerminalInitialized"
+          @terminal-initialized="() => onMainAgentTerminalInitialized()"
         />
       </div>
     </div>
@@ -132,7 +132,7 @@ const removeAgentTerminal = (agentId: string) => {
   }
 }
 
-const onAgentTerminalInitialized = (agentId: string, terminal: any) => {
+const onAgentTerminalInitialized = (agentId: string) => {
   const agent = agentTerminals.value.find(a => a.id === agentId)
   if (agent) {
     agent.status = 'active'
@@ -140,7 +140,7 @@ const onAgentTerminalInitialized = (agentId: string, terminal: any) => {
   }
 }
 
-const onMainAgentTerminalInitialized = (terminal: any) => {
+const onMainAgentTerminalInitialized = () => {
   mainAgentStatus.value = 'active'
   console.log('Main agent terminal initialized')
 }

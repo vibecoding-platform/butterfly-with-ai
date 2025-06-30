@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from dependency_injector.wiring import Provide, inject
 
-from aetherterm.agentserver import utils
+from aetherterm.agentserver.infrastructure.config import utils
 
 # Clean Architecture imports
 from aetherterm.agentserver.domain.entities.terminals.asyncio_terminal import AsyncioTerminal
