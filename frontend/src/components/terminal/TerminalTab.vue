@@ -252,6 +252,7 @@ const connectTerminal = () => {
   console.log('Socket exists:', !!terminalStore.socket)
   console.log('Terminal exists:', !!terminal.value)
   console.log('Callback already registered:', callbackRegistered.value)
+  console.log('Existing session:', terminalStore.session.id)
   
   if (!terminalStore.socket || !terminal.value) {
     console.error('❌ Cannot connect - missing socket or terminal')
@@ -287,15 +288,28 @@ const connectTerminal = () => {
 
   // Only request session once per component instance
   if (!sessionRequested.value) {
-    console.log('🔧 Requesting new session...')
-    terminalStore.socket.emit('create_terminal', {
-      tabId: props.tabId,
-      subType: props.subType,
-      cols: terminal.value?.cols || 80,
-      rows: terminal.value?.rows || 24
-    })
+    // Check if there's an existing session to resume
+    if (terminalStore.session.id) {
+      console.log('🔧 Attempting to resume existing session:', terminalStore.session.id)
+      terminalStore.socket.emit('resume_terminal', {
+        sessionId: terminalStore.session.id,
+        tabId: props.tabId,
+        subType: props.subType,
+        cols: terminal.value?.cols || 80,
+        rows: terminal.value?.rows || 24
+      })
+      console.log('✅ Resume request sent for session:', terminalStore.session.id)
+    } else {
+      console.log('🔧 No existing session found, creating new terminal...')
+      terminalStore.socket.emit('create_terminal', {
+        tabId: props.tabId,
+        subType: props.subType,
+        cols: terminal.value?.cols || 80,
+        rows: terminal.value?.rows || 24
+      })
+      console.log('✅ New terminal creation request sent')
+    }
     sessionRequested.value = true
-    console.log('✅ Session request sent')
   } else {
     console.log('ℹ️ Session already requested, skipping')
   }

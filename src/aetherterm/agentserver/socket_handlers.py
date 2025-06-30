@@ -354,6 +354,79 @@ async def create_terminal(
         await sio_instance.emit("terminal_error", {"error": str(e)}, room=sid)
 
 
+async def resume_terminal(sid, data):
+    """Handle resuming an existing terminal session or create new if not found."""
+    try:
+        session_id = data.get("sessionId")
+        tab_id = data.get("tabId")
+        sub_type = data.get("subType")
+        cols = data.get("cols", 80)
+        rows = data.get("rows", 24)
+        
+        log.info(f"Resume terminal request for session {session_id} from client {sid}")
+        
+        if not session_id:
+            log.warning("Resume terminal request without sessionId")
+            await sio_instance.emit("terminal_error", {"error": "sessionId required for resume"}, room=sid)
+            return
+        
+        # Check if session exists and is active
+        if session_id in AsyncioTerminal.sessions:
+            existing_terminal = AsyncioTerminal.sessions[session_id]
+            if not existing_terminal.closed:
+                log.info(f"Resuming existing active terminal session {session_id}")
+                
+                # Add this client to the existing terminal's client set
+                existing_terminal.client_sids.add(sid)
+                
+                # Send terminal history to client if available
+                if existing_terminal.history:
+                    await sio_instance.emit(
+                        "terminal_output",
+                        {"session": session_id, "data": existing_terminal.history},
+                        room=sid,
+                    )
+                
+                # Notify client that terminal is ready (resumed)
+                await sio_instance.emit(
+                    "terminal_ready", 
+                    {
+                        "session": session_id, 
+                        "status": "resumed",
+                        "tabId": tab_id,
+                        "subType": sub_type
+                    }, 
+                    room=sid
+                )
+                log.info(f"Terminal session {session_id} successfully resumed for client {sid}")
+                return
+            else:
+                log.info(f"Session {session_id} exists but is closed, will create new terminal")
+        else:
+            log.info(f"Session {session_id} not found, will create new terminal")
+        
+        # Session doesn't exist or is closed - create new terminal with the provided session ID
+        log.info(f"Creating new terminal session with ID {session_id}")
+        
+        # Use create_terminal to create new session with specified session_id
+        await create_terminal(
+            sid,
+            {
+                "session": session_id,
+                "tabId": tab_id,
+                "subType": sub_type,
+                "cols": cols,
+                "rows": rows,
+                "user": "",
+                "path": ""
+            }
+        )
+        
+    except Exception as e:
+        log.error(f"Error resuming terminal: {e}", exc_info=True)
+        await sio_instance.emit("terminal_error", {"error": str(e)}, room=sid)
+
+
 async def terminal_input(sid, data):
     """Handle input from client to terminal."""
     try:
