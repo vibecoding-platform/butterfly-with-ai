@@ -288,12 +288,12 @@ const initializeActiveTerminal = () => {
     // Setup terminal event handlers
     setupTerminalEventHandlers()
 
+    // Setup shell output handler after terminal is initialized
+    setupShellOutputHandler()
+
     // Setup keyboard and resize handlers
     keyboardCleanup.value = setupKeyboardHandlers()
     resizeCleanup.value = setupResizeHandler()
-
-    // Setup shell output handler after terminal is initialized
-    setupShellOutputHandler()
 
     // Handle inventory terminal auto-command execution
     if (activeTab.value.subType === 'inventory' && activeTab.value.serverContext) {
@@ -422,9 +422,6 @@ const setupShellOutputHandler = () => {
     }
   })
 }
-
-const setupTerminalEventHandlers = () => {
-  if (!terminal.value) return
 
   terminal.value.onKey((e) => {
     const ev = e.domEvent
