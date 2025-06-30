@@ -28,9 +28,9 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.staticfiles import StaticFiles
 
-from aetherterm.agentserver.api.inventory_api import inventory_router
-from aetherterm.agentserver.api.log_processing_api import router as log_processing_router
-from aetherterm.agentserver.containers import ApplicationContainer
+from aetherterm.agentserver.interfaces.api.inventory_api import inventory_router
+from aetherterm.agentserver.interfaces.api.log_processing_api import router as log_processing_router
+from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
 
 # Initialize FastAPI router
 router = APIRouter()
@@ -40,11 +40,6 @@ router.include_router(inventory_router)
 
 # Include log processing API routes
 router.include_router(log_processing_router)
-
-# Include JupyterHub management API routes
-from aetherterm.agentserver.jupyterhub_management import router as jupyterhub_router
-
-router.include_router(jupyterhub_router)
 
 log = logging.getLogger("aetherterm.routes")
 

@@ -10,10 +10,12 @@ from dependency_injector import containers, providers
 from aetherterm.agentserver.application.services.workspace_service import WorkspaceService
 from aetherterm.agentserver.application.services.agent_service import AgentService
 from aetherterm.agentserver.application.services.report_service import ReportService
+from aetherterm.agentserver.application.services.context_service import ContextService
 from aetherterm.agentserver.infrastructure.external.ai_service import AIService
 from aetherterm.agentserver.infrastructure.external.security_service import SecurityService
 from aetherterm.agentserver.infrastructure.persistence.memory_store import MemoryStore
 from aetherterm.agentserver.infrastructure.config.ssl_config import SSLConfig
+from aetherterm.agentserver.infrastructure.logging.log_analyzer import LogAnalyzer
 
 
 class InfrastructureContainer(containers.DeclarativeContainer):
@@ -37,6 +39,9 @@ class InfrastructureContainer(containers.DeclarativeContainer):
     
     # SSL Configuration
     ssl_config = providers.Singleton(SSLConfig)
+    
+    # Log Analyzer
+    log_analyzer = providers.Singleton(LogAnalyzer)
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
@@ -55,6 +60,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
     
     # Report Service
     report_service = providers.Singleton(ReportService)
+    
+    # Context Service
+    context_service = providers.Singleton(ContextService)
 
 
 class MainContainer(containers.DeclarativeContainer):

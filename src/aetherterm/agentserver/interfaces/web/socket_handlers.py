@@ -5,14 +5,9 @@ from uuid import uuid4
 
 from dependency_injector.wiring import Provide, inject
 
-from aetherterm.agentserver.infrastructure.config import utils
-
 # Clean Architecture imports
 from aetherterm.agentserver.domain.entities.terminals.asyncio_terminal import AsyncioTerminal
-from aetherterm.agentserver.infrastructure import set_socket_io_instance
-from aetherterm.agentserver.log_analyzer import SeverityLevel, get_log_analyzer
-from aetherterm.agentserver.utils import User
-from aetherterm.core.container import ApplicationContainer, DIContainer
+from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
 
 log = logging.getLogger("aetherterm.socket_handlers")
 
@@ -23,18 +18,8 @@ log_processing_manager = None
 
 def set_sio_instance(sio):
     """Set the global socket.io server instance."""
-    global sio_instance, log_processing_manager
+    global sio_instance
     sio_instance = sio
-
-    # Get log manager directly from DI container
-    try:
-        log_processing_manager = DIContainer.get_log_processing_manager()
-    except Exception as e:
-        log.warning(f"Failed to get log processing manager: {e}")
-        log_processing_manager = None
-
-    # Set Socket.IO instance for infrastructure services
-    set_socket_io_instance(sio)
     log.info("Socket.IO instance configured")
 
 

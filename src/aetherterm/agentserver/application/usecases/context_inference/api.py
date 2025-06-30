@@ -8,21 +8,20 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Depends
 from pydantic import BaseModel, Field
+from dependency_injector.wiring import inject, Provide
 
 from .inference_engine import OperationContextInferenceEngine
 from .models import OperationContext
 from .pattern_learner import OperationPatternLearner
+from ...services.context_service import ContextService
+from ...infrastructure.config.di_container import MainContainer
 
 logger = logging.getLogger(__name__)
 
 # API Router
 router = APIRouter(prefix="/api/context", tags=["Operation Context"])
-
-# Global instances (initialized at startup)
-inference_engine: Optional[OperationContextInferenceEngine] = None
-pattern_learner: Optional[OperationPatternLearner] = None
 
 
 # Pydantic Models for API
@@ -74,17 +73,17 @@ class PatternLearningResponse(BaseModel):
 
 
 @router.get("/infer/{terminal_id}", response_model=InferenceResultResponse)
+@inject
 async def infer_operation_context(
     terminal_id: str = Path(description="Terminal ID to analyze"),
+    context_service: ContextService = Provide[MainContainer.application.context_service]
 ) -> InferenceResultResponse:
     """
     指定ターミナルの現在のオペレーションコンテキストを推定
     """
-    if not inference_engine:
-        raise HTTPException(status_code=503, detail="Context inference engine not initialized")
-
     try:
-        result = await inference_engine.infer_current_operation(terminal_id)
+        # Use injected context service instead of global variable
+        result = await context_service.get_session_analytics(terminal_id)
 
         return InferenceResultResponse(
             terminal_id=result.terminal_id,
