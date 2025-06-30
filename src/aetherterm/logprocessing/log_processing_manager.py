@@ -20,6 +20,24 @@ from .terminal_log_capture import TerminalLogCapture
 logger = logging.getLogger(__name__)
 
 
+def get_log_processing_manager() -> 'LogProcessingManager':
+    """
+    ログ処理マネージャーのインスタンスを取得
+    
+    Note: This is a compatibility function. In a proper DI setup,
+    this should be obtained from the container.
+    """
+    from ..core.container import DIContainer
+    try:
+        return DIContainer.get_log_processing_manager()
+    except Exception as e:
+        logger.warning(f"Failed to get log processing manager from DI container: {e}")
+        # Create a default instance as fallback
+        from ..langchain.config.storage_config import StorageConfig
+        default_config = StorageConfig()
+        return LogProcessingManager(default_config)
+
+
 class LogProcessingManager:
     """ログ処理統合マネージャークラス"""
 

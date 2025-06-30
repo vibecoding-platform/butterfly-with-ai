@@ -10,6 +10,7 @@ from dependency_injector.wiring import Provide, inject
 
 from ..logprocessing.log_processing_manager import LogProcessingManager
 from ..common.interfaces import ILogProcessor, IAgentManager, ITerminalController
+from ..langchain.config.storage_config import StorageConfig
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
@@ -24,9 +25,13 @@ class ApplicationContainer(containers.DeclarativeContainer):
     config.pam_profile.from_value("login")
     config.uri_root_path.from_value("")
 
+    # Storage configuration
+    storage_config = providers.Singleton(StorageConfig)
+    
     # Core Services - interface-based dependency injection
     log_processing_manager = providers.Singleton(
         LogProcessingManager,
+        storage_config=storage_config,
     )
 
     # インターフェースベースの依存関係
