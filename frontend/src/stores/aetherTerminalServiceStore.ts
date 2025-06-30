@@ -444,6 +444,31 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     }
   }
 
+  // Terminal output callback management
+  const terminalOutputCallbacks = ref<Map<string, Array<(data: string) => void>>>(new Map())
+
+  const addTerminalOutputCallback = (sessionId: string, callback: (data: string) => void) => {
+    if (!terminalOutputCallbacks.value.has(sessionId)) {
+      terminalOutputCallbacks.value.set(sessionId, [])
+    }
+    terminalOutputCallbacks.value.get(sessionId)?.push(callback)
+    console.log('📺 STORE: Added terminal output callback for session:', sessionId)
+  }
+
+  const removeTerminalOutputCallback = (sessionId: string, callback: (data: string) => void) => {
+    const callbacks = terminalOutputCallbacks.value.get(sessionId)
+    if (callbacks) {
+      const index = callbacks.indexOf(callback)
+      if (index !== -1) {
+        callbacks.splice(index, 1)
+        console.log('🗑️ STORE: Removed terminal output callback for session:', sessionId)
+      }
+      if (callbacks.length === 0) {
+        terminalOutputCallbacks.value.delete(sessionId)
+      }
+    }
+  }
+
   // Ask AI Event Handling
   const onAskAI = (callback: (text: string) => void) => {
     eventCallbacks.value.onAskAI.push(callback)
@@ -676,5 +701,7 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
     sendResize,
     addToOutput,
     setSocket,
+    addTerminalOutputCallback,
+    removeTerminalOutputCallback,
   }
 })

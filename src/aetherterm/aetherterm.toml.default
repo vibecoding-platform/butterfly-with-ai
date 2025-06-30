@@ -51,9 +51,9 @@ timeout = 3600                       # Session timeout in seconds
 auto_cleanup = true                  # Automatically cleanup terminated sessions
 hierarchy_display = true             # Show sessions in hierarchical tree view
 
-[ai.agent_shell]
-# AI Agent Shell Integration
-enabled = true                       # Enable AgentShell integration
+[ai.agents]
+# AI Agent Integration
+enabled = true                       # Enable agent integration
 max_concurrent_agents = 3            # Maximum concurrent agent processes
 execution_timeout = 1800             # Agent execution timeout in seconds
 command_monitoring = true            # Monitor agent command execution

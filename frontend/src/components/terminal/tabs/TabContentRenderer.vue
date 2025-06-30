@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import { type TerminalTab } from '../../../stores/terminalTabStore'
-import TerminalTabComponent from '../TerminalTab.vue'
+import TerminalTabComponent from '../AetherTerminalComponent.vue'
 import AIAgentTab from '../AIAgentTab.vue'
 import LogMonitorTab from '../LogMonitorTab.vue'
 

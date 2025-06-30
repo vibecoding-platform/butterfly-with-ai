@@ -99,7 +99,7 @@
       <v-card>
         <v-card-title>Pane Information</v-card-title>
         <v-card-text>
-          <v-table density="compact">
+          <table class="info-table">
             <tbody>
               <tr>
                 <td><strong>ID:</strong></td>
@@ -134,12 +134,12 @@
                 <td>{{ formatDate(pane.lastActivity) }}</td>
               </tr>
             </tbody>
-          </v-table>
+          </table>
         </v-card-text>
-        <v-card-actions>
-          <v-spacer />
+        <div class="dialog-actions">
+          <div class="spacer" />
           <v-btn @click="showInfoDialog = false">Close</v-btn>
-        </v-card-actions>
+        </div>
       </v-card>
     </v-dialog>
   </div>
@@ -335,16 +335,34 @@ const formatDate = (date: Date): string => {
   gap: $spacing-xs;
 }
 
-:deep(.v-table) {
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
   background-color: transparent;
   
   tbody tr td {
-    padding: 4px 8px;
+    padding: 8px 12px;
     font-size: $font-size-sm;
+    border-bottom: 1px solid var(--color-border-primary);
+    vertical-align: top;
     
     &:first-child {
       width: 40%;
+      text-align: right;
+      padding-right: 16px;
+      font-weight: $font-weight-medium;
     }
+  }
+}
+
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border-primary);
+  
+  .spacer {
+    flex: 1;
   }
 }
 </style>

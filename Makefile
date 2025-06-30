@@ -25,11 +25,6 @@ AGENTSERVER_ARGS ?= --host=localhost --port=57575 --unsecure --debug
 run-agentserver:
 	uv run aetherterm-agentserver $(AGENTSERVER_ARGS)
 
-# AgentShell (AI Terminal Wrapper)
-AGENTSHELL_ARGS ?=
-run-agentshell:
-	uv run aetherterm-agentshell $(AGENTSHELL_ARGS)
-
 # ControlServer (Central Management)
 CONTROLSERVER_ARGS ?= --port=8765
 run-controlserver:

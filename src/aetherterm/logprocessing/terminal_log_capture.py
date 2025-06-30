@@ -36,13 +36,13 @@ class TerminalLogCapture:
         self.redis_log_key_prefix = "terminal_logs"
         self.redis_session_key_prefix = "terminal_sessions"
         self.log_ttl = 3600  # 1時間でTTL
-        
+
         # Pub/Sub チャンネル設定
         self.pub_channels = {
             "input": "terminal:input:{}",
-            "output": "terminal:output:{}", 
+            "output": "terminal:output:{}",
             "error": "terminal:error:{}",
-            "system": "system:events"
+            "system": "system:events",
         }
 
     async def initialize(self) -> None:
@@ -155,82 +155,81 @@ class TerminalLogCapture:
 
         except Exception as e:
             self._logger.error(f"Failed to handle terminal output for {terminal_id}: {e}")
-    
+
     def _classify_terminal_data(self, data: str) -> tuple[str, dict]:
         """
         ターミナルデータを入力/出力/エラーに分類
-        
+
         Returns:
             (data_type, processed_data)
         """
-        lines = data.strip().split('\n')
-        
+        lines = data.strip().split("\n")
+
         for line in lines:
             line = line.strip()
-            
+
             # ユーザー入力検出（プロンプト付き）
-            if line.startswith('$ ') or line.startswith('# ') or line.endswith('$ '):
-                command = line.replace('$ ', '').replace('# ', '').replace('$ ', '')
+            if line.startswith("$ ") or line.startswith("# ") or line.endswith("$ "):
+                command = line.replace("$ ", "").replace("# ", "").replace("$ ", "")
                 return "input", {
                     "command": command,
                     "command_type": self._classify_command(command),
-                    "prompt_type": "user" if line.startswith('$ ') else "root"
+                    "prompt_type": "user" if line.startswith("$ ") else "root",
                 }
-            
+
             # エラー出力検出
-            if any(keyword in line.lower() for keyword in ['error', 'failed', 'exception', 'traceback']):
+            if any(
+                keyword in line.lower() for keyword in ["error", "failed", "exception", "traceback"]
+            ):
                 return "error", {
                     "error_type": self._classify_error(line),
-                    "severity": self._get_error_severity(line)
+                    "severity": self._get_error_severity(line),
                 }
-        
+
         # デフォルトは出力
-        return "output", {
-            "output_type": "stdout",
-            "has_ansi": '\x1b[' in data
-        }
-    
+        return "output", {"output_type": "stdout", "has_ansi": "\x1b[" in data}
+
     def _classify_command(self, command: str) -> str:
         """コマンド分類"""
-        if command.startswith('git'):
+        if command.startswith("git"):
             return "git"
-        elif command.startswith(('npm', 'yarn', 'pnpm')):
+        elif command.startswith(("npm", "yarn", "pnpm")):
             return "package_manager"
-        elif command.startswith(('docker', 'kubectl')):
+        elif command.startswith(("docker", "kubectl")):
             return "container"
-        elif command.startswith('sudo'):
+        elif command.startswith("sudo"):
             return "system"
         return "general"
-    
+
     def _classify_error(self, error_line: str) -> str:
         """エラー分類"""
-        if 'permission' in error_line.lower():
+        if "permission" in error_line.lower():
             return "permission"
-        elif 'not found' in error_line.lower():
+        elif "not found" in error_line.lower():
             return "not_found"
-        elif 'connection' in error_line.lower():
+        elif "connection" in error_line.lower():
             return "network"
         return "general"
-    
+
     def _get_error_severity(self, error_line: str) -> str:
         """エラー重要度"""
-        if 'fatal' in error_line.lower() or 'critical' in error_line.lower():
+        if "fatal" in error_line.lower() or "critical" in error_line.lower():
             return "critical"
-        elif 'error' in error_line.lower():
+        elif "error" in error_line.lower():
             return "error"
-        elif 'warning' in error_line.lower():
+        elif "warning" in error_line.lower():
             return "warning"
         return "info"
-    
+
     async def _publish_to_channel(self, terminal_id: str, data_type: str, log_entry: dict) -> bool:
         """
         Pub/Subチャンネルにリアルタイム配信
-        
+
         Args:
             terminal_id: ターミナルID
             data_type: データタイプ (input/output/error)
             log_entry: ログエントリ
-            
+
         Returns:
             bool: 配信成功フラグ
         """
@@ -242,32 +241,36 @@ class TerminalLogCapture:
                 channel = self.pub_channels["input"].format(terminal_id)
             else:
                 channel = self.pub_channels["output"].format(terminal_id)
-            
+
             # 配信メッセージ作成
             message = {
                 "type": "terminal_log",
                 "terminal_id": terminal_id,
                 "data_type": data_type,
                 "timestamp": log_entry["timestamp"],
-                "data": log_entry
+                "data": log_entry,
             }
-            
+
             # Redis Pub/Sub配信
             subscriber_count = await self.redis_storage.publish(channel, json.dumps(message))
-            
+
             # システムイベントチャンネルにも配信（エラーの場合）
             if data_type == "error":
                 system_message = {
                     "type": "error_detected",
                     "terminal_id": terminal_id,
                     "timestamp": log_entry["timestamp"],
-                    "severity": log_entry["processed_data"].get("severity", "unknown")
+                    "severity": log_entry["processed_data"].get("severity", "unknown"),
                 }
-                await self.redis_storage.publish(self.pub_channels["system"], json.dumps(system_message))
-            
-            self._logger.debug(f"Published to channel {channel}: {data_type} ({subscriber_count} subscribers)")
+                await self.redis_storage.publish(
+                    self.pub_channels["system"], json.dumps(system_message)
+                )
+
+            self._logger.debug(
+                f"Published to channel {channel}: {data_type} ({subscriber_count} subscribers)"
+            )
             return True
-            
+
         except Exception as e:
             self._logger.error(f"Failed to publish to channel: {e}")
             return False

@@ -18,7 +18,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     # Configuration
     config = providers.Configuration()
-    
+
     # Default configuration values
     config.motd.from_value("Welcome to AetherTerm")
     config.login.from_value(False)
@@ -27,7 +27,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     # Storage configuration
     storage_config = providers.Singleton(StorageConfig)
-    
+
     # Core Services - interface-based dependency injection
     log_processing_manager = providers.Singleton(
         LogProcessingManager,
@@ -59,16 +59,15 @@ class DIContainer:
     @inject
     def get_log_processing_manager(
         cls,
-        log_manager: LogProcessingManager = Provide[ApplicationContainer.log_processing_manager]
+        log_manager: LogProcessingManager = Provide[ApplicationContainer.log_processing_manager],
     ) -> LogProcessingManager:
         """LogProcessingManagerを取得"""
         return log_manager
 
     @classmethod
-    @inject  
+    @inject
     def get_log_processor(
-        cls,
-        processor: ILogProcessor = Provide[ApplicationContainer.log_processor]
+        cls, processor: ILogProcessor = Provide[ApplicationContainer.log_processor]
     ) -> ILogProcessor:
         """LogProcessorインターフェースを取得"""
         return processor

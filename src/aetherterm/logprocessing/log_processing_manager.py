@@ -20,20 +20,22 @@ from .terminal_log_capture import TerminalLogCapture
 logger = logging.getLogger(__name__)
 
 
-def get_log_processing_manager() -> 'LogProcessingManager':
+def get_log_processing_manager() -> "LogProcessingManager":
     """
     ログ処理マネージャーのインスタンスを取得
-    
+
     Note: This is a compatibility function. In a proper DI setup,
     this should be obtained from the container.
     """
     from ..core.container import DIContainer
+
     try:
         return DIContainer.get_log_processing_manager()
     except Exception as e:
         logger.warning(f"Failed to get log processing manager from DI container: {e}")
         # Create a default instance as fallback
         from ..langchain.config.storage_config import StorageConfig
+
         default_config = StorageConfig()
         return LogProcessingManager(default_config)
 
@@ -245,6 +247,48 @@ class LogProcessingManager:
         except Exception as e:
             self._logger.error(f"Failed to search patterns: {e}")
             return []
+
+    def initialize_terminal_capture(self, session_id: str) -> bool:
+        """
+        ターミナルキャプチャの初期化
+
+        Args:
+            session_id: セッションID
+
+        Returns:
+            bool: 初期化成功かどうか
+        """
+        try:
+            if not self.terminal_capture:
+                self._logger.error("Terminal capture not initialized")
+                return False
+
+            # セッションを追跡用に登録
+            self._logger.info(f"Initializing terminal capture for session: {session_id}")
+            return True
+
+        except Exception as e:
+            self._logger.error(f"Failed to initialize terminal capture for {session_id}: {e}")
+            return False
+
+    def capture_terminal_output(self, session_id: str, data: str) -> None:
+        """
+        ターミナル出力をキャプチャ
+
+        Args:
+            session_id: セッションID
+            data: ターミナル出力データ
+        """
+        try:
+            if not self.terminal_capture:
+                self._logger.warning("Terminal capture not initialized, skipping output capture")
+                return
+
+            # 非同期でキャプチャ処理を実行
+            asyncio.create_task(self.terminal_capture.capture_output(session_id, data))
+
+        except Exception as e:
+            self._logger.error(f"Failed to capture terminal output for {session_id}: {e}")
 
     async def get_terminal_summary(self, terminal_id: str) -> Dict:
         """指定ターミナルの包括的サマリーを取得"""

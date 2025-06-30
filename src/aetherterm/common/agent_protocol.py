@@ -1,7 +1,7 @@
 """
 エージェント間通信プロトコル
 
-AgentShell、AgentServer、OpenHands間の通信プロトコルを定義します。
+AgentServer、OpenHands間の通信プロトコルを定義します。
 """
 
 from dataclasses import dataclass, field

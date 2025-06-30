@@ -326,125 +326,125 @@ class RedisStorageAdapter(BaseStorageAdapter, CacheStorageAdapter):
         except Exception as e:
             self._logger.error(f"キャッシュ存在チェックエラー: {e}")
             return False
-    
+
     # Pub/Sub 機能追加
-    
+
     async def publish(self, channel: str, message: str) -> int:
         """
         Redis Pub/Subチャンネルにメッセージを配信
-        
+
         Args:
             channel: チャンネル名
             message: 配信メッセージ
-            
+
         Returns:
             int: メッセージを受信したクライアント数
         """
         if not self._redis:
             await self.connect()
-            
+
         try:
             result = await self._redis.publish(channel, message)
             self._logger.debug(f"Published message to {channel}: {result} subscribers")
             return result
-            
+
         except Exception as e:
             self._logger.error(f"Pub/Sub配信エラー: {e}")
             return 0
-    
+
     async def subscribe_with_pattern(self, patterns: List[str], callback) -> None:
         """
         パターンマッチでチャンネルをサブスクライブ
-        
+
         Args:
             patterns: チャンネルパターンのリスト
             callback: メッセージ受信時のコールバック
         """
         if not self._redis:
             await self.connect()
-            
+
         try:
             pubsub = self._redis.pubsub()
-            
+
             # パターンでサブスクライブ
             for pattern in patterns:
                 await pubsub.psubscribe(pattern)
-                
+
             self._logger.info(f"Subscribed to patterns: {patterns}")
-            
+
             # メッセージを非同期で処理
             async for message in pubsub.listen():
-                if message['type'] == 'pmessage':
-                    channel = message['channel'].decode('utf-8')
-                    data = message['data'].decode('utf-8')
+                if message["type"] == "pmessage":
+                    channel = message["channel"].decode("utf-8")
+                    data = message["data"].decode("utf-8")
                     await callback(channel, data)
-                    
+
         except Exception as e:
             self._logger.error(f"Pub/Subサブスクライブエラー: {e}")
             raise
-    
+
     async def scan_keys(self, pattern: str) -> List[str]:
         """
         パターンにマッチするキーをスキャン
-        
+
         Args:
             pattern: キーパターン
-            
+
         Returns:
             List[str]: マッチしたキーのリスト
         """
         if not self._redis:
             await self.connect()
-            
+
         try:
             keys = []
             async for key in self._redis.scan_iter(match=pattern):
-                keys.append(key.decode('utf-8') if isinstance(key, bytes) else key)
+                keys.append(key.decode("utf-8") if isinstance(key, bytes) else key)
             return keys
-            
+
         except Exception as e:
             self._logger.error(f"キースキャンエラー: {e}")
             return []
-    
+
     async def list_push(self, key: str, value: str) -> int:
         """リストに値を追加"""
         if not self._redis:
             await self.connect()
-            
+
         try:
             return await self._redis.lpush(key, value)
         except Exception as e:
             self._logger.error(f"リスト追加エラー: {e}")
             return 0
-    
+
     async def list_range(self, key: str, start: int, end: int) -> List[str]:
         """リストから範囲を取得"""
         if not self._redis:
             await self.connect()
-            
+
         try:
             result = await self._redis.lrange(key, start, end)
-            return [item.decode('utf-8') if isinstance(item, bytes) else item for item in result]
+            return [item.decode("utf-8") if isinstance(item, bytes) else item for item in result]
         except Exception as e:
             self._logger.error(f"リスト範囲取得エラー: {e}")
             return []
-    
+
     async def list_remove(self, key: str, value: str) -> int:
         """リストから値を削除"""
         if not self._redis:
             await self.connect()
-            
+
         try:
             return await self._redis.lrem(key, 1, value)
         except Exception as e:
             self._logger.error(f"リスト削除エラー: {e}")
             return 0
-    
+
     async def expire(self, key: str, seconds: int) -> bool:
         """キーにTTLを設定"""
         if not self._redis:
             await self.connect()
-            
+
         try:
             return await self._redis.expire(key, seconds)
         except Exception as e:

@@ -107,67 +107,62 @@ class LogProcessor:
         try:
             # Pub/Subサブスクライバー開始
             subscriber_task = asyncio.create_task(self._start_pubsub_subscriber())
-            
+
             # フォールバックポーリングも継続（未処理ログのため）
             polling_task = asyncio.create_task(self._fallback_polling(check_interval))
-            
+
             # 両方のタスクを並行実行
             await asyncio.gather(subscriber_task, polling_task, return_exceptions=True)
-            
+
         except Exception as e:
             self._logger.error(f"Log processing error: {e}")
         finally:
             self._running = False
             self._logger.info("Log processing stopped")
-    
+
     async def _start_pubsub_subscriber(self) -> None:
         """
         Redis Pub/Subサブスクライバーを開始
         """
-        channels = [
-            "terminal:input:*",
-            "terminal:output:*", 
-            "terminal:error:*",
-            "system:events"
-        ]
-        
+        channels = ["terminal:input:*", "terminal:output:*", "terminal:error:*", "system:events"]
+
         try:
             await self.redis_storage.subscribe_with_pattern(
-                patterns=channels,
-                callback=self._handle_pubsub_message
+                patterns=channels, callback=self._handle_pubsub_message
             )
         except Exception as e:
             self._logger.error(f"Pub/Sub subscriber error: {e}")
-    
+
     async def _handle_pubsub_message(self, channel: str, message: str) -> None:
         """
         Pub/Subメッセージハンドラー
-        
+
         Args:
             channel: チャンネル名
             message: メッセージ内容
         """
         try:
             import json
+
             data = json.loads(message)
-            
+
             if data.get("type") == "terminal_log":
                 # ターミナルログを即座に処理
                 log_entry = data.get("data", {})
                 structured_logs = await self._structure_log_entry(log_entry)
-                
+
                 for structured_log in structured_logs:
                     await self._save_structured_log(structured_log)
-                
+
                 self._logger.debug(f"Processed realtime log from {channel}")
-                
+
             elif data.get("type") == "error_detected":
                 # エラーアラート処理
                 await self._handle_error_alert(data)
-                
+
         except Exception as e:
             self._logger.error(f"Failed to handle pub/sub message: {e}")
-    
+
     async def _fallback_polling(self, interval: int) -> None:
         """
         フォールバックポーリング（未処理ログのため）
@@ -180,14 +175,14 @@ class LogProcessor:
             except Exception as e:
                 self._logger.error(f"Fallback polling error: {e}")
                 await asyncio.sleep(interval)
-    
+
     async def _handle_error_alert(self, error_data: dict) -> None:
         """
         エラーアラートを処理
         """
         severity = error_data.get("severity", "unknown")
         terminal_id = error_data.get("terminal_id")
-        
+
         if severity in ["critical", "error"]:
             self._logger.warning(
                 f"High severity error detected on terminal {terminal_id}: {severity}"
@@ -213,7 +208,7 @@ class LogProcessor:
                 terminal_id = terminal_key.split(":")[-1]
                 count = await self._process_terminal_logs(terminal_id)
                 processed_count += count
-                
+
             self._logger.info(f"Force processed {processed_count} missed logs")
 
         except Exception as e:
@@ -248,8 +243,10 @@ class LogProcessor:
                 await self.redis_storage.list_remove(list_key, log_key)
 
             if processed_count > 0:
-                self._logger.info(f"Force processed {processed_count} logs for terminal {terminal_id}")
-                
+                self._logger.info(
+                    f"Force processed {processed_count} logs for terminal {terminal_id}"
+                )
+
             return processed_count
 
         except Exception as e:

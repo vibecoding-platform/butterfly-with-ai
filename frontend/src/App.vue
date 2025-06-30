@@ -7,13 +7,17 @@
   import TerminalComponent from './components/TerminalComponent.vue'
   import DevJWTRegister from './components/DevJWTRegister.vue'
   import ServerInventoryPanel from './components/ServerInventoryPanel.vue'
+  import ThemeSelector from './components/ThemeSelector.vue'
+  import ThemeToggle from './components/ThemeToggle.vue'
   import { useChatStore } from './stores/chatStore'
   import { useAetherTerminalServiceStore } from './stores/aetherTerminalServiceStore'
+  import { useTheme } from './composables/useTheme'
   import { enableJWTDevRegister } from './config/environment'
 
   const chatStore = useChatStore()
   const terminalStore = useAetherTerminalServiceStore()
-  const activeTab = ref('chat') // 'chat', 'inventory', 'supervisor', or 'debug'
+  const { initialize: initializeTheme } = useTheme()
+  const activeTab = ref('chat') // 'chat', 'inventory', 'supervisor', 'theme', or 'debug'
   const isSupervisorPanelFloating = ref(false)
   const isSupervisorPanelVisible = ref(false)
 
@@ -151,9 +155,12 @@
   }
 
   // 初期化時に保存された設定を読み込み
-  onMounted(() => {
+  onMounted(async () => {
     loadPanelWidth()
     loadPanelVisibility()
+
+    // Initialize theme system
+    await initializeTheme()
 
     // Listen for Ask AI events from Spine and auto-show side panel
     terminalStore.onAskAI((selectedText: string) => {

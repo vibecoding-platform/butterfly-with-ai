@@ -64,7 +64,7 @@ class CentralController:
 
         # WebSocketサーバー
         self.server = None
-        
+
         # ログサマリ管理
         self.log_summary_manager = LogSummaryManager()
 
@@ -73,7 +73,7 @@ class CentralController:
         logger.info(f"Starting CentralController on {self.host}:{self.port}")
 
         self.server = await websockets.serve(self.handle_connection, self.host, self.port)
-        
+
         # ログサマリ管理開始
         await self.log_summary_manager.start()
 
@@ -83,7 +83,7 @@ class CentralController:
         """中央制御サーバー停止"""
         # ログサマリ管理停止
         await self.log_summary_manager.stop()
-        
+
         if self.server:
             self.server.close()
             await self.server.wait_closed()
@@ -480,52 +480,54 @@ class CentralController:
             # エージェントIDを追加してログサマリマネージャーに送信
             memory_data = data.get("memory", {})
             memory_data["agent_id"] = agent_id
-            
+
             await self.log_summary_manager.receive_short_term_memory(memory_data)
-            
-            logger.debug(f"Received short-term memory from {agent_id}: {memory_data.get('memory_type')}")
-            
+
+            logger.debug(
+                f"Received short-term memory from {agent_id}: {memory_data.get('memory_type')}"
+            )
+
         except Exception as e:
             logger.error(f"Error processing short-term memory from {agent_id}: {e}")
-    
+
     async def send_log_summaries(self, websocket: WebSocketServerProtocol, data: Dict):
         """ログサマリを送信"""
         try:
             limit = data.get("limit", 10)
             summaries = self.log_summary_manager.get_recent_summaries(limit)
-            
+
             response = {
                 "type": "log_summaries",
                 "timestamp": datetime.now().isoformat(),
                 "summaries": summaries,
-                "total_count": len(summaries)
+                "total_count": len(summaries),
             }
-            
+
             await websocket.send(json.dumps(response))
-            
+
         except Exception as e:
             logger.error(f"Error sending log summaries: {e}")
-    
+
     async def send_memory_statistics(self, websocket: WebSocketServerProtocol):
         """メモリ統計を送信"""
         try:
             stats = self.log_summary_manager.get_memory_statistics()
-            
+
             response = {
                 "type": "memory_statistics",
                 "timestamp": datetime.now().isoformat(),
-                "statistics": stats
+                "statistics": stats,
             }
-            
+
             await websocket.send(json.dumps(response))
-            
+
         except Exception as e:
             logger.error(f"Error sending memory statistics: {e}")
 
     def get_status_summary(self) -> Dict:
         """状態サマリーを取得"""
         memory_stats = self.log_summary_manager.get_memory_statistics()
-        
+
         return {
             "agent_servers_count": len(self.agent_servers),
             "admin_clients_count": len(self.admin_clients),

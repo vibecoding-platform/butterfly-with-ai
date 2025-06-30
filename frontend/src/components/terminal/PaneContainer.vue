@@ -32,10 +32,10 @@
           @rename="handleRename"
         />
         <div class="pane-content">
-          <TerminalTab 
-            :tab-id="pane.id" 
+          <AetherTerminalComponent 
+            :id="pane.id" 
+            mode="pane"
             :sub-type="pane.subType"
-            @terminal-initialized="handleTerminalInitialized"
           />
         </div>
         <!-- Resize Handle -->
@@ -62,10 +62,10 @@
           @rename="handleRename"
         />
         <div class="pane-content">
-          <TerminalTab 
-            :tab-id="pane.id" 
+          <AetherTerminalComponent 
+            :id="pane.id" 
+            mode="pane"
             :sub-type="pane.subType"
-            @terminal-initialized="handleTerminalInitialized"
           />
         </div>
         <!-- Resize Handle -->
@@ -97,10 +97,10 @@
           @rename="handleRename"
         />
         <div class="pane-content">
-          <TerminalTab 
-            :tab-id="pane.id" 
+          <AetherTerminalComponent 
+            :id="pane.id" 
+            mode="pane"
             :sub-type="pane.subType"
-            @terminal-initialized="handleTerminalInitialized"
           />
         </div>
       </div>
@@ -111,7 +111,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTerminalPaneStore, type TerminalPane } from '../../stores/terminalPaneStore'
-import TerminalTab from './TerminalTab.vue'
+import AetherTerminalComponent from './AetherTerminalComponent.vue'
 import PaneHeader from './PaneHeader.vue'
 
 interface Props {
