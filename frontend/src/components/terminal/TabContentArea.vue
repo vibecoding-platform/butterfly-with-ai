@@ -292,6 +292,9 @@ const initializeActiveTerminal = () => {
     keyboardCleanup.value = setupKeyboardHandlers()
     resizeCleanup.value = setupResizeHandler()
 
+    // Setup shell output handler after terminal is initialized
+    setupShellOutputHandler()
+
     // Handle inventory terminal auto-command execution
     if (activeTab.value.subType === 'inventory' && activeTab.value.serverContext) {
       console.log('Inventory terminal detected for server:', activeTab.value.serverContext.name)
@@ -373,10 +376,15 @@ const setupTerminalEventHandlers = () => {
   // Watch for session changes
   watch(() => terminalStore.session.id, sessionReadyCheck)
 
+const setupShellOutputHandler = () => {
   // Connect to the socket and receive data
   let motdContent = ''
 
   terminalStore.onShellOutput((data: string) => {
+    console.log('onShellOutput callback triggered with data:', data)
+    console.log('Terminal ref exists:', !!terminal.value)
+    console.log('Terminal element exists:', !!terminalEl.value)
+    
     // Detect MOTD content (contains multiple color sequences and text)
     if (data.includes('\\u001b[34;1m') && data.includes('\\u001b[37;1m') && data.length > 100) {
       motdContent = data
@@ -394,7 +402,12 @@ const setupTerminalEventHandlers = () => {
       }
     }
 
-    terminal.value?.write(data)
+    if (terminal.value) {
+      terminal.value.write(data)
+      console.log('Data written to terminal:', data)
+    } else {
+      console.warn('Terminal not initialized, cannot write data:', data)
+    }
     
     // Check if terminal is ready based on shell prompt or system messages
     if (!terminalReady.value && 
@@ -408,6 +421,10 @@ const setupTerminalEventHandlers = () => {
       }, 100)
     }
   })
+}
+
+const setupTerminalEventHandlers = () => {
+  if (!terminal.value) return
 
   terminal.value.onKey((e) => {
     const ev = e.domEvent
