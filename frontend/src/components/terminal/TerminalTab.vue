@@ -35,15 +35,16 @@ import { useTerminalTabStore } from '../../stores/terminalTabStore'
 
 interface Props {
   tabId: string
-  subType?: 'pure' | 'inventory'
+  subType?: 'pure' | 'inventory' | 'agent' | 'main-agent'
 }
 
 interface Emits {
   (e: 'click'): void
+  (e: 'terminal-initialized', terminal: Terminal): void
 }
 
 const props = defineProps<Props>()
-defineEmits<Emits>()
+const emit = defineEmits<Emits>()
 
 // Terminal instance and addons
 const terminal = ref<Terminal | null>(null)
@@ -156,6 +157,12 @@ const initializeTerminal = async () => {
     connectTerminal()
   }
   console.log('✅ Backend connection initiated')
+  
+  // Emit terminal initialized event
+  if (terminal.value) {
+    emit('terminal-initialized', terminal.value)
+    console.log('📡 Terminal initialized event emitted')
+  }
 }
 
 const setupTerminalEventHandlers = () => {
@@ -235,10 +242,26 @@ onMounted(() => {
 
 onUnmounted(() => {
   console.log('🔴 TerminalTab UNMOUNTED for tab:', props.tabId)
-  if (terminal.value) {
-    console.log('🔧 Disposing terminal instance')
-    terminal.value.dispose()
-    console.log('✅ Terminal disposed')
+  
+  try {
+    // Dispose fitAddon first if it exists and is loaded
+    if (fitAddon.value && terminal.value) {
+      try {
+        fitAddon.value.dispose()
+        console.log('✅ FitAddon disposed')
+      } catch (e) {
+        console.warn('FitAddon disposal warning:', e)
+      }
+    }
+    
+    // Then dispose terminal
+    if (terminal.value) {
+      console.log('🔧 Disposing terminal instance')
+      terminal.value.dispose()
+      console.log('✅ Terminal disposed')
+    }
+  } catch (error) {
+    console.error('Error during terminal cleanup:', error)
   }
 })
 </script>
@@ -313,5 +336,36 @@ onUnmounted(() => {
   border-top: $border-width solid var(--color-border-primary);
   min-height: 300px;
   background-color: var(--color-terminal-bg);
+  overflow: hidden;
+  
+  // Hide xterm.js internal textarea that shouldn't be visible
+  :deep(.xterm-helper-textarea) {
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    z-index: -1 !important;
+  }
+  
+  // Ensure terminal screen is properly displayed
+  :deep(.xterm-screen) {
+    position: relative;
+    z-index: 1;
+  }
+  
+  // Focus handling for terminal
+  :deep(.xterm) {
+    height: 100%;
+    
+    &:focus {
+      outline: none;
+    }
+  }
+  
+  // Make sure viewport fills container
+  :deep(.xterm-viewport) {
+    background-color: transparent;
+  }
 }
 </style>

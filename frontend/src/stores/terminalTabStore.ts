@@ -25,7 +25,7 @@ export interface TerminalTab {
   id: string
   title: string
   type: 'terminal' | 'ai-agent' | 'log-monitor'
-  subType?: 'pure' | 'inventory'
+  subType?: 'pure' | 'inventory' | 'agent' | 'main-agent'
   isActive: boolean
   sessionId?: string
   lastActivity: Date
@@ -33,6 +33,7 @@ export interface TerminalTab {
   serverContext?: ServerContext
   preExecutionCommands?: PreExecutionCommand[]
   commandsExecuted?: boolean
+  order?: number
 }
 
 export const useTerminalTabStore = defineStore('terminalTab', () => {
@@ -175,6 +176,34 @@ export const useTerminalTabStore = defineStore('terminalTab', () => {
     const tab = tabs.value.find(t => t.id === tabId)
     if (tab) {
       tab.sessionId = sessionId
+    }
+  }
+
+  // Create terminal session for AI agents
+  const createTerminalSession = (terminalId: string, subType: string) => {
+    // Create a virtual tab for agent terminals (not displayed in main tab bar)
+    const agentTab: TerminalTab = {
+      id: terminalId,
+      title: `${subType === 'main-agent' ? 'Main Agent' : 'Sub Agent'}`,
+      type: 'terminal',
+      subType: subType as 'pure' | 'inventory' | 'agent' | 'main-agent',
+      status: 'connecting',
+      isActive: false,
+      order: tabs.value.length + 1000, // High order to keep them out of main display
+      sessionId: terminalId,
+      lastActivity: new Date()
+    }
+    
+    tabs.value.push(agentTab)
+    console.log(`Created terminal session: ${terminalId} (${subType})`)
+  }
+
+  // Close terminal session for AI agents
+  const closeTerminalSession = (terminalId: string) => {
+    const index = tabs.value.findIndex(t => t.id === terminalId)
+    if (index > -1) {
+      tabs.value.splice(index, 1)
+      console.log(`Closed terminal session: ${terminalId}`)
     }
   }
 
@@ -413,6 +442,8 @@ export const useTerminalTabStore = defineStore('terminalTab', () => {
     createTab,
     createInventoryTerminal,
     createLogMonitorTab,
+    createTerminalSession,
+    closeTerminalSession,
     closeTab,
     switchToTab,
     switchToLogMonitor,

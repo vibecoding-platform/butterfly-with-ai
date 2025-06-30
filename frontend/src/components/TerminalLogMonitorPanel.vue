@@ -18,6 +18,64 @@
       </div>
     </div>
 
+    <!-- Memory Status -->
+    <div class="monitor-section">
+      <h4>Memory Systems</h4>
+      <div class="memory-status-grid">
+        <div class="memory-card redis-memory" :class="{ 'connected': redisConnected, 'disconnected': !redisConnected }">
+          <div class="memory-header">
+            <v-icon :color="redisConnected ? 'success' : 'error'">
+              {{ redisConnected ? 'mdi-database-check' : 'mdi-database-remove' }}
+            </v-icon>
+            <span class="memory-title">Short-term Memory (Redis)</span>
+          </div>
+          <div class="memory-status">
+            <div class="status-indicator" :class="{ active: redisConnected }">
+              {{ redisConnected ? 'Connected' : 'Disconnected' }}
+            </div>
+            <div class="memory-info" v-if="redisConnected">
+              <div class="info-item">
+                <span>Used Memory:</span>
+                <span>{{ redisStats.used_memory || 'N/A' }}</span>
+              </div>
+              <div class="info-item">
+                <span>Keys:</span>
+                <span>{{ redisStats.total_keys || 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="memory-card controlserver-memory" :class="{ 'connected': controlServerConnected, 'disconnected': !controlServerConnected }">
+          <div class="memory-header">
+            <v-icon :color="controlServerConnected ? 'success' : 'warning'">
+              {{ controlServerConnected ? 'mdi-server-network' : 'mdi-server-network-off' }}
+            </v-icon>
+            <span class="memory-title">Long-term Memory (ControlServer)</span>
+          </div>
+          <div class="memory-status">
+            <div class="status-indicator" :class="{ active: controlServerConnected }">
+              {{ controlServerConnected ? 'Connected' : 'Unavailable' }}
+            </div>
+            <div class="memory-info" v-if="controlServerConnected">
+              <div class="info-item">
+                <span>Vector Store:</span>
+                <span>{{ controlServerStats.vector_documents || 0 }} docs</span>
+              </div>
+              <div class="info-item">
+                <span>Summaries:</span>
+                <span>{{ controlServerStats.log_summaries || 0 }}</span>
+              </div>
+            </div>
+            <div class="memory-warning" v-else>
+              <v-icon color="warning" size="small">mdi-alert</v-icon>
+              <span>Limited functionality without ControlServer</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- System Overview -->
     <div class="monitor-section">
       <h4>System Overview</h4>
@@ -660,6 +718,12 @@ const topMatchingPatterns = ref([])
 const topErrorPatterns = ref([])
 const topCommandPatterns = ref([])
 const errorPatternStats = ref({})
+
+// Memory system status
+const redisConnected = ref(false)
+const controlServerConnected = ref(false)
+const redisStats = ref({})
+const controlServerStats = ref({})
 
 // Auto refresh interval
 let refreshInterval = null
