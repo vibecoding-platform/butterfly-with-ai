@@ -354,6 +354,118 @@ async def create_terminal(
         await sio_instance.emit("terminal_error", {"error": str(e)}, room=sid)
 
 
+async def resume_workspace(sid, data):
+    """Handle resuming an entire workspace with multiple tabs and sessions."""
+    try:
+        workspace_id = data.get("workspaceId")
+        tabs = data.get("tabs", [])
+        
+        log.info(f"Resume workspace request for workspace {workspace_id} with {len(tabs)} tabs from client {sid}")
+        
+        if not workspace_id:
+            log.warning("Resume workspace request without workspaceId")
+            await sio_instance.emit("workspace_error", {"error": "workspaceId required for workspace resume"}, room=sid)
+            return
+        
+        # Process each tab in the workspace
+        resumed_tabs = []
+        created_tabs = []
+        
+        for tab_data in tabs:
+            tab_id = tab_data.get("id")
+            session_id = tab_data.get("sessionId")
+            tab_type = tab_data.get("type", "terminal")
+            sub_type = tab_data.get("subType", "pure")
+            title = tab_data.get("title", "Terminal")
+            
+            if not tab_id:
+                log.warning(f"Tab data missing id, skipping: {tab_data}")
+                continue
+                
+            log.info(f"Processing tab {tab_id} with session {session_id}")
+            
+            # Check if session exists and is active
+            if session_id and session_id in AsyncioTerminal.sessions:
+                existing_terminal = AsyncioTerminal.sessions[session_id]
+                if not existing_terminal.closed:
+                    log.info(f"Resuming existing active terminal session {session_id} for tab {tab_id}")
+                    
+                    # Add this client to the existing terminal's client set
+                    existing_terminal.client_sids.add(sid)
+                    
+                    # Send terminal history to client if available
+                    if existing_terminal.history:
+                        await sio_instance.emit(
+                            "terminal_output",
+                            {"session": session_id, "data": existing_terminal.history},
+                            room=sid,
+                        )
+                    
+                    resumed_tabs.append({
+                        "tabId": tab_id,
+                        "sessionId": session_id,
+                        "status": "resumed",
+                        "type": tab_type,
+                        "subType": sub_type,
+                        "title": title
+                    })
+                    continue
+                else:
+                    log.info(f"Session {session_id} exists but is closed for tab {tab_id}, will create new")
+            else:
+                log.info(f"Session {session_id} not found for tab {tab_id}, will create new")
+            
+            # Session doesn't exist or is closed - create new terminal
+            # Generate new session ID if none provided or if session was closed
+            new_session_id = session_id or f"terminal_{tab_id}_{uuid4().hex[:8]}"
+            
+            log.info(f"Creating new terminal session {new_session_id} for tab {tab_id}")
+            
+            # Create new terminal session
+            await create_terminal(
+                sid,
+                {
+                    "session": new_session_id,
+                    "tabId": tab_id,
+                    "subType": sub_type,
+                    "type": tab_type,
+                    "cols": 80,
+                    "rows": 24,
+                    "user": "",
+                    "path": ""
+                }
+            )
+            
+            created_tabs.append({
+                "tabId": tab_id,
+                "sessionId": new_session_id,
+                "status": "created",
+                "type": tab_type,
+                "subType": sub_type,
+                "title": title
+            })
+        
+        # Send workspace resume response
+        await sio_instance.emit(
+            "workspace_resumed",
+            {
+                "workspaceId": workspace_id,
+                "status": "success",
+                "resumedTabs": resumed_tabs,
+                "createdTabs": created_tabs,
+                "totalTabs": len(tabs),
+                "message": f"Workspace resumed with {len(resumed_tabs)} existing and {len(created_tabs)} new sessions"
+            },
+            room=sid
+        )
+        
+        log.info(f"Workspace {workspace_id} resumed successfully: {len(resumed_tabs)} resumed, {len(created_tabs)} created")
+        
+    except Exception as e:
+        log.error(f"Error resuming workspace: {e}", exc_info=True)
+        await sio_instance.emit("workspace_error", {"error": str(e)}, room=sid)
+
+
 async def resume_terminal(sid, data):
     """Handle resuming an existing terminal session or create new if not found."""
     try:

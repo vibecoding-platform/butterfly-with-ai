@@ -393,6 +393,8 @@ async def start_server(**kwargs):
     sio.on("connect", socket_handlers.connect)
     sio.on("disconnect", socket_handlers.disconnect)
     sio.on("create_terminal", socket_handlers.create_terminal)
+    sio.on("resume_workspace", socket_handlers.resume_workspace)
+    sio.on("resume_terminal", socket_handlers.resume_terminal)
     sio.on("terminal_input", socket_handlers.terminal_input)
     sio.on("terminal_resize", socket_handlers.terminal_resize)
 
@@ -568,6 +570,7 @@ def setup_app(**kwargs):
     sio.on("connect", socket_handlers.connect)
     sio.on("disconnect", socket_handlers.disconnect)
     sio.on("create_terminal", socket_handlers.create_terminal)
+    sio.on("resume_workspace", socket_handlers.resume_workspace)
     sio.on("resume_terminal", socket_handlers.resume_terminal)
     sio.on("terminal_input", socket_handlers.terminal_input)
     sio.on("terminal_resize", socket_handlers.terminal_resize)
