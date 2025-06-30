@@ -132,7 +132,12 @@ const initializeTerminal = async () => {
     scrollOnUserInput: true,
     fastScrollModifier: 'alt',
     fastScrollSensitivity: 5,
-    wordSeparator: ' ()[]{}\'"`.,;'
+    wordSeparator: ' ()[]{}\'"`.,;',
+    // Enhanced screen buffer management
+    windowsMode: false,
+    smoothScrollDuration: 0,
+    minimumContrastRatio: 4.5,
+    logLevel: 'warn'
   })
 
   // Create and attach fit addon
@@ -143,6 +148,20 @@ const initializeTerminal = async () => {
   // Open terminal in the container
   terminal.value.open(terminalEl.value)
   console.log('✅ Terminal opened')
+  
+  // Initialize screen buffer and clear terminal
+  setTimeout(() => {
+    if (terminal.value) {
+      console.log('🔧 Initializing screen buffer...')
+      // Clear the terminal and reset to a clean state
+      terminal.value.clear()
+      // Reset cursor to top-left
+      terminal.value.write('\x1b[H\x1b[2J')
+      // Ensure we're in normal screen buffer (not alternate)
+      terminal.value.write('\x1b[?1049l')
+      console.log('✅ Screen buffer initialized and cleared')
+    }
+  }, 50)
   
   // Fit terminal to container
   setTimeout(() => {
@@ -245,6 +264,13 @@ const connectTerminal = () => {
     const outputCallback = (data: string) => {
       if (terminal.value) {
         console.log('✅ Writing data to terminal via callback:', data.substring(0, 50) + '...')
+        
+        // Check if we need to initialize buffer for first output
+        if (data.includes('Welcome') || data.includes('$') || data.includes('#')) {
+          console.log('🔧 Detected shell prompt, ensuring clean buffer state')
+          resetScreenBuffer()
+        }
+        
         terminal.value.write(data)
       }
     }
@@ -282,6 +308,48 @@ const handleTerminalClick = () => {
   emit('click')
 }
 
+// Buffer management functions
+const clearScreenBuffer = () => {
+  if (terminal.value) {
+    console.log('🔧 Clearing screen buffer...')
+    // Clear terminal content
+    terminal.value.clear()
+    // Send clear screen escape sequence
+    terminal.value.write('\x1b[H\x1b[2J')
+    // Reset scroll position
+    terminal.value.scrollToTop()
+    console.log('✅ Screen buffer cleared')
+  }
+}
+
+const resetScreenBuffer = () => {
+  if (terminal.value) {
+    console.log('🔧 Resetting screen buffer...')
+    // Clear current buffer
+    clearScreenBuffer()
+    // Ensure we're in normal screen buffer
+    terminal.value.write('\x1b[?1049l')
+    // Reset all terminal attributes
+    terminal.value.write('\x1b[0m')
+    // Show cursor
+    terminal.value.write('\x1b[?25h')
+    console.log('✅ Screen buffer reset to normal state')
+  }
+}
+
+const refreshTerminalBuffer = () => {
+  if (terminal.value && fitAddon.value) {
+    console.log('🔧 Refreshing terminal buffer...')
+    // Clear and reset
+    resetScreenBuffer()
+    // Refit to ensure proper dimensions
+    fitAddon.value.fit()
+    // Focus terminal
+    terminal.value.focus()
+    console.log('✅ Terminal buffer refreshed')
+  }
+}
+
 // Watch for session changes (only when initializing)
 watch(() => terminalStore.session.id, (newSessionId, oldSessionId) => {
   console.log('🔄 Session ID changed:', {
@@ -299,6 +367,13 @@ watch(() => terminalStore.session.id, (newSessionId, oldSessionId) => {
     const outputCallback = (data: string) => {
       if (terminal.value) {
         console.log('✅ Writing data to terminal via callback:', data.substring(0, 50) + '...')
+        
+        // Check if we need to initialize buffer for first output
+        if (data.includes('Welcome') || data.includes('$') || data.includes('#')) {
+          console.log('🔧 Detected shell prompt, ensuring clean buffer state')
+          resetScreenBuffer()
+        }
+        
         terminal.value.write(data)
       }
     }
@@ -350,6 +425,14 @@ onUnmounted(() => {
   } catch (error) {
     console.error('Error during terminal cleanup:', error)
   }
+})
+
+// Expose buffer management functions for external use
+defineExpose({
+  clearScreenBuffer,
+  resetScreenBuffer,
+  refreshTerminalBuffer,
+  terminal: () => terminal.value
 })
 </script>
 
@@ -439,6 +522,22 @@ onUnmounted(() => {
   :deep(.xterm-screen) {
     position: relative;
     z-index: 1;
+    // Ensure proper rendering of screen buffer
+    overflow: visible;
+    background-color: transparent;
+  }
+  
+  // Enhanced buffer rendering
+  :deep(.xterm-rows) {
+    position: relative;
+    z-index: 2;
+  }
+  
+  // Alternative screen buffer support
+  :deep(.xterm-alt-buffer-on) {
+    .xterm-rows {
+      background-color: var(--color-terminal-bg);
+    }
   }
   
   // Focus handling for terminal
