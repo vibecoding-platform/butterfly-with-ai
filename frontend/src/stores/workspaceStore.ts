@@ -2,13 +2,18 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAetherTerminalServiceStore } from './aetherTerminalServiceStore'
 import { useTerminalTabStore, type TerminalTab } from './terminalTabStore'
+import { useTerminalPaneStore, type TerminalTabWithPanes, type TerminalPane } from './terminalPaneStore'
 
 export interface WorkspaceState {
   id: string
   name: string
   lastAccessed: Date
-  tabs: TerminalTab[]
+  tabs: TerminalTabWithPanes[] // ペーン対応タブ
   isActive: boolean
+  layout: {
+    type: 'tabs' | 'grid' | 'mosaic'
+    configuration?: any
+  }
 }
 
 export const useWorkspaceStore = defineStore('workspace', () => {
@@ -21,6 +26,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   // Store references
   const terminalService = useAetherTerminalServiceStore()
   const terminalTabStore = useTerminalTabStore()
+  const terminalPaneStore = useTerminalPaneStore()
 
   // Getters
   const hasCurrentWorkspace = computed(() => !!currentWorkspace.value)
@@ -34,7 +40,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       name: name || `Workspace ${workspaces.value.length + 1}`,
       lastAccessed: new Date(),
       tabs: [],
-      isActive: true
+      isActive: true,
+      layout: {
+        type: 'tabs'
+      }
     }
 
     workspaces.value.push(workspace)
@@ -65,15 +74,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       return
     }
 
-    // Capture current tabs
-    currentWorkspace.value.tabs = terminalTabStore.activeTabs.map(tab => ({
+    // Capture current tabs with panes
+    currentWorkspace.value.tabs = terminalPaneStore.tabsWithPanes.map(tab => ({
       ...tab,
       lastActivity: new Date()
     }))
     
     currentWorkspace.value.lastAccessed = new Date()
     
-    console.log('📋 WORKSPACE: Saved workspace with', currentWorkspace.value.tabs.length, 'tabs')
+    console.log('📋 WORKSPACE: Saved workspace with', currentWorkspace.value.tabs.length, 'tabs and panes')
   }
 
   const resumeWorkspace = async (workspaceId?: string): Promise<boolean> => {
@@ -112,10 +121,16 @@ export const useWorkspaceStore = defineStore('workspace', () => {
           workspaceId: targetWorkspace!.id,
           tabs: targetWorkspace!.tabs.map(tab => ({
             id: tab.id,
-            sessionId: tab.sessionId,
-            type: tab.type,
-            subType: tab.subType,
-            title: tab.title
+            title: tab.title,
+            layout: tab.layout,
+            panes: tab.panes.map(pane => ({
+              id: pane.id,
+              sessionId: pane.sessionId,
+              type: pane.type,
+              subType: pane.subType,
+              title: pane.title,
+              position: pane.position
+            }))
           }))
         }
 
@@ -134,10 +149,19 @@ export const useWorkspaceStore = defineStore('workspace', () => {
             targetWorkspace!.isActive = true
             targetWorkspace!.lastAccessed = new Date()
 
-            // Update sessions for resumed and created tabs
+            // Update sessions for resumed and created panes
             const allTabResults = (data.resumedTabs || []).concat(data.createdTabs || [])
             allTabResults.forEach((tabResult: any) => {
-              terminalTabStore.setTabSession(tabResult.tabId, tabResult.sessionId)
+              // Handle pane-level session mapping
+              if (tabResult.panes) {
+                tabResult.panes.forEach((paneResult: any) => {
+                  terminalPaneStore.setPaneSession(paneResult.paneId, paneResult.sessionId)
+                })
+              }
+              // Backward compatibility: direct tab session
+              if (tabResult.sessionId) {
+                terminalTabStore.setTabSession(tabResult.tabId, tabResult.sessionId)
+              }
             })
 
             console.log('📋 WORKSPACE: Workspace resumed successfully:', data.message)
@@ -182,11 +206,26 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const createDefaultWorkspace = () => {
     const workspace = createWorkspace('Default Workspace')
     
-    // Create a default terminal tab
-    const defaultTab = terminalTabStore.createTab('terminal', 'Terminal 1', 'pure')
-    workspace.tabs = [defaultTab]
+    // Create a default tab with pane
+    const tabId = `tab-${Date.now()}`
+    const defaultPane = terminalPaneStore.createPane(tabId, 'terminal', 'Terminal 1', 'pure')
     
-    console.log('📋 WORKSPACE: Created default workspace with terminal tab')
+    // Create tab with panes structure
+    const defaultTab = {
+      id: tabId,
+      title: 'Main',
+      isActive: true,
+      panes: [defaultPane],
+      layout: 'single' as const,
+      lastActivity: new Date()
+    }
+    
+    workspace.tabs = [defaultTab]
+    workspace.layout = {
+      type: 'tabs' as const
+    }
+    
+    console.log('📋 WORKSPACE: Created default workspace with pane structure')
   }
 
   const initializeWorkspace = async () => {

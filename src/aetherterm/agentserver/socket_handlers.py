@@ -355,10 +355,10 @@ async def create_terminal(
 
 
 async def resume_workspace(sid, data):
-    """Handle resuming an entire workspace with multiple tabs and sessions."""
+    """Handle resuming an entire workspace with multiple tabs, panes and sessions."""
     try:
         workspace_id = data.get("workspaceId")
-        tabs = data.get("tabs", [])
+        tabs = data.get("tabs", [])  # Each tab can contain multiple panes
         
         log.info(f"Resume workspace request for workspace {workspace_id} with {len(tabs)} tabs from client {sid}")
         
@@ -367,83 +367,122 @@ async def resume_workspace(sid, data):
             await sio_instance.emit("workspace_error", {"error": "workspaceId required for workspace resume"}, room=sid)
             return
         
-        # Process each tab in the workspace
+        # Process each tab with panes in the workspace
         resumed_tabs = []
         created_tabs = []
         
         for tab_data in tabs:
             tab_id = tab_data.get("id")
-            session_id = tab_data.get("sessionId")
-            tab_type = tab_data.get("type", "terminal")
-            sub_type = tab_data.get("subType", "pure")
-            title = tab_data.get("title", "Terminal")
+            tab_title = tab_data.get("title", "Tab")
+            tab_layout = tab_data.get("layout", "single")
+            panes = tab_data.get("panes", [])
             
             if not tab_id:
                 log.warning(f"Tab data missing id, skipping: {tab_data}")
                 continue
                 
-            log.info(f"Processing tab {tab_id} with session {session_id}")
+            log.info(f"Processing tab {tab_id} with {len(panes)} panes")
             
-            # Check if session exists and is active
-            if session_id and session_id in AsyncioTerminal.sessions:
-                existing_terminal = AsyncioTerminal.sessions[session_id]
-                if not existing_terminal.closed:
-                    log.info(f"Resuming existing active terminal session {session_id} for tab {tab_id}")
-                    
-                    # Add this client to the existing terminal's client set
-                    existing_terminal.client_sids.add(sid)
-                    
-                    # Send terminal history to client if available
-                    if existing_terminal.history:
-                        await sio_instance.emit(
-                            "terminal_output",
-                            {"session": session_id, "data": existing_terminal.history},
-                            room=sid,
-                        )
-                    
-                    resumed_tabs.append({
-                        "tabId": tab_id,
-                        "sessionId": session_id,
-                        "status": "resumed",
-                        "type": tab_type,
-                        "subType": sub_type,
-                        "title": title
-                    })
+            # Process each pane in the tab
+            resumed_panes = []
+            created_panes = []
+            
+            for pane_data in panes:
+                pane_id = pane_data.get("id")
+                session_id = pane_data.get("sessionId")
+                pane_type = pane_data.get("type", "terminal")
+                sub_type = pane_data.get("subType", "pure")
+                pane_title = pane_data.get("title", "Terminal")
+                position = pane_data.get("position", {"x": 0, "y": 0, "width": 100, "height": 100})
+                
+                if not pane_id:
+                    log.warning(f"Pane data missing id, skipping: {pane_data}")
                     continue
+                    
+                log.info(f"Processing pane {pane_id} with session {session_id}")
+            
+                # Check if session exists and is active
+                if session_id and session_id in AsyncioTerminal.sessions:
+                    existing_terminal = AsyncioTerminal.sessions[session_id]
+                    if not existing_terminal.closed:
+                        log.info(f"Resuming existing active terminal session {session_id} for pane {pane_id}")
+                        
+                        # Add this client to the existing terminal's client set
+                        existing_terminal.client_sids.add(sid)
+                        
+                        # Send terminal history to client if available
+                        if existing_terminal.history:
+                            await sio_instance.emit(
+                                "terminal_output",
+                                {"session": session_id, "data": existing_terminal.history},
+                                room=sid,
+                            )
+                        
+                        resumed_panes.append({
+                            "paneId": pane_id,
+                            "sessionId": session_id,
+                            "status": "resumed",
+                            "type": pane_type,
+                            "subType": sub_type,
+                            "title": pane_title,
+                            "position": position
+                        })
+                        continue
+                    else:
+                        log.info(f"Session {session_id} exists but is closed for pane {pane_id}, will create new")
                 else:
-                    log.info(f"Session {session_id} exists but is closed for tab {tab_id}, will create new")
-            else:
-                log.info(f"Session {session_id} not found for tab {tab_id}, will create new")
-            
-            # Session doesn't exist or is closed - create new terminal
-            # Generate new session ID if none provided or if session was closed
-            new_session_id = session_id or f"terminal_{tab_id}_{uuid4().hex[:8]}"
-            
-            log.info(f"Creating new terminal session {new_session_id} for tab {tab_id}")
-            
-            # Create new terminal session
-            await create_terminal(
-                sid,
-                {
-                    "session": new_session_id,
-                    "tabId": tab_id,
+                    log.info(f"Session {session_id} not found for pane {pane_id}, will create new")
+                
+                # Session doesn't exist or is closed - create new terminal
+                # Generate new session ID if none provided or if session was closed
+                new_session_id = session_id or f"terminal_{pane_id}_{uuid4().hex[:8]}"
+                
+                log.info(f"Creating new terminal session {new_session_id} for pane {pane_id}")
+                
+                # Create new terminal session
+                await create_terminal(
+                    sid,
+                    {
+                        "session": new_session_id,
+                        "tabId": tab_id,
+                        "paneId": pane_id,
+                        "subType": sub_type,
+                        "type": pane_type,
+                        "cols": 80,
+                        "rows": 24,
+                        "user": "",
+                        "path": ""
+                    }
+                )
+                
+                created_panes.append({
+                    "paneId": pane_id,
+                    "sessionId": new_session_id,
+                    "status": "created",
+                    "type": pane_type,
                     "subType": sub_type,
-                    "type": tab_type,
-                    "cols": 80,
-                    "rows": 24,
-                    "user": "",
-                    "path": ""
-                }
-            )
+                    "title": pane_title,
+                    "position": position
+                })
             
-            created_tabs.append({
-                "tabId": tab_id,
-                "sessionId": new_session_id,
-                "status": "created",
-                "type": tab_type,
-                "subType": sub_type,
-                "title": title
-            })
+            # Add tab result with panes
+            if resumed_panes:
+                resumed_tabs.append({
+                    "tabId": tab_id,
+                    "title": tab_title,
+                    "layout": tab_layout,
+                    "panes": resumed_panes,
+                    "status": "resumed"
+                })
+            
+            if created_panes:
+                created_tabs.append({
+                    "tabId": tab_id,
+                    "title": tab_title,
+                    "layout": tab_layout,
+                    "panes": created_panes,
+                    "status": "created"
+                })
         
         # Send workspace resume response
         await sio_instance.emit(
@@ -454,7 +493,8 @@ async def resume_workspace(sid, data):
                 "resumedTabs": resumed_tabs,
                 "createdTabs": created_tabs,
                 "totalTabs": len(tabs),
-                "message": f"Workspace resumed with {len(resumed_tabs)} existing and {len(created_tabs)} new sessions"
+                "totalPanes": sum(len(tab.get("panes", [])) for tab in resumed_tabs + created_tabs),
+                "message": f"Workspace resumed with {len(resumed_tabs)} existing and {len(created_tabs)} new tab configurations"
             },
             room=sid
         )

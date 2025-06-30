@@ -23,11 +23,28 @@
       <LogMonitorTab />
     </div>
 
-    <!-- Active Terminal Tab Content -->
+    <!-- Active Terminal Tab Content with Panes -->
     <div 
-      v-for="tab in terminalTabStore.tabs" 
+      v-for="tab in workspaceStore.currentWorkspace?.tabs || []" 
       :key="tab.id"
       v-show="tab.isActive && !terminalTabStore.isLogMonitorActive"
+      class="tab-content"
+    >
+      <!-- Pane Container for modern layout -->
+      <PaneContainer
+        :tab-id="tab.id"
+        :layout="tab.layout"
+        @layout-changed="handleLayoutChange(tab.id, $event)"
+        @pane-created="handlePaneCreated"
+        @pane-closed="handlePaneClosed"
+      />
+    </div>
+    
+    <!-- Fallback: Legacy Terminal Tab Content -->
+    <div 
+      v-for="tab in terminalTabStore.tabs" 
+      :key="`legacy-${tab.id}`"
+      v-show="tab.isActive && !terminalTabStore.isLogMonitorActive && !hasWorkspaceTabs"
       class="tab-content"
     >
       <!-- Direct tab component usage based on type -->
@@ -84,10 +101,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useTerminalTabStore } from '../../stores/terminalTabStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useTerminalPaneStore, type TerminalPane } from '../../stores/terminalPaneStore'
 import SelectionActionPopup from '../SelectionActionPopup.vue'
 import TerminalTabComponent from './TerminalTab.vue'
 import AIAgentTab from './AIAgentTab.vue'
 import LogMonitorTab from './LogMonitorTab.vue'
+import PaneContainer from './PaneContainer.vue'
 import CommandQueueManager from './CommandQueueManager.vue'
 import SelectionPopupManager from './SelectionPopupManager.vue'
 
@@ -108,9 +128,16 @@ const commandQueueManagerRef = ref<InstanceType<typeof CommandQueueManager> | nu
 const selectionPopupManagerRef = ref<InstanceType<typeof SelectionPopupManager> | null>(null)
 
 const terminalTabStore = useTerminalTabStore()
+const workspaceStore = useWorkspaceStore()
+const terminalPaneStore = useTerminalPaneStore()
 
 // Get active tab from store
 const activeTab = computed(() => terminalTabStore.activeTab)
+
+// Check if we have workspace tabs (modern pane-based structure)
+const hasWorkspaceTabs = computed(() => {
+  return workspaceStore.currentWorkspace?.tabs && workspaceStore.currentWorkspace.tabs.length > 0
+})
 
 // Computed properties for template
 const isExecutingQueue = computed(() => commandQueueManagerRef.value?.isExecutingQueue || false)
@@ -127,6 +154,29 @@ onMounted(async () => {
 // Event handlers for popup actions
 const hideSelectionPopup = () => {
   selectionPopupManagerRef.value?.hideSelectionPopup()
+}
+
+// Pane event handlers
+const handleLayoutChange = (tabId: string, newLayout: string) => {
+  console.log('📋 TAB_CONTENT: Layout changed for tab:', tabId, 'to:', newLayout)
+  terminalPaneStore.updatePaneLayout(tabId, newLayout as any)
+  
+  // Save workspace state
+  workspaceStore.saveCurrentWorkspace()
+}
+
+const handlePaneCreated = (pane: TerminalPane) => {
+  console.log('📋 TAB_CONTENT: Pane created:', pane.id)
+  
+  // Save workspace state
+  workspaceStore.saveCurrentWorkspace()
+}
+
+const handlePaneClosed = (paneId: string) => {
+  console.log('📋 TAB_CONTENT: Pane closed:', paneId)
+  
+  // Save workspace state
+  workspaceStore.saveCurrentWorkspace()
 }
 </script>
 
