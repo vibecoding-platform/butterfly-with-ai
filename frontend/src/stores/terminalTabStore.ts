@@ -96,6 +96,20 @@ export const useTerminalTabStore = defineStore('terminalTab', () => {
     return newTab
   }
 
+  // Session management for tabs
+  const getTabSession = (tabId: string): string | undefined => {
+    const tab = tabs.value.find(tab => tab.id === tabId)
+    return tab?.sessionId
+  }
+
+  const setTabSession = (tabId: string, sessionId: string) => {
+    const tab = tabs.value.find(tab => tab.id === tabId)
+    if (tab) {
+      tab.sessionId = sessionId
+      console.log('📋 STORE: Set session for tab:', tabId, '-> session:', sessionId)
+    }
+  }
+
   const closeTab = (tabId: string) => {
     const tabIndex = tabs.value.findIndex(tab => tab.id === tabId)
     if (tabIndex === -1) return
@@ -454,6 +468,10 @@ export const useTerminalTabStore = defineStore('terminalTab', () => {
     markCommandsExecuted,
     getTabCommands,
     hasUnexecutedCommands,
+    
+    // Session management
+    getTabSession,
+    setTabSession,
     
     // Helper functions
     getServerType

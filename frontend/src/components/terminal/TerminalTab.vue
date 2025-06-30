@@ -61,155 +61,56 @@ const terminalTabStore = useTerminalTabStore()
 
 // Terminal initialization
 const initializeTerminal = async () => {
-  console.log('=== INITIALIZING TERMINAL ===')
-  console.log('Tab ID:', props.tabId)
-  console.log('Sub Type:', props.subType)
+  console.log('Initializing terminal for tab:', props.tabId)
   
   await nextTick()
   terminalEl.value = document.getElementById(`terminal-${props.tabId}`)
   
   if (!terminalEl.value) {
-    console.error('❌ Terminal element not found:', `terminal-${props.tabId}`)
-    console.log('All available elements with "terminal" in ID:', 
-      Array.from(document.querySelectorAll('[id*="terminal"]')).map(el => el.id)
-    )
+    console.error('Terminal element not found:', `terminal-${props.tabId}`)
     return
   }
-  
-  console.log('✅ Terminal element found:', terminalEl.value, 'for tab:', props.tabId)
-  console.log('Element dimensions:', {
-    width: terminalEl.value.offsetWidth,
-    height: terminalEl.value.offsetHeight,
-    display: getComputedStyle(terminalEl.value).display,
-    visibility: getComputedStyle(terminalEl.value).visibility
-  })
 
-  // Create xterm.js instance with enhanced configuration
+  // Create simple xterm.js instance
   terminal.value = new Terminal({
     fontSize: 14,
-    fontFamily: '"SF Mono", Monaco, Menlo, "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace',
-    fontWeight: 'normal',
-    fontWeightBold: 'bold',
-    letterSpacing: 0,
-    lineHeight: 1.0,
+    fontFamily: 'Monaco, Menlo, "Courier New", monospace',
     theme: {
       background: '#1e1e1e',
-      foreground: '#cccccc',
-      cursor: '#ffffff',
-      cursorAccent: '#000000',
-      selectionBackground: '#264f78',
-      selectionForeground: '#ffffff',
-      black: '#000000',
-      red: '#cd3131',
-      green: '#0dbc79',
-      yellow: '#e5e510',
-      blue: '#2472c8',
-      magenta: '#bc3fbc',
-      cyan: '#11a8cd',
-      white: '#e5e5e5',
-      brightBlack: '#666666',
-      brightRed: '#f14c4c',
-      brightGreen: '#23d18b',
-      brightYellow: '#f5f543',
-      brightBlue: '#3b8eea',
-      brightMagenta: '#d670d6',
-      brightCyan: '#29b8db',
-      brightWhite: '#e5e5e5'
+      foreground: '#ffffff',
+      cursor: '#ffffff'
     } as ITheme,
     cursorBlink: true,
-    cursorStyle: 'block',
-    cursorWidth: 1,
-    scrollback: 10000,
-    tabStopWidth: 4,
-    convertEol: true,
-    disableStdin: false,
-    allowTransparency: false,
-    allowProposedApi: true,
-    altClickMovesCursor: true,
-    macOptionIsMeta: true,
-    rightClickSelectsWord: true,
-    screenReaderMode: false,
-    scrollOnUserInput: true,
-    fastScrollModifier: 'alt',
-    fastScrollSensitivity: 5,
-    wordSeparator: ' ()[]{}\'"`.,;',
-    // Enhanced screen buffer management
-    windowsMode: false,
-    smoothScrollDuration: 0,
-    minimumContrastRatio: 4.5,
-    logLevel: 'warn'
+    scrollback: 1000,
+    convertEol: true
   })
 
   // Create and attach fit addon
   fitAddon.value = new FitAddon()
   terminal.value.loadAddon(fitAddon.value)
 
-  console.log('🔧 Opening terminal in DOM element...')
-  // Open terminal in the container
+  // Open terminal
   terminal.value.open(terminalEl.value)
-  console.log('✅ Terminal opened')
-  
-  // Initialize screen buffer and clear terminal
-  setTimeout(() => {
-    if (terminal.value) {
-      console.log('🔧 Initializing screen buffer...')
-      // Clear the terminal and reset to a clean state
-      terminal.value.clear()
-      // Reset cursor to top-left
-      terminal.value.write('\x1b[H\x1b[2J')
-      // Ensure we're in normal screen buffer (not alternate)
-      terminal.value.write('\x1b[?1049l')
-      console.log('✅ Screen buffer initialized and cleared')
-    }
-  }, 50)
   
   // Fit terminal to container
-  setTimeout(() => {
-    if (fitAddon.value) {
-      console.log('🔧 Fitting terminal to container...')
-      fitAddon.value.fit()
-      console.log('✅ Terminal fitted, dimensions:', {
-        cols: terminal.value?.cols,
-        rows: terminal.value?.rows
-      })
-    }
-  }, 100)
+  fitAddon.value.fit()
 
   // Setup event handlers
-  console.log('🔧 Setting up terminal event handlers...')
   setupTerminalEventHandlers()
-  console.log('✅ Event handlers set up')
   
   // Connect to backend
-  console.log('🔧 Connecting to backend...')
   if (terminalStore.socket && terminalStore.session.id) {
-    console.log('Using existing session:', terminalStore.session.id)
-    // Only connect if callback isn't already registered
     if (!callbackRegistered.value) {
       connectTerminal()
-    } else {
-      console.log('ℹ️ Callback already registered, skipping connect')
     }
   } else {
-    console.log('Creating new connection for tab:', props.tabId)
     await terminalStore.connect()
     connectTerminal()
   }
-  console.log('✅ Backend connection initiated')
   
-  // Focus the terminal and emit initialized event
-  if (terminal.value) {
-    // Focus terminal after a short delay to ensure DOM is ready
-    setTimeout(() => {
-      if (terminal.value) {
-        terminal.value.focus()
-        console.log('🎯 Terminal focused')
-      }
-    }, 100)
-    
-    emit('terminal-initialized', terminal.value)
-    console.log('📡 Terminal initialized event emitted')
-  }
+  // Focus terminal
+  terminal.value.focus()
+  emit('terminal-initialized', terminal.value)
 }
 
 const setupTerminalEventHandlers = () => {
@@ -248,70 +149,56 @@ const outputCallbackRef = ref<((data: string) => void) | null>(null)
 const sessionRequested = ref(false)
 
 const connectTerminal = () => {
-  console.log('=== CONNECTING TERMINAL ===')
-  console.log('Socket exists:', !!terminalStore.socket)
-  console.log('Terminal exists:', !!terminal.value)
-  console.log('Callback already registered:', callbackRegistered.value)
-  console.log('Existing session:', terminalStore.session.id)
+  console.log('Connecting terminal for tab:', props.tabId)
   
   if (!terminalStore.socket || !terminal.value) {
-    console.error('❌ Cannot connect - missing socket or terminal')
+    console.error('Cannot connect - missing socket or terminal')
     return
   }
 
   // Only register callback once per component instance
   if (!callbackRegistered.value) {
-    console.log('🔧 Setting up output callback...')
     const outputCallback = (data: string) => {
       if (terminal.value) {
-        console.log('✅ Writing data to terminal via callback:', data.substring(0, 50) + '...')
-        
-        // Check if we need to initialize buffer for first output
-        if (data.includes('Welcome') || data.includes('$') || data.includes('#')) {
-          console.log('🔧 Detected shell prompt, ensuring clean buffer state')
-          resetScreenBuffer()
-        }
-        
         terminal.value.write(data)
       }
     }
     
     terminalStore.onShellOutput(outputCallback)
     callbackRegistered.value = true
-    
-    // Store callback reference for cleanup
     outputCallbackRef.value = outputCallback
-    console.log('✅ Callback registered and stored')
-  } else {
-    console.log('ℹ️ Callback already registered, skipping')
   }
 
   // Only request session once per component instance
   if (!sessionRequested.value) {
-    // Check if there's an existing session to resume
-    if (terminalStore.session.id) {
-      console.log('🔧 Attempting to resume existing session:', terminalStore.session.id)
+    // Generate session ID based on tab ID for consistency
+    const sessionId = `terminal_${props.tabId}_${Date.now()}`
+    
+    // Check if there's an existing session to resume for this specific tab
+    const existingSession = terminalTabStore.getTabSession(props.tabId)
+    if (existingSession) {
+      console.log('Resuming existing session for tab:', props.tabId, existingSession)
       terminalStore.socket.emit('resume_terminal', {
-        sessionId: terminalStore.session.id,
+        sessionId: existingSession,
         tabId: props.tabId,
         subType: props.subType,
         cols: terminal.value?.cols || 80,
         rows: terminal.value?.rows || 24
       })
-      console.log('✅ Resume request sent for session:', terminalStore.session.id)
     } else {
-      console.log('🔧 No existing session found, creating new terminal...')
+      console.log('Creating new session for tab:', props.tabId, sessionId)
+      // Store session ID for this tab
+      terminalTabStore.setTabSession(props.tabId, sessionId)
+      
       terminalStore.socket.emit('create_terminal', {
+        session: sessionId,
         tabId: props.tabId,
         subType: props.subType,
         cols: terminal.value?.cols || 80,
         rows: terminal.value?.rows || 24
       })
-      console.log('✅ New terminal creation request sent')
     }
     sessionRequested.value = true
-  } else {
-    console.log('ℹ️ Session already requested, skipping')
   }
 }
 
@@ -322,109 +209,29 @@ const handleTerminalClick = () => {
   emit('click')
 }
 
-// Buffer management functions
-const clearScreenBuffer = () => {
-  if (terminal.value) {
-    console.log('🔧 Clearing screen buffer...')
-    // Clear terminal content
-    terminal.value.clear()
-    // Send clear screen escape sequence
-    terminal.value.write('\x1b[H\x1b[2J')
-    // Reset scroll position
-    terminal.value.scrollToTop()
-    console.log('✅ Screen buffer cleared')
-  }
-}
 
-const resetScreenBuffer = () => {
-  if (terminal.value) {
-    console.log('🔧 Resetting screen buffer...')
-    // Clear current buffer
-    clearScreenBuffer()
-    // Ensure we're in normal screen buffer
-    terminal.value.write('\x1b[?1049l')
-    // Reset all terminal attributes
-    terminal.value.write('\x1b[0m')
-    // Show cursor
-    terminal.value.write('\x1b[?25h')
-    console.log('✅ Screen buffer reset to normal state')
-  }
-}
-
-const refreshTerminalBuffer = () => {
-  if (terminal.value && fitAddon.value) {
-    console.log('🔧 Refreshing terminal buffer...')
-    // Clear and reset
-    resetScreenBuffer()
-    // Refit to ensure proper dimensions
-    fitAddon.value.fit()
-    // Focus terminal
-    terminal.value.focus()
-    console.log('✅ Terminal buffer refreshed')
-  }
-}
-
-// Watch for session changes (only when initializing)
-watch(() => terminalStore.session.id, (newSessionId, oldSessionId) => {
-  console.log('🔄 Session ID changed:', {
-    old: oldSessionId,
-    new: newSessionId,
-    terminalExists: !!terminal.value,
-    callbackAlreadyRegistered: callbackRegistered.value,
-    sessionRequested: sessionRequested.value
-  })
-  
-  // Only register callback once when we first get a valid session
-  if (newSessionId && terminal.value && !callbackRegistered.value && !sessionRequested.value) {
-    console.log('✅ First session received, registering callback only:', newSessionId)
-    
-    const outputCallback = (data: string) => {
-      if (terminal.value) {
-        console.log('✅ Writing data to terminal via callback:', data.substring(0, 50) + '...')
-        
-        // Check if we need to initialize buffer for first output
-        if (data.includes('Welcome') || data.includes('$') || data.includes('#')) {
-          console.log('🔧 Detected shell prompt, ensuring clean buffer state')
-          resetScreenBuffer()
-        }
-        
-        terminal.value.write(data)
-      }
-    }
-    
-    terminalStore.onShellOutput(outputCallback)
-    callbackRegistered.value = true
-    outputCallbackRef.value = outputCallback
-    console.log('✅ Callback registered for session:', newSessionId)
-  } else {
-    console.log('ℹ️ Skipping session change handling - already initialized or missing requirements')
-  }
-})
 
 onMounted(() => {
-  console.log('🟢 TerminalTab MOUNTED for tab:', props.tabId, 'subType:', props.subType)
+  console.log('Terminal mounted for tab:', props.tabId, 'subType:', props.subType)
   initializeTerminal()
 })
 
 onUnmounted(() => {
-  console.log('🔴 TerminalTab UNMOUNTED for tab:', props.tabId)
+  console.log('Terminal unmounted for tab:', props.tabId)
   
   try {
     // Clean up callback registration
     if (outputCallbackRef.value && terminalStore) {
-      console.log('🔧 Cleaning up output callback')
       terminalStore.offShellOutput(outputCallbackRef.value)
       outputCallbackRef.value = null
       callbackRegistered.value = false
       sessionRequested.value = false
-      console.log('✅ Callback cleaned up')
     }
     
     // Dispose fitAddon first if it exists and is loaded
     if (fitAddon.value && terminal.value) {
       try {
         fitAddon.value.dispose()
-        console.log('✅ FitAddon disposed')
       } catch (e) {
         console.warn('FitAddon disposal warning:', e)
       }
@@ -432,20 +239,15 @@ onUnmounted(() => {
     
     // Then dispose terminal
     if (terminal.value) {
-      console.log('🔧 Disposing terminal instance')
       terminal.value.dispose()
-      console.log('✅ Terminal disposed')
     }
   } catch (error) {
     console.error('Error during terminal cleanup:', error)
   }
 })
 
-// Expose buffer management functions for external use
+// Expose terminal instance for external use
 defineExpose({
-  clearScreenBuffer,
-  resetScreenBuffer,
-  refreshTerminalBuffer,
   terminal: () => terminal.value
 })
 </script>
@@ -517,55 +319,15 @@ defineExpose({
 
 .xterm-container {
   flex: 1;
-  border-top: $border-width solid var(--color-border-primary);
   min-height: 300px;
-  background-color: var(--color-terminal-bg);
-  overflow: hidden;
+  background-color: #1e1e1e;
   
-  // Hide xterm.js internal textarea that shouldn't be visible
-  :deep(.xterm-helper-textarea) {
-    position: absolute !important;
-    left: -9999px !important;
-    top: -9999px !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    z-index: -1 !important;
-  }
-  
-  // Ensure terminal screen is properly displayed
-  :deep(.xterm-screen) {
-    position: relative;
-    z-index: 1;
-    // Ensure proper rendering of screen buffer
-    overflow: visible;
-    background-color: transparent;
-  }
-  
-  // Enhanced buffer rendering
-  :deep(.xterm-rows) {
-    position: relative;
-    z-index: 2;
-  }
-  
-  // Alternative screen buffer support
-  :deep(.xterm-alt-buffer-on) {
-    .xterm-rows {
-      background-color: var(--color-terminal-bg);
-    }
-  }
-  
-  // Focus handling for terminal
   :deep(.xterm) {
     height: 100%;
     
     &:focus {
       outline: none;
     }
-  }
-  
-  // Make sure viewport fills container
-  :deep(.xterm-viewport) {
-    background-color: transparent;
   }
 }
 </style>

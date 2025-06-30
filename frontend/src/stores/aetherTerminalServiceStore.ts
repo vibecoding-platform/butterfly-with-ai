@@ -59,9 +59,9 @@ export const useAetherTerminalServiceStore = defineStore('aetherTerminalService'
 
   const socket = ref<Socket | null>(null)
 
-  // Terminal State
+  // Terminal State - Empty initial session, will be set by terminal tabs
   const session = ref<TerminalSession>({
-    id: '',
+    id: '',  // Will be set by individual terminal tabs
     isActive: false,
     isPaused: false,
     isReconnecting: false,
