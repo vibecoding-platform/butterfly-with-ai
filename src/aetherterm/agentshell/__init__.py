@@ -1,32 +1,34 @@
 """
-Butterfly with AI - ラッパープログラム
+AgentShell - エージェント協調プラットフォーム
 
-このパッケージは、既存のBashターミナルセッションに対して
-非侵入型のAI連携機能を提供します。
+OpenHandsやClaudeCodeなどの複数エージェントがWebSocket経由で
+協調作業を行うためのプラットフォームを提供します。
 
 主な機能:
-- ターミナル出力のリアルタイム監視
-- セッション管理とオペレーション識別
-- AI サービスとの非同期通信
-- 既存のBash動作への影響を最小化
+- 複数エージェントの統合管理
+- WebSocket経由のエージェント間通信
+- 構造化された起動プロセス
+- インタラクティブなエージェント制御
+- リアルタイムなタスク調整
 
-新しいアーキテクチャ:
-- PTY層: 低レベルターミナル通信
-- Domain層: ドメインモデルとビジネスルール
-- Service層: ビジネスロジックとアプリケーションサービス
-- Controller層: UIとビジネスロジックの橋渡し
+アーキテクチャ:
+- Startup層: ブートストラップと依存関係管理
+- Agent層: 各種エージェント実装
+- Coordination層: エージェント間協調制御
+- WebSocket層: 通信プロトコル実装
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __author__ = "AetherTerm Team"
 
-from .config import WrapperConfig
-from .containers import WrapperApplication, get_application
-from .main import WrapperMain
+from .startup.bootstrap import BootstrapManager
+from .agents.base import AgentInterface, AgentCapability, AgentStatus
+from .websocket.client import WebSocketClient
 
 __all__ = [
-    "WrapperApplication",
-    "WrapperConfig",
-    "WrapperMain",
-    "get_application",
+    "BootstrapManager",
+    "AgentInterface", 
+    "AgentCapability",
+    "AgentStatus",
+    "WebSocketClient",
 ]

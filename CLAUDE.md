@@ -37,3 +37,36 @@ cd frontend && pnpm install && pnpm dev
 **Frontend changes**: Edit `frontend/src/` → `make build-frontend` → test  
 **Add dependencies**: Python (`pyproject.toml` + `uv sync`), Node (`package.json` + `pnpm install`)  
 **Testing**: `pytest` (Python), `pnpm type-check` (frontend)
+
+## Troubleshooting
+
+**Process monitoring**: `ps aux | grep agentserver`  
+**Port status**: `ss -tulpn | grep 57575` or `lsof -i :57575`  
+**Health check**: `curl http://localhost:57575/health`  
+**Dependencies**: Missing modules → `uv add <module>` → `uv sync`
+
+## Supervisord Process Management
+
+**Setup**: `supervisord` already installed at `/root/.local/bin/supervisord`
+
+**Config file** (`/etc/supervisor/conf.d/aetherterm.conf`):
+```ini
+[program:agentserver]
+command=uv run aetherterm-agentserver --host=localhost --port=57575 --unsecure --debug
+directory=/mnt/c/workspace/vibecoding-platform/app/terminal
+user=root
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/agentserver.log
+stdout_logfile_maxbytes=50MB
+stdout_logfile_backups=10
+```
+
+**Commands**:
+- Start: `supervisorctl start agentserver`
+- Stop: `supervisorctl stop agentserver`
+- Restart: `supervisorctl restart agentserver`
+- Status: `supervisorctl status`
+- Logs: `supervisorctl tail -f agentserver`
+- Real-time logs: `tail -f /var/log/supervisor/agentserver.log`

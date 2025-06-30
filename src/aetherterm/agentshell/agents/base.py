@@ -12,6 +12,8 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
 from uuid import UUID, uuid4
 
+from ..websocket.protocol import AgentMessage, MessageType
+
 
 class AgentCapability(str, Enum):
     """エージェントの能力タイプ"""
@@ -37,6 +39,15 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class AgentStatus(str, Enum):
+    """エージェントの状態"""
+
+    IDLE = "idle"
+    BUSY = "busy"
+    ERROR = "error"
+    OFFLINE = "offline"
 
 
 class InterventionType(str, Enum):

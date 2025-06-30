@@ -13,12 +13,12 @@ from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
 from ...common.agent_protocol import (
-    AgentCapability,
-    AgentStatus,
-    InterventionData,
-    ProgressData,
-    TaskData,
+    InterventionRequest,
+    InterventionResponse,
+    ProgressUpdate,
+    TaskCreateRequest,
 )
+from .base import AgentCapability, TaskStatus, AgentStatus
 from ...langchain.containers import LangChainContainer
 from ...langchain.memory.conversation_memory import ConversationMemoryManager
 from ...langchain.models.conversation import ConversationType, MessageRole
@@ -65,7 +65,7 @@ class LangChainAgent(AgentInterface):
         """
         super().__init__(agent_id)
         self._status = AgentStatus.IDLE
-        self._current_task: Optional[TaskData] = None
+        self._current_task: Optional[TaskCreateRequest] = None
         self._container: Optional[LangChainContainer] = None
         self._conversation_memory: Optional[ConversationMemoryManager] = None
         self._agent_manager = agent_manager
@@ -73,8 +73,8 @@ class LangChainAgent(AgentInterface):
         self._openhands_agent_id: Optional[str] = None
 
         # コールバック
-        self._progress_callback: Optional[Callable[[ProgressData], None]] = None
-        self._intervention_callback: Optional[Callable[[InterventionData], Any]] = None
+        self._progress_callback: Optional[Callable[[ProgressUpdate], None]] = None
+        self._intervention_callback: Optional[Callable[[InterventionRequest], Any]] = None
 
         # 実行統計
         self._task_history: List[Dict[str, Any]] = []
@@ -144,7 +144,7 @@ class LangChainAgent(AgentInterface):
         """現在のステータスを取得"""
         return self._status
 
-    async def execute_task(self, task: TaskData) -> Dict[str, Any]:
+    async def execute_task(self, task: TaskCreateRequest) -> Dict[str, Any]:
         """
         タスクを実行
 
@@ -222,15 +222,15 @@ class LangChainAgent(AgentInterface):
         self._status = AgentStatus.READY
         return True
 
-    def set_progress_callback(self, callback: Callable[[ProgressData], None]) -> None:
+    def set_progress_callback(self, callback: Callable[[ProgressUpdate], None]) -> None:
         """進捗通知コールバックを設定"""
         self._progress_callback = callback
 
-    def set_intervention_callback(self, callback: Callable[[InterventionData], Any]) -> None:
+    def set_intervention_callback(self, callback: Callable[[InterventionRequest], Any]) -> None:
         """ユーザー介入コールバックを設定"""
         self._intervention_callback = callback
 
-    async def _process_task(self, task: TaskData) -> Dict[str, Any]:
+    async def _process_task(self, task: TaskCreateRequest) -> Dict[str, Any]:
         """
         タスクを処理
 
@@ -268,7 +268,7 @@ class LangChainAgent(AgentInterface):
         raise ValueError(f"未対応のタスクタイプ: {task_type}")
 
     async def _delegate_to_openhands(
-        self, task: TaskData, context: Dict[str, Any]
+        self, task: TaskCreateRequest, context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         OpenHandsエージェントにタスクを委譲
@@ -303,13 +303,11 @@ class LangChainAgent(AgentInterface):
             await self._agent_manager.start_agent(self._openhands_agent_id)
 
         # コンテキストを含めたタスクデータを作成
-        enhanced_task = TaskData(
+        enhanced_task = TaskCreateRequest(
             task_id=task.task_id,
             task_type=task.task_type,
             description=f"{task.description}\n\nコンテキスト:\n{self._format_context(context)}",
-            parameters=task.parameters,
-            priority=task.priority,
-            dependencies=task.dependencies,
+            context=task.context,
         )
 
         # 進捗を通知
@@ -328,7 +326,7 @@ class LangChainAgent(AgentInterface):
 
         return result
 
-    async def _analyze_task(self, task: TaskData, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _analyze_task(self, task: TaskCreateRequest, context: Dict[str, Any]) -> Dict[str, Any]:
         """分析タスクを実行"""
         await self._notify_progress(0.2, "コンテキストを分析中...")
 
@@ -346,7 +344,7 @@ class LangChainAgent(AgentInterface):
         await self._notify_progress(1.0, "分析が完了しました")
         return analysis_result
 
-    async def _summarize_task(self, task: TaskData, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _summarize_task(self, task: TaskCreateRequest, context: Dict[str, Any]) -> Dict[str, Any]:
         """要約タスクを実行"""
         await self._notify_progress(0.2, "情報を収集中...")
 
@@ -361,7 +359,7 @@ class LangChainAgent(AgentInterface):
         return summary_result
 
     async def _create_documentation(
-        self, task: TaskData, context: Dict[str, Any]
+        self, task: TaskCreateRequest, context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """ドキュメント作成タスクを実行"""
         await self._notify_progress(0.2, "ドキュメントを生成中...")
@@ -376,7 +374,7 @@ class LangChainAgent(AgentInterface):
         await self._notify_progress(1.0, "ドキュメント作成が完了しました")
         return doc_result
 
-    async def _get_relevant_context(self, task: TaskData) -> Dict[str, Any]:
+    async def _get_relevant_context(self, task: TaskCreateRequest) -> Dict[str, Any]:
         """
         タスクに関連するコンテキストを取得
 
@@ -435,7 +433,7 @@ class LangChainAgent(AgentInterface):
     async def _notify_progress(self, percentage: float, message: str) -> None:
         """進捗を通知"""
         if self._progress_callback and self._current_task:
-            progress_data = ProgressData(
+            progress_data = ProgressUpdate(
                 task_id=self._current_task.task_id,
                 percentage=percentage,
                 message=message,

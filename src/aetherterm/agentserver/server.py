@@ -486,10 +486,12 @@ def create_app(**kwargs):
     if os.path.exists(static_path):
         fastapi_app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-    # Include router
+    # Include routers
     from aetherterm.agentserver.routes import router
+    from aetherterm.agentserver.context_inference import context_api_router
 
     fastapi_app.include_router(router)
+    fastapi_app.include_router(context_api_router)
 
     # Create Socket.IO server
     sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -512,7 +514,11 @@ def setup_app(**kwargs):
 
     # Set the socket.io instance in handlers module
     from aetherterm.agentserver import socket_handlers
+    from aetherterm.core.container import DIContainer
 
+    # Wire the DI container first
+    DIContainer.wire_modules([socket_handlers])
+    
     socket_handlers.set_sio_instance(sio)
 
     # Register Socket.IO event handlers
@@ -532,6 +538,11 @@ def setup_app(**kwargs):
     sio.on("log_monitor_subscribe", socket_handlers.log_monitor_subscribe)
     sio.on("log_monitor_unsubscribe", socket_handlers.log_monitor_unsubscribe)
     sio.on("log_monitor_search", socket_handlers.log_monitor_search)
+    
+    # Register context inference handlers
+    sio.on("context_inference_subscribe", socket_handlers.context_inference_subscribe)
+    sio.on("predict_next_commands", socket_handlers.predict_next_commands)
+    sio.on("get_operation_analytics", socket_handlers.get_operation_analytics)
 
     # Set up auto-blocker integration
     from aetherterm.agentserver.auto_blocker import set_socket_io_instance
@@ -557,18 +568,32 @@ def setup_app(**kwargs):
             log.info("Log processing service started successfully")
         except Exception as e:
             log.warning(f"Failed to start log processing service: {e}")
+    
+    # Initialize context inference
+    async def startup_context_inference():
+        try:
+            from aetherterm.agentserver.context_inference import initialize_context_inference
+            from aetherterm.logprocessing.log_processing_manager import get_log_processing_manager
+            
+            # Get storage instances from log processing manager
+            manager = get_log_processing_manager()
+            if manager and manager.vector_storage and manager.sql_storage:
+                initialize_context_inference(manager.vector_storage, manager.sql_storage)
+                log.info("Context inference system initialized successfully")
+            else:
+                log.warning("Cannot initialize context inference: storage not available")
+        except Exception as e:
+            log.warning(f"Failed to initialize context inference: {e}")
 
-    # Add startup event handler
-    @asgi_app.on_event("startup")
+    # Add startup and shutdown event handlers using lifespan
     async def startup():
         await startup_inventory_service()
         await startup_log_processing()
+        await startup_context_inference()
         
         # Start log monitoring background task
         socket_handlers.start_log_monitoring_background_task()
 
-    # Add shutdown event handler
-    @asgi_app.on_event("shutdown")
     async def shutdown():
         try:
             from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
@@ -577,6 +602,12 @@ def setup_app(**kwargs):
             log.info("Log processing service stopped")
         except Exception as e:
             log.warning(f"Error stopping log processing service: {e}")
+    
+    # Add event handlers to the FastAPI app (accessible through ASGI wrapper)
+    if hasattr(asgi_app, 'other_asgi_app') and asgi_app.other_asgi_app:
+        fastapi_app = asgi_app.other_asgi_app
+        fastapi_app.add_event_handler("startup", startup)
+        fastapi_app.add_event_handler("shutdown", shutdown)
 
     log.info("AetherTerm AgentServer application setup complete")
 

@@ -1,23 +1,22 @@
 """
 AIエージェント統合モジュール
 
-このモジュールは、様々なAIエージェント（OpenHands等）との
-統合インターフェースを提供します。
+WebSocket経由でのエージェント間協調作業を支援
 """
 
 from .base import AgentInterface, AgentCapability, AgentTask, AgentResult
-from .openhands import OpenHandsAgent
+from .claude_code import ClaudeCodeAgent
 from .langchain_agent import LangChainAgent
-from .command_analyzer import CommandAnalyzerAgent
 from .manager import AgentManager
+from .openhands import OpenHandsAgent
 
 __all__ = [
     "AgentInterface",
-    "AgentCapability",
+    "AgentCapability", 
     "AgentTask",
     "AgentResult",
-    "OpenHandsAgent",
+    "ClaudeCodeAgent",
     "LangChainAgent",
-    "CommandAnalyzerAgent",
     "AgentManager",
+    "OpenHandsAgent",
 ]

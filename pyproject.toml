@@ -36,6 +36,8 @@ dependencies = [
     "pyopenssl",
     "click",
     "websockets",
+    "toml",
+    "aiohttp",
     # LangChain関連依存関係
     "langchain>=0.1.0",
     "langchain-openai>=0.1.0",
@@ -58,6 +60,9 @@ dependencies = [
     "azure-identity>=1.12.0",
     "google-cloud-core>=2.3.0",
     "kubernetes>=24.0.0",
+    "opentelemetry-instrumentation-logging>=0.55b1",
+    "tornado>=6.5.1",
+    "structlog>=25.4.0",
 ]
 
 [project.optional-dependencies]

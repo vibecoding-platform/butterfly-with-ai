@@ -105,14 +105,14 @@ class LogProcessingManager:
             return
 
         self._running = True
-        self._logger.info("Starting log processing system...")
+        self._logger.info("Starting pure Pub/Sub log processing system...")
 
         try:
-            # バックグラウンドタスクを開始
+            # バックグラウンドタスクを開始 (純粋Pub/Sub)
             self._processing_tasks = [
                 asyncio.create_task(
-                    self.log_processor.start_processing(log_processing_interval),
-                    name="log_processor",
+                    self.log_processor.start_processing(),  # ポーリング間隔不要
+                    name="log_processor_pubsub",
                 ),
                 asyncio.create_task(
                     self.structured_extractor.start_extraction(pattern_extraction_interval),
@@ -120,7 +120,7 @@ class LogProcessingManager:
                 ),
             ]
 
-            self._logger.info("Log processing system started successfully")
+            self._logger.info("Pure Pub/Sub log processing system started successfully")
 
             # タスクの完了を待機
             await asyncio.gather(*self._processing_tasks, return_exceptions=True)
