@@ -347,35 +347,6 @@ const setupContextMenuPrevention = () => {
   })
 }
 
-const setupTerminalEventHandlers = () => {
-  if (!terminal.value) return
-
-  // Listen for terminal resize events and send to backend
-  terminal.value.onResize((dimensions) => {
-    console.log('Terminal resized:', dimensions)
-    // Send resize event to backend
-    if (terminalStore.socket && terminalStore.session.id) {
-      terminalStore.socket.emit('terminal_resize', {
-        session: terminalStore.session.id,
-        cols: dimensions.cols,
-        rows: dimensions.rows,
-      })
-    }
-  })
-  
-  // Check if terminal becomes ready when session is established
-  const sessionReadyCheck = () => {
-    if (terminalStore.session.id && !terminalReady.value) {
-      setTimeout(() => {
-        terminalReady.value = true
-        console.log('Terminal ready detected from session establishment')
-      }, 500)
-    }
-  }
-  
-  // Watch for session changes
-  watch(() => terminalStore.session.id, sessionReadyCheck)
-
 const setupShellOutputHandler = () => {
   // Connect to the socket and receive data
   let motdContent = ''
@@ -422,6 +393,35 @@ const setupShellOutputHandler = () => {
     }
   })
 }
+
+const setupTerminalEventHandlers = () => {
+  if (!terminal.value) return
+
+  // Listen for terminal resize events and send to backend
+  terminal.value.onResize((dimensions) => {
+    console.log('Terminal resized:', dimensions)
+    // Send resize event to backend
+    if (terminalStore.socket && terminalStore.session.id) {
+      terminalStore.socket.emit('terminal_resize', {
+        session: terminalStore.session.id,
+        cols: dimensions.cols,
+        rows: dimensions.rows,
+      })
+    }
+  })
+  
+  // Check if terminal becomes ready when session is established
+  const sessionReadyCheck = () => {
+    if (terminalStore.session.id && !terminalReady.value) {
+      setTimeout(() => {
+        terminalReady.value = true
+        console.log('Terminal ready detected from session establishment')
+      }, 500)
+    }
+  }
+  
+  // Watch for session changes
+  watch(() => terminalStore.session.id, sessionReadyCheck)
 
   terminal.value.onKey((e) => {
     const ev = e.domEvent
