@@ -15,6 +15,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { useAetherTerminalStore } from '../../stores/aetherTerminalStore'
 import { useTerminalTabStore } from '../../stores/terminalTabStore'
 import { useTerminalPaneStore } from '../../stores/terminalPaneStore'
+import { useThemeStore } from '../../stores/themeStore'
 import '@xterm/xterm/css/xterm.css'
 
 interface Props {
@@ -45,6 +46,7 @@ const fitAddon = ref<FitAddon | null>(null)
 const aetherStore = useAetherTerminalStore()
 const tabStore = useTerminalTabStore()
 const paneStore = useTerminalPaneStore()
+const themeStore = useThemeStore()
 
 // State
 const sessionId = ref<string | null>(null)
@@ -52,6 +54,59 @@ const isInitialized = ref(false)
 
 // Computed
 const terminalElementId = computed(() => `aether-${props.mode}-${props.id}`)
+
+// Terminal theme configuration
+const terminalTheme = computed(() => {
+  const colors = themeStore.currentColors
+  if (!colors) {
+    // Fallback theme
+    return {
+      background: '#1e1e1e',
+      foreground: '#d4d4d4',
+      cursor: '#ffffff',
+      selection: '#264f78',
+      black: '#000000',
+      red: '#cd3131',
+      green: '#0dbc79',
+      yellow: '#e5e510',
+      blue: '#2472c8',
+      magenta: '#bc3fbc',
+      cyan: '#11a8cd',
+      white: '#e5e5e5',
+      brightBlack: '#666666',
+      brightRed: '#f14c4c',
+      brightGreen: '#23d18b',
+      brightYellow: '#f5f543',
+      brightBlue: '#3b8eea',
+      brightMagenta: '#d670d6',
+      brightCyan: '#29b8db',
+      brightWhite: '#e5e5e5'
+    }
+  }
+  
+  return {
+    background: colors.background,
+    foreground: colors.foreground,
+    cursor: colors.cursor,
+    selection: colors.selection,
+    black: colors.black,
+    red: colors.red,
+    green: colors.green,
+    yellow: colors.yellow,
+    blue: colors.blue,
+    magenta: colors.magenta,
+    cyan: colors.cyan,
+    white: colors.white,
+    brightBlack: colors.bright_black,
+    brightRed: colors.bright_red,
+    brightGreen: colors.bright_green,
+    brightYellow: colors.bright_yellow,
+    brightBlue: colors.bright_blue,
+    brightMagenta: colors.bright_magenta,
+    brightCyan: colors.bright_cyan,
+    brightWhite: colors.bright_white
+  }
+})
 
 // セッション管理（統一）
 const getCurrentSession = () => {
@@ -82,14 +137,10 @@ const initializeTerminal = async () => {
 
   // xterm.js作成
   terminal.value = new Terminal({
-    cursorBlink: true,
-    theme: {
-      background: '#1e1e1e',
-      foreground: '#d4d4d4',
-      cursor: '#ffffff'
-    },
-    fontSize: 14,
-    fontFamily: '"Cascadia Code", "Fira Code", monospace',
+    cursorBlink: themeStore.themeConfig.cursorBlink,
+    theme: terminalTheme.value,
+    fontSize: themeStore.themeConfig.fontSize,
+    fontFamily: themeStore.themeConfig.fontFamily,
     rows: 30,
     cols: 120,
     scrollback: 1000
@@ -167,6 +218,22 @@ const setupOutput = () => {
   console.log(`📺 AETHER_TERMINAL: Output setup for ${props.mode}:`, props.id)
 }
 
+// テーマ更新
+const updateTerminalTheme = () => {
+  if (!terminal.value) return
+  
+  console.log(`🎨 AETHER_TERMINAL: Updating theme for ${props.mode}:`, props.id, themeStore.themeConfig.colorScheme)
+  
+  // Update terminal theme
+  terminal.value.options.theme = terminalTheme.value
+  terminal.value.options.fontSize = themeStore.themeConfig.fontSize
+  terminal.value.options.fontFamily = themeStore.themeConfig.fontFamily
+  terminal.value.options.cursorBlink = themeStore.themeConfig.cursorBlink
+  
+  // Refresh terminal to apply changes
+  terminal.value.refresh(0, terminal.value.rows - 1)
+}
+
 // クリック処理
 const handleClick = () => {
   emit('click')
@@ -179,6 +246,23 @@ watch(() => aetherStore.connectionState.isConnected, (connected) => {
     console.log(`🔌 AETHER_TERMINAL: Connection restored, requesting session for ${props.mode}:`, props.id)
     requestSession()
   }
+})
+
+// テーマ変更監視
+watch(() => themeStore.currentColors, () => {
+  updateTerminalTheme()
+}, { deep: true })
+
+watch(() => themeStore.themeConfig.fontSize, () => {
+  updateTerminalTheme()
+  // Also trigger a fit when font size changes
+  setTimeout(() => fitAddon.value?.fit(), 100)
+})
+
+watch(() => themeStore.themeConfig.fontFamily, () => {
+  updateTerminalTheme()
+  // Also trigger a fit when font family changes
+  setTimeout(() => fitAddon.value?.fit(), 100)
 })
 
 // ライフサイクル
@@ -221,9 +305,14 @@ defineExpose({
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #1e1e1e;
+  background-color: var(--terminal-background, #1e1e1e);
   position: relative;
   overflow: hidden;
+  font-family: var(--terminal-font-family);
+  font-size: var(--terminal-font-size);
+  
+  // Smooth transitions for theme changes
+  transition: background-color 0.3s ease;
 }
 
 .aether-terminal {
@@ -234,14 +323,44 @@ defineExpose({
   :deep(.xterm) {
     height: 100% !important;
     width: 100% !important;
+    font-family: var(--terminal-font-family) !important;
+    font-size: var(--terminal-font-size) !important;
   }
   
   :deep(.xterm-viewport) {
-    background-color: #1e1e1e;
+    background-color: var(--terminal-background, #1e1e1e) !important;
   }
   
   :deep(.xterm-screen) {
-    background-color: #1e1e1e;
+    background-color: var(--terminal-background, #1e1e1e) !important;
+  }
+  
+  :deep(.xterm-cursor-layer) {
+    .xterm-cursor {
+      background-color: var(--terminal-cursor, #ffffff) !important;
+    }
+  }
+  
+  :deep(.xterm-selection) {
+    background-color: var(--terminal-selection, #264f78) !important;
+  }
+  
+  // Scrollbar theming
+  :deep(.xterm-viewport)::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  :deep(.xterm-viewport)::-webkit-scrollbar-track {
+    background: var(--terminal-background, #1e1e1e);
+  }
+  
+  :deep(.xterm-viewport)::-webkit-scrollbar-thumb {
+    background: var(--terminal-bright-black, #666666);
+    border-radius: 4px;
+    
+    &:hover {
+      background: var(--terminal-white, #e5e5e5);
+    }
   }
 }
 </style>

@@ -44,11 +44,20 @@
   --color-status-error: #{$color-status-error};
   --color-status-info: #{$color-status-info};
   
-  // Terminal Colors
+  // Terminal Colors (fallback - will be overridden by theme store)
   --color-terminal-bg: #{$color-terminal-bg};
   --color-terminal-fg: #{$color-terminal-fg};
   --color-terminal-cursor: #{$color-terminal-cursor};
   --color-terminal-selection: #{$color-terminal-selection};
+  
+  // Terminal variables compatible with theme store
+  --terminal-background: var(--color-terminal-bg);
+  --terminal-foreground: var(--color-terminal-fg);
+  --terminal-cursor: var(--color-terminal-cursor);
+  --terminal-selection: var(--color-terminal-selection);
+  --terminal-font-family: #{$font-family-mono};
+  --terminal-font-size: #{$font-size-base};
+  --terminal-line-height: #{$line-height-normal};
 }
 
 // =============================================================================

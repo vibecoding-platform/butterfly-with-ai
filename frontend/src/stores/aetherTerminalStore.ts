@@ -121,10 +121,10 @@ export const useAetherTerminalStore = defineStore('aetherTerminal', () => {
       }
     })
 
-    // セッション作成イベント
-    socket.value.on('session_created', (data: any) => {
-      if (data?.session_id) {
-        console.log('✅ AETHER_TERMINAL: Session created:', data.session_id)
+    // セッション作成イベント (backend emits 'terminal_ready' not 'session_created')
+    socket.value.on('terminal_ready', (data: any) => {
+      if (data?.session) {
+        console.log('✅ AETHER_TERMINAL: Terminal ready:', data.session)
         // セッション管理は各コンポーネントが個別に処理
       }
     })
@@ -146,34 +146,36 @@ export const useAetherTerminalStore = defineStore('aetherTerminal', () => {
     console.log('🔄 AETHER_TERMINAL: Requesting session:', sessionId)
 
     return new Promise((resolve) => {
-      const handleSessionCreated = (data: any) => {
-        const targetId = mode === 'pane' ? data.pane_id : data.tab_id
-        if (data.session_id && targetId === terminalId) {
+      const handleTerminalReady = (data: any) => {
+        if (data.session && data.session === sessionId) {
           // セッション登録
-          sessions.value.set(data.session_id, {
-            id: data.session_id,
+          sessions.value.set(data.session, {
+            id: data.session,
             type: mode,
             terminalId,
             isActive: true,
             createdAt: new Date()
           })
 
-          socket.value?.off('session_created', handleSessionCreated)
-          resolve(data.session_id)
+          socket.value?.off('terminal_ready', handleTerminalReady)
+          resolve(data.session)
         }
       }
 
-      socket.value?.on('session_created', handleSessionCreated)
-      socket.value?.emit('request_terminal_session', {
-        session_id: sessionId,
-        tab_type: 'terminal',
-        tab_sub_type: subType,
-        [mode === 'pane' ? 'pane_id' : 'tab_id']: terminalId
+      socket.value?.on('terminal_ready', handleTerminalReady)
+      socket.value?.emit('create_terminal', {
+        session: sessionId,
+        user: '',
+        path: '',
+        cols: 80,
+        rows: 24,
+        [mode === 'pane' ? 'paneId' : 'tabId']: terminalId,
+        subType: subType
       })
 
       // タイムアウト処理
       setTimeout(() => {
-        socket.value?.off('session_created', handleSessionCreated)
+        socket.value?.off('terminal_ready', handleTerminalReady)
         resolve(null)
       }, 5000)
     })

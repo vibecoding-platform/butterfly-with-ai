@@ -1,5 +1,9 @@
 <template>
-  <div class="main-container" @contextmenu.prevent>
+  <div 
+    class="main-container"
+    :class="[`theme-${themeStore.isDarkMode ? 'dark' : 'light'}`, `scheme-${themeStore.themeConfig.colorScheme}`]"
+    @contextmenu.prevent
+  >
     <!-- Tab Bar -->
     <TerminalTabBar />
 
@@ -16,13 +20,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watchEffect } from 'vue'
 import { useAetherTerminalServiceStore } from '../../stores/aetherTerminalServiceStore'
+import { useThemeStore } from '../../stores/themeStore'
 import ConnectionStatusBanner from './ConnectionStatusBanner.vue'
 import TerminalTabBar from '../TabBarContainer.vue'
 import MainContentView from '../MainContentView.vue'
 
 const terminalStore = useAetherTerminalServiceStore()
+const themeStore = useThemeStore()
 
 // Terminal pause state
 const isTerminalPaused = ref(false)
@@ -52,6 +58,15 @@ onMounted(async () => {
   terminalStore.connect()
 })
 
+// Apply theme changes reactively
+watchEffect(() => {
+  // Theme application is handled automatically by the theme store watchers
+  // This just ensures the component is reactive to theme changes
+  if (themeStore.currentColors) {
+    console.log('🎨 THEME: Theme applied to terminal container:', themeStore.themeConfig.colorScheme)
+  }
+})
+
 // Export functions for external use
 defineExpose({
   pauseTerminal,
@@ -65,5 +80,26 @@ defineExpose({
 .main-container {
   @include terminal-container;
   position: relative;
+  
+  // Use CSS variables for theming
+  background-color: var(--terminal-background);
+  color: var(--terminal-foreground);
+  font-family: var(--terminal-font-family);
+  font-size: var(--terminal-font-size);
+  line-height: var(--terminal-line-height);
+  
+  // Transition for smooth theme changes
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// Theme-specific adjustments
+.main-container.theme-dark {
+  background-color: var(--terminal-background);
+  color: var(--terminal-foreground);
+}
+
+.main-container.theme-light {
+  background-color: var(--terminal-background);
+  color: var(--terminal-foreground);
 }
 </style>

@@ -7,6 +7,7 @@ import vuetify from './plugins/vuetify'
 import AetherTermService from './services/AetherTermService'
 import { useAetherTerminalServiceStore } from './stores/aetherTerminalServiceStore'
 import { useWorkspaceStore } from './stores/workspaceStore'
+import { useThemeStore } from './stores/themeStore'
 
 // Register vue-advanced-chat
 register()
@@ -29,10 +30,18 @@ terminalStore.setSocket(socket)
 // Initialize workspace system
 const workspaceStore = useWorkspaceStore()
 
+// Initialize theme system
+const themeStore = useThemeStore()
+
 // Setup application initialization
 const initializeApp = async () => {
   try {
     console.log('🚀 APP: Initializing application...')
+    
+    // Initialize theme system first (before any UI rendering)
+    console.log('🎨 THEME: Loading theme configuration...')
+    await themeStore.loadThemeConfig()
+    console.log('🎨 THEME: Theme system initialized successfully')
     
     // Connect to service
     await terminalStore.connect()
