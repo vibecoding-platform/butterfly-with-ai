@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Any, Dict
 
-from dependency_injector.wiring import Provide, inject
+# from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -20,34 +20,30 @@ from aetherterm.agentserver.infrastructure.config.di_container import MainContai
 router = APIRouter()
 log = logging.getLogger("aetherterm.routes.main")
 
-# Templates
-templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "templates"))
+# Templates - go up from routes to agentserver level
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "..", "templates"))
 
-# Mount static files directory
-static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+# Mount static files directory - go up from routes to agentserver level  
+static_dir = os.path.join(os.path.dirname(__file__), "..", "..", "static")
 if os.path.exists(static_dir) and os.listdir(static_dir):
     router.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 @router.get("/", response_class=HTMLResponse)
-@inject
-async def index(
-    request: Request,
-    config=Provide[MainContainer.application.config],
-):
+async def index(request: Request):
     """Main index route that serves the terminal interface."""
-    # Dynamically find the hashed asset filenames
-    assets_dir = os.path.join(os.path.dirname(__file__), "..", "static", "assets")
+    # Dynamically find the hashed asset filenames - go up from routes to agentserver level 
+    assets_dir = os.path.join(os.path.dirname(__file__), "..", "..", "static", "assets")
     js_bundle = ""
     css_bundle = ""
-    # Get root path from configuration
-    root_path = config.get("uri_root_path", "")
+    # Get root path from configuration (use empty string as default)
+    root_path = ""
 
     for filename in os.listdir(assets_dir):
         if filename.startswith("index.") and filename.endswith(".js"):
-            js_bundle = f"{root_path}/static/assets/{filename}"
+            js_bundle = f"{root_path}/assets/{filename}"
         elif filename.startswith("index.") and filename.endswith(".css"):
-            css_bundle = f"{root_path}/static/assets/{filename}"
+            css_bundle = f"{root_path}/assets/{filename}"
 
     if not js_bundle or not css_bundle:
         raise HTTPException(status_code=500, detail="Could not find hashed JS or CSS files")
@@ -58,7 +54,7 @@ async def index(
             "request": request,
             "js_bundle": js_bundle,
             "css_bundle": css_bundle,
-            "favicon_path": f"{root_path}/static/favicon.ico",
+            "favicon_path": f"{root_path}/favicon.ico",
             "uri_root_path": root_path,
         },
     )

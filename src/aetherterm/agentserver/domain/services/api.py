@@ -8,15 +8,12 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Path, Query, Depends
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
-from dependency_injector.wiring import inject, Provide
 
 from .inference_engine import OperationContextInferenceEngine
 from .models import OperationContext
 from .pattern_learner import OperationPatternLearner
-from ...services.context_service import ContextService
-from ...infrastructure.config.di_container import MainContainer
 
 logger = logging.getLogger(__name__)
 
@@ -73,31 +70,15 @@ class PatternLearningResponse(BaseModel):
 
 
 @router.get("/infer/{terminal_id}", response_model=InferenceResultResponse)
-@inject
 async def infer_operation_context(
-    terminal_id: str = Path(description="Terminal ID to analyze"),
-    context_service: ContextService = Provide[MainContainer.application.context_service]
+    terminal_id: str = Path(description="Terminal ID to analyze")
 ) -> InferenceResultResponse:
     """
     指定ターミナルの現在のオペレーションコンテキストを推定
     """
-    try:
-        # Use injected context service instead of global variable
-        result = await context_service.get_session_analytics(terminal_id)
-
-        return InferenceResultResponse(
-            terminal_id=result.terminal_id,
-            timestamp=result.timestamp.isoformat(),
-            primary_context=_context_to_response(result.primary_context),
-            overall_confidence=result.overall_confidence,
-            reasoning=result.reasoning,
-            recommendations=result.recommendations,
-            warnings=result.warnings,
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to infer context for terminal {terminal_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Context inference failed: {e!s}")
+    # This is a placeholder implementation since context inference is not fully implemented
+    # The real functionality is now provided by the local insights API
+    raise HTTPException(status_code=501, detail="Context inference is not implemented. Use /api/v1/insights/ endpoints instead.")
 
 
 @router.get("/status/{terminal_id}", response_model=OperationContextResponse)
@@ -107,23 +88,7 @@ async def get_operation_status(
     """
     指定ターミナルの現在のオペレーション状態を取得
     """
-    if not inference_engine:
-        raise HTTPException(status_code=503, detail="Context inference engine not initialized")
-
-    try:
-        # アクティブなコンテキストを確認
-        active_context = inference_engine.active_contexts.get(terminal_id)
-
-        if not active_context:
-            # 新しい推定を実行
-            result = await inference_engine.infer_current_operation(terminal_id)
-            active_context = result.primary_context
-
-        return _context_to_response(active_context)
-
-    except Exception as e:
-        logger.error(f"Failed to get status for terminal {terminal_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Status retrieval failed: {e!s}")
+    raise HTTPException(status_code=501, detail="Context inference is not implemented. Use /api/v1/insights/ endpoints instead.")
 
 
 @router.get("/predict/{terminal_id}/next-commands")
@@ -134,27 +99,7 @@ async def predict_next_commands(
     """
     指定ターミナルの次に実行される可能性の高いコマンドを予測
     """
-    if not inference_engine:
-        raise HTTPException(status_code=503, detail="Context inference engine not initialized")
-
-    try:
-        # 現在のコンテキストを取得
-        active_context = inference_engine.active_contexts.get(terminal_id)
-
-        if not active_context:
-            # コンテキストが無い場合は推定を実行
-            result = await inference_engine.infer_current_operation(terminal_id)
-            active_context = result.primary_context
-
-        return {
-            "next_commands": active_context.next_likely_commands[:limit],
-            "confidence": active_context.confidence,
-            "operation_type": active_context.operation_type.value,
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to predict commands for terminal {terminal_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Command prediction failed: {e!s}")
+    raise HTTPException(status_code=501, detail="Context inference is not implemented. Use /api/v1/insights/ endpoints instead.")
 
 
 @router.get("/active-operations")
@@ -162,20 +107,7 @@ async def get_active_operations() -> Dict[str, List[OperationContextResponse]]:
     """
     現在アクティブな全オペレーションを取得
     """
-    if not inference_engine:
-        raise HTTPException(status_code=503, detail="Context inference engine not initialized")
-
-    try:
-        active_operations = []
-
-        for terminal_id, context in inference_engine.active_contexts.items():
-            active_operations.append(_context_to_response(context))
-
-        return {"active_operations": active_operations, "count": len(active_operations)}
-
-    except Exception as e:
-        logger.error(f"Failed to get active operations: {e}")
-        raise HTTPException(status_code=500, detail=f"Active operations retrieval failed: {e!s}")
+    raise HTTPException(status_code=501, detail="Context inference is not implemented. Use /api/v1/insights/ endpoints instead.")
 
 
 @router.post("/learn-patterns", response_model=PatternLearningResponse)
@@ -183,28 +115,7 @@ async def learn_operation_patterns(request: PatternLearningRequest) -> PatternLe
     """
     過去のコマンド履歴からオペレーションパターンを学習
     """
-    if not pattern_learner:
-        raise HTTPException(status_code=503, detail="Pattern learner not initialized")
-
-    try:
-        start_time = datetime.utcnow()
-
-        # パターン学習を実行
-        learned_patterns = await pattern_learner.learn_patterns_from_history(days=request.days)
-
-        end_time = datetime.utcnow()
-        duration = (end_time - start_time).total_seconds()
-
-        return PatternLearningResponse(
-            status="success",
-            patterns_learned=len(learned_patterns),
-            learning_duration=duration,
-            message=f"Successfully learned {len(learned_patterns)} patterns from {request.days} days of history",
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to learn patterns: {e}")
-        raise HTTPException(status_code=500, detail=f"Pattern learning failed: {e!s}")
+    raise HTTPException(status_code=501, detail="Context inference is not implemented. Use /api/v1/insights/ endpoints instead.")
 
 
 @router.get("/patterns/summary")
@@ -301,54 +212,31 @@ def _context_to_response(context: OperationContext) -> OperationContextResponse:
     )
 
 
-# Initialization Functions
-
+# Initialization Functions - DEPRECATED
 
 def initialize_context_inference(
     vector_storage, sql_storage
-) -> Tuple[OperationContextInferenceEngine, OperationPatternLearner]:
+) -> Tuple[None, None]:
     """
-    コンテキスト推定エンジンを初期化
+    コンテキスト推定エンジンを初期化 - DEPRECATED
     """
-    global inference_engine, pattern_learner
-
-    try:
-        pattern_learner = OperationPatternLearner(vector_storage, sql_storage)
-        inference_engine = OperationContextInferenceEngine(
-            vector_storage, sql_storage, pattern_learner
-        )
-
-        logger.info("Context inference system initialized successfully")
-        return inference_engine, pattern_learner
-
-    except Exception as e:
-        logger.error(f"Failed to initialize context inference: {e}")
-        raise
-
+    logger.warning("Context inference initialization is deprecated. Use local insights API instead.")
+    return None, None
 
 async def startup_context_inference():
     """
-    起動時のコンテキスト推定システム初期化
+    起動時のコンテキスト推定システム初期化 - DEPRECATED
     """
-    try:
-        # 必要に応じて初期パターン学習を実行
-        if pattern_learner:
-            logger.info("Starting initial pattern learning...")
-            await pattern_learner.learn_patterns_from_history(days=7)
-            logger.info("Initial pattern learning completed")
-
-    except Exception as e:
-        logger.warning(f"Initial pattern learning failed: {e}")
+    logger.warning("Context inference startup is deprecated. Use local insights API instead.")
 
 
 # Health Check
 @router.get("/health")
 async def health_check() -> Dict[str, str]:
     """ヘルスチェック"""
-    status = "healthy" if inference_engine and pattern_learner else "unhealthy"
-
     return {
-        "status": status,
+        "status": "deprecated",
         "service": "context-inference",
+        "message": "Use /api/v1/insights/ endpoints instead",
         "timestamp": datetime.utcnow().isoformat(),
     }

@@ -52,10 +52,13 @@ const emit = defineEmits<Emits>()
 const showMenu = ref(false)
 
 const toggleMenu = () => {
+  console.log('🔥 Toggle menu clicked, current state:', showMenu.value)
   showMenu.value = !showMenu.value
+  console.log('🔥 Menu state after toggle:', showMenu.value)
 }
 
 const addTab = (type: 'terminal' | 'ai-agent') => {
+  console.log('🔥 Add tab clicked, type:', type)
   emit('add-tab', type)
   showMenu.value = false
 }
@@ -128,6 +131,9 @@ onUnmounted(() => {
   right: 0;
   min-width: 180px;
   overflow: hidden;
+  z-index: 1000; // Ensure menu appears above other elements
+  background-color: var(--color-bg-primary); // Ensure background is set
+  border: 1px solid var(--color-border-primary); // Add border for visibility
 }
 
 .menu-section {

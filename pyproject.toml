@@ -57,12 +57,27 @@ dependencies = [
     # Steampipe統合用 (PostgreSQL経由)
     "psutil>=5.9.0",
     "boto3>=1.26.0",
+    "botocore>=1.29.0",
     "azure-identity>=1.12.0",
     "google-cloud-core>=2.3.0",
     "kubernetes>=24.0.0",
-    "opentelemetry-instrumentation-logging>=0.55b1",
+    # OpenTelemetry for APM
+    "opentelemetry-api>=1.25.0",
+    "opentelemetry-sdk>=1.25.0",
+    "opentelemetry-instrumentation>=0.46b0",
+    "opentelemetry-instrumentation-fastapi>=0.46b0",
+    "opentelemetry-instrumentation-logging>=0.46b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.46b0",
+    "opentelemetry-instrumentation-redis>=0.46b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.46b0",
+    "opentelemetry-exporter-otlp>=1.25.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.25.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.25.0",
     "tornado>=6.5.1",
     "structlog>=25.4.0",
+    # MCP integration
+    "supervisor>=4.2.0",
+    "mcp>=1.1.0",
 ]
 
 [project.optional-dependencies]

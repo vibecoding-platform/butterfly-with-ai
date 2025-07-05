@@ -8,7 +8,7 @@ import logging
 from typing import Any, Dict, List
 from uuid import uuid4
 
-from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+from aetherterm.agentserver.domain.entities.terminals.asyncio_terminal import AsyncioTerminal
 
 log = logging.getLogger("aetherterm.application.workspace")
 

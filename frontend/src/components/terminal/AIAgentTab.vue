@@ -27,8 +27,9 @@
             />
           </div>
           <div class="agent-terminal">
-            <TerminalTab 
+            <AetherTerminalComponent 
               :id="agent.terminalId"
+              mode="pane"
               :sub-type="'agent'"
               @terminal-initialized="() => onAgentTerminalInitialized(agent.id)"
             />
@@ -60,8 +61,9 @@
         </v-chip>
       </div>
       <div class="main-agent-terminal">
-        <TerminalTab 
+        <AetherTerminalComponent 
           :id="mainAgentTerminalId"
+          mode="pane"
           :sub-type="'main-agent'"
           @terminal-initialized="() => onMainAgentTerminalInitialized()"
         />

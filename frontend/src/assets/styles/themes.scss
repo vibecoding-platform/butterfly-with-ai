@@ -20,10 +20,18 @@
   --color-secondary-dark: #{$color-secondary-dark};
   --color-secondary-light: #{$color-secondary-light};
   
+  // Accent Colors
+  --color-accent-purple: #{$color-accent-purple};
+  --color-accent-purple-dark: #{$color-accent-purple-dark};
+  --color-accent-purple-light: #{$color-accent-purple-light};
+  --color-accent-blue: #{$color-secondary};
+  --color-accent-blue-light: #{$color-secondary-light};
+  
   // Background Colors
   --color-bg-primary: #{$color-bg-primary};
   --color-bg-secondary: #{$color-bg-secondary};
   --color-bg-tertiary: #{$color-bg-tertiary};
+  --color-bg-quaternary: #555555;
   --color-bg-elevated: #{$color-bg-elevated};
   
   // Text Colors
@@ -36,6 +44,7 @@
   // Border Colors
   --color-border-primary: #{$color-border-primary};
   --color-border-secondary: #{$color-border-secondary};
+  --color-border-tertiary: #666666;
   --color-border-focus: #{$color-border-focus};
   
   // Status Colors
@@ -43,6 +52,10 @@
   --color-status-warning: #{$color-status-warning};
   --color-status-error: #{$color-status-error};
   --color-status-info: #{$color-status-info};
+  
+  // Status Color Variants
+  --color-warning: #{$color-status-warning};
+  --color-warning-light: rgba(255, 152, 0, 0.1);
   
   // Terminal Colors (fallback - will be overridden by theme store)
   --color-terminal-bg: #{$color-terminal-bg};
@@ -71,6 +84,7 @@
   --color-bg-primary: #ffffff;
   --color-bg-secondary: #f5f5f5;
   --color-bg-tertiary: #e0e0e0;
+  --color-bg-quaternary: #cccccc;
   --color-bg-elevated: #ffffff;
   
   // Text Colors (inverted for light theme)
@@ -83,6 +97,7 @@
   // Border Colors
   --color-border-primary: #e0e0e0;
   --color-border-secondary: #cccccc;
+  --color-border-tertiary: #b0b0b0;
   
   // Terminal Colors (adjusted for light theme)
   --color-terminal-bg: #ffffff;

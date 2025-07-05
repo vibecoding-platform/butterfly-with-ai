@@ -8,6 +8,16 @@ import AetherTermService from './services/AetherTermService'
 import { useAetherTerminalServiceStore } from './stores/aetherTerminalServiceStore'
 import { useWorkspaceStore } from './stores/workspaceStore'
 import { useThemeStore } from './stores/themeStore'
+import { initializeTelemetry, getEnvironmentConfig } from './utils/telemetry'
+
+// Initialize OpenTelemetry for frontend tracing
+try {
+  const telemetryConfig = getEnvironmentConfig()
+  initializeTelemetry(telemetryConfig)
+  console.log('🔬 Frontend telemetry initialized')
+} catch (error) {
+  console.warn('⚠️ Frontend telemetry initialization failed:', error)
+}
 
 // Register vue-advanced-chat
 register()

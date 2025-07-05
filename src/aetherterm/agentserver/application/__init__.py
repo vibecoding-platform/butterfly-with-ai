@@ -5,9 +5,9 @@ Provides unified access to all application services with DI integration.
 """
 
 from dependency_injector.wiring import Provide, inject
-from .services.workspace_service import WorkspaceService
-from .services.agent_service import AgentService
-from .services.report_service import ReportService
+from aetherterm.agentserver.domain.services.workspace_service import WorkspaceService
+from aetherterm.agentserver.domain.services.agent_service import AgentService
+from aetherterm.agentserver.domain.services.report_service import ReportService
 
 
 class ApplicationServices:

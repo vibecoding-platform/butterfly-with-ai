@@ -148,7 +148,7 @@ const initializeTerminal = async () => {
     fontSize: themeStore.themeConfig.fontSize,
     fontFamily: themeStore.themeConfig.fontFamily,
     // 固定サイズを削除 - FitAddonに任せる
-    scrollback: 500, // メモリ使用量削減
+    scrollback: 5000, // Increased to match screen buffer store capacity
     fastScrollModifier: 'shift', // 高速スクロール有効化
     rightClickSelectsWord: false, // 選択処理オーバーヘッド削減
     // rendererType: 'canvas' // xterm.js 5.x では廃止されたオプション

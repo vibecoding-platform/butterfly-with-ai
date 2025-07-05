@@ -7,20 +7,20 @@ Workspace session and tab management handlers with Dependency Injection.
 import logging
 from datetime import datetime
 from uuid import uuid4
-from dependency_injector.wiring import inject, Provide
+# from dependency_injector.wiring import inject, Provide
 
-from aetherterm.agentserver.application.services.workspace_service import WorkspaceService
-from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
+from aetherterm.agentserver.domain.services.workspace_service import WorkspaceService
+# from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
 
 log = logging.getLogger("aetherterm.handlers.workspace")
 
 
-@inject
+# @inject
 async def resume_workspace(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Resume a workspace with multiple terminals."""
     try:
@@ -28,9 +28,10 @@ async def resume_workspace(
         tabs = data.get("tabs", [])
 
         # Use injected workspace service for workspace resumption
-        result = await workspace_service.resume_workspace(
-            client_sid=sid, workspace_id=workspace_id, tabs=tabs
-        )
+        # result = await workspace_service.resume_workspace(
+        #     client_sid=sid, workspace_id=workspace_id, tabs=tabs
+        # )
+        result = {"workspace_id": workspace_id, "tabs": tabs, "disabled": "dependency injection temporarily disabled"}
 
         await sio_instance.emit("workspace_resumed", result, room=sid)
 
@@ -39,12 +40,12 @@ async def resume_workspace(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-@inject
+# @inject
 async def resume_terminal(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Resume a specific terminal session."""
     try:
@@ -57,12 +58,13 @@ async def resume_terminal(
             return
 
         # Use injected workspace service for terminal resumption
-        result = await workspace_service.resume_terminal(
-            client_sid=sid,
-            session_id=session_id,
-            tab_id=tab_id,
-            pane_id=pane_id,
-        )
+        # result = await workspace_service.resume_terminal(
+        #     client_sid=sid,
+        #     session_id=session_id,
+        #     tab_id=tab_id,
+        #     pane_id=pane_id,
+        # )
+        result = {"session_id": session_id, "tab_id": tab_id, "pane_id": pane_id, "disabled": "dependency injection temporarily disabled"}
 
         await sio_instance.emit("terminal_resumed", result, room=sid)
 
@@ -71,19 +73,20 @@ async def resume_terminal(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-@inject
+# @inject
 async def wrapper_session_sync(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Synchronize wrapper session state."""
     try:
         sessions = data.get("sessions", {})
         
         # Update session states in workspace service
-        result = await workspace_service.sync_wrapper_sessions(sid, sessions)
+        # result = await workspace_service.sync_wrapper_sessions(sid, sessions)
+        result = {"sessions": sessions, "disabled": "dependency injection temporarily disabled"}
         
         await sio_instance.emit("wrapper_session_synced", result, room=sid)
 
@@ -92,17 +95,18 @@ async def wrapper_session_sync(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-@inject
+# @inject
 async def get_wrapper_sessions(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Get current wrapper session information."""
     try:
         # Get session information from workspace service
-        result = await workspace_service.get_wrapper_sessions(sid)
+        # result = await workspace_service.get_wrapper_sessions(sid)
+        result = {"disabled": "dependency injection temporarily disabled"}
         
         await sio_instance.emit("wrapper_sessions_info", result, room=sid)
 

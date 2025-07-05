@@ -126,3 +126,82 @@ Starting with a different port
 ```bash
 docker run -d -p 12345:12345 aetherterm/aetherterm --port=12345
 ```
+
+## APM Monitoring with Grafana Cloud
+
+AetherTerm includes built-in OpenTelemetry instrumentation for comprehensive observability through Grafana Cloud APM.
+
+### Features
+
+- **Distributed Tracing**: Track requests across terminal sessions, WebSocket connections, and AI agent interactions
+- **Custom Metrics**: Monitor terminal sessions, WebSocket traffic, AI token usage, and system resources
+- **Structured Logging**: Correlated logs with trace IDs for debugging
+- **Service Map**: Visualize dependencies and service interactions
+
+### Setup
+
+1. **Get Grafana Cloud Credentials**
+   - Sign up for [Grafana Cloud](https://grafana.com/cloud/)
+   - Create an API key with push permissions
+   - Note your instance ID
+
+2. **Configure Environment Variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Grafana Cloud credentials
+   ```
+
+3. **Required Environment Variables**
+   ```bash
+   GRAFANA_CLOUD_INSTANCE_ID="your-instance-id"
+   GRAFANA_CLOUD_API_KEY="your-api-key"
+   ENVIRONMENT="development"  # or staging, production
+   ```
+
+4. **Optional Configuration**
+   ```bash
+   OTEL_ENABLE_TRACING="true"
+   OTEL_ENABLE_METRICS="true"
+   OTEL_ENABLE_LOGGING="true"
+   OTEL_TRACE_SAMPLE_RATE="1.0"
+   ```
+
+### Usage
+
+Once configured, telemetry data will automatically be sent to Grafana Cloud:
+
+```bash
+# Start with APM enabled (default)
+make run-agentserver
+
+# Start with APM disabled
+OTEL_ENABLE_TRACING=false make run-agentserver
+```
+
+### Available Metrics
+
+- `aetherterm.terminal.sessions.active` - Active terminal sessions
+- `aetherterm.websocket.connections.active` - Active WebSocket connections
+- `aetherterm.ai.requests.total` - Total AI agent requests
+- `aetherterm.ai.tokens.usage.total` - AI token consumption
+- `aetherterm.system.memory.usage` - Memory usage
+- `aetherterm.errors.total` - Error counts
+
+### Grafana Dashboards
+
+Pre-built dashboards are available for:
+- Terminal session monitoring
+- WebSocket connection health
+- AI agent performance
+- System resource utilization
+- Error tracking and alerting
+
+### Development
+
+Enable console output for local development:
+
+```bash
+export OTEL_ENABLE_CONSOLE="true"
+```
+
+This will print telemetry data to the console in addition to sending to Grafana Cloud.

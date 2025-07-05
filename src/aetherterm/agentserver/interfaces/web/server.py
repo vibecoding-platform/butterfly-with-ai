@@ -16,85 +16,42 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import getpass
 import logging
 import os
-import shutil
-import socket
 import ssl
 import stat
 import sys
 import uuid
+import socket
+import getpass
 import webbrowser
-
 import uvicorn
 
-from aetherterm.agentserver.interfaces.web import socket_handlers
-from aetherterm.agentserver.infrastructure.config.legacy_containers import ApplicationContainer
-from aetherterm.agentserver.infrastructure.config.di_container import MainContainer, setup_di_container
-from aetherterm.agentserver.infrastructure import initialize_infra_services
-from aetherterm.agentserver.application import initialize_app_services
-from aetherterm.agentserver.interfaces.web.routes import router
+# OpenTelemetry imports
+from aetherterm.agentserver.infrastructure.observability.telemetry import (
+    initialize_telemetry,
+    get_telemetry
+)
 
-# Default configuration values
-DEFAULT_CONFIG = {
-    "debug": False,
-    "more": False,
-    "unminified": False,
-    "host": "localhost",
-    "port": 57575,
-    "keepalive_interval": 30,
-    "one_shot": False,
-    "shell": None,
-    "motd": "motd",
-    "cmd": None,
-    "unsecure": False,
-    "i_hereby_declare_i_dont_want_any_security_whatsoever": False,
-    "login": False,
-    "pam_profile": "",
-    "force_unicode_width": False,
-    "ssl_version": None,
-    "generate_certs": False,
-    "generate_current_user_pkcs": False,
-    "generate_user_pkcs": "",
-    "uri_root_path": "",
-    "ai_mode": "streaming",  # New option for AI assistance mode
-    "ai_provider": "mock",  # AI provider (anthropic, mock)
-    "ai_api_key": None,  # AI API key (will be read from env)
-    "ai_model": "claude-3-5-sonnet-20241022",  # AI model
-    "conf": "",  # Will be set dynamically
-    "ssl_dir": "",  # Will be set dynamically
-}
-
-
-def setup_config_paths(config_dict):
-    """Setup configuration paths and update the config dictionary."""
-    if os.getuid() == 0:
-        ev = os.getenv("XDG_CONFIG_DIRS", "/etc")
-    else:
-        ev = os.getenv(
-            "XDG_CONFIG_HOME",
-            os.path.join(os.getenv("HOME", os.path.expanduser("~")), ".config"),
-        )
-
-    aetherterm_dir = os.path.join(ev, "aetherterm")
-    conf_file = os.path.join(aetherterm_dir, "aetherterm.conf")
-    ssl_dir = os.path.join(aetherterm_dir, "ssl")
-
-    config_dict["conf"] = conf_file
-    config_dict["ssl_dir"] = ssl_dir
-
-    if not os.path.exists(conf_file):
-        try:
-            default_conf_path = os.path.join(
-                os.path.abspath(os.path.dirname(__file__)), "butterfly.conf.default"
-            )
-            shutil.copy(default_conf_path, conf_file)
-            print("aetherterm.conf installed in %s" % conf_file)
-        except Exception as e:
-            print(f"Could not install default aetherterm.conf: {e}")
-
-    return config_dict
+from aetherterm.agentserver.interfaces.web.config import (
+    DEFAULT_CONFIG,
+    setup_config_paths,
+    parse_environment_config,
+)
+from aetherterm.agentserver.interfaces.web.config.ssl_manager import (
+    SSLCertificateManager,
+    SSLCertificateOperations
+)
+from aetherterm.agentserver.interfaces.web.config.app_factory import (
+    ApplicationFactoryRegistry,
+    LegacyApplicationFactory
+)
+from aetherterm.agentserver.interfaces.web.config.lifecycle_manager import (
+    ServerSetupOrchestrator,
+    UvicornServerManager
+)
+from aetherterm.agentserver.endpoint.routes import router
+from aetherterm.agentserver.endpoint.websocket import socket_handlers
 
 
 # Configure logging
@@ -113,29 +70,8 @@ log = logging.getLogger("aetherterm")
 
 def create_app(**kwargs):
     """Create the Butterfly ASGI application with dependency injection."""
-    # Start with default config
-    config = DEFAULT_CONFIG.copy()
-
-    # Setup config paths first (may be overridden by kwargs)
-    config = setup_config_paths(config)
-
-    # Override with Click-provided values (this ensures CLI args take precedence)
-    config.update(kwargs)
-
-    # Configure the dependency injection container
-    container = ApplicationContainer()
-    container.config.from_dict(config)
-    container.wire(
-        modules=[
-            "aetherterm.agentserver.server",
-            "aetherterm.agentserver.terminals",
-            "aetherterm.agentserver.utils",
-            "aetherterm.agentserver.socket_handlers",
-            "aetherterm.agentserver.routes",  # Wire routes module
-        ]
-    )
-
-    return container, config
+    factory = LegacyApplicationFactory()
+    return factory.create_app(**kwargs)
 
 
 async def start_server(**kwargs):
@@ -434,13 +370,32 @@ async def start_server(**kwargs):
     sio.on("context_inference_subscribe", socket_handlers.context_inference_subscribe)
     sio.on("predict_next_commands", socket_handlers.predict_next_commands)
     sio.on("get_operation_analytics", socket_handlers.get_operation_analytics)
+    
+    # AI チャットとログ検索
+    from aetherterm.agentserver.endpoint.handlers import ai_handlers
+    sio.on("ai_chat", ai_handlers.ai_chat_message)
+    sio.on("ai_log_search", ai_handlers.ai_log_search)
+    sio.on("ai_search_suggestions", ai_handlers.ai_search_suggestions)
+
+    # Supervisord プロセス管理 - check if module exists
+    try:
+        from aetherterm.agentserver.endpoint.handlers import supervisord_handlers
+        sio.on("get_processes_list", supervisord_handlers.get_processes_list)
+        sio.on("start_process", supervisord_handlers.start_process)
+        sio.on("stop_process", supervisord_handlers.stop_process)
+        sio.on("restart_process", supervisord_handlers.restart_process)
+        sio.on("get_process_logs", supervisord_handlers.get_process_logs)
+        sio.on("get_supervisord_status", supervisord_handlers.get_supervisord_status)
+    except ImportError:
+        log.warning("Supervisord handlers not available")
 
     # ログ監視バックグラウンドタスクを開始
     socket_handlers.start_log_monitoring_background_task()
 
     # 短期記憶機能とControlServer接続を初期化
     from aetherterm.agentserver.control_server_client import ControlServerClient
-    from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+    from aetherterm.agentserver.domain.entities.terminals.asyncio_terminal import AsyncioTerminal
+    from aetherterm.agentserver.infrastructure.external.supervisord_mcp_service import initialize_supervisord_mcp
 
     # エージェントIDを生成（ホスト:ポートベース）
     agent_id = f"agentserver_{host}_{port}"
@@ -451,6 +406,13 @@ async def start_server(**kwargs):
     # ControlServer接続を開始
     control_client = ControlServerClient(agent_id=agent_id)
     await control_client.start()
+
+    # Supervisord MCP サービスを初期化
+    try:
+        await initialize_supervisord_mcp()
+        log.info("Supervisord MCP service initialized successfully")
+    except Exception as e:
+        log.warning(f"Failed to initialize Supervisord MCP service: {e}")
 
     # Mount the FastAPI router onto the main ASGI app
     app.other_asgi_app.include_router(router, prefix=uri_root_path)
@@ -486,62 +448,53 @@ async def start_server(**kwargs):
 def create_app(**kwargs):
     """Create the AetherTerm AgentServer ASGI application with dependency injection."""
     import socketio
+    import os
     from fastapi import FastAPI
     from fastapi.staticfiles import StaticFiles
     
+    from aetherterm.agentserver.infrastructure.config.di_container import setup_di_container
+    
     # Initialize DI container
     di_container = setup_di_container()
-    
-    # Initialize services with DI
-    initialize_infra_services(di_container.infrastructure)
-    initialize_app_services(di_container.application)
-
-    # Default configuration values
-    default_config = {
-        "debug": False,
-        "more": False,
-        "unminified": False,
-        "host": "localhost",
-        "port": 57575,
-        "keepalive_interval": 30,
-        "one_shot": False,
-        "shell": None,
-        "motd": "motd",
-        "cmd": None,
-        "unsecure": False,
-        "i_hereby_declare_i_dont_want_any_security_whatsoever": False,
-        "login": False,
-        "pam_profile": "",
-        "force_unicode_width": False,
-        "ssl_version": None,
-        "generate_certs": False,
-        "generate_current_user_pkcs": False,
-        "generate_user_pkcs": "",
-        "uri_root_path": "",
-        "ai_mode": "streaming",
-    }
 
     # Start with default config and override with provided kwargs
-    config = default_config.copy()
+    config = DEFAULT_CONFIG.copy()
     config.update(kwargs)
 
-    # Configure the dependency injection container
-    from aetherterm.agentserver.containers import configure_container
-
-    container = configure_container(config)
-
+    # Initialize OpenTelemetry if enabled
+    enable_telemetry = config.get("enable_telemetry", True)
+    telemetry = None
+    
+    if enable_telemetry:
+        try:
+            telemetry = initialize_telemetry(
+                service_name="aetherterm-agentserver",
+                service_version="0.0.1", 
+                environment=config.get("environment", "development"),
+                enable_console_exporter=config.get("debug", False)
+            )
+            telemetry.setup_all()
+        except Exception as e:
+            log.warning(f"Failed to initialize telemetry: {e}")
+    
     # Create FastAPI application
-    fastapi_app = FastAPI()
-    static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    fastapi_app = FastAPI(
+        title="AetherTerm AgentServer API",
+        description="Web-based terminal with AI agent integration",
+        version="0.0.1"
+    )
+    
+    # Apply OpenTelemetry instrumentation to FastAPI
+    if telemetry:
+        telemetry.instrument_app(fastapi_app)
+    # Calculate path to static files (go up from web/server.py to agentserver/static)
+    static_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "static")
     if os.path.exists(static_path):
         fastapi_app.mount("/static", StaticFiles(directory=static_path), name="static")
+        fastapi_app.mount("/assets", StaticFiles(directory=os.path.join(static_path, "assets")), name="assets")
 
     # Include routers
-    from aetherterm.agentserver.context_inference import context_api_router
-    from aetherterm.agentserver.routes import router
-
     fastapi_app.include_router(router)
-    fastapi_app.include_router(context_api_router)
 
     # Create Socket.IO server
     sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -554,7 +507,7 @@ def create_app(**kwargs):
         socketio_server=sio, other_asgi_app=fastapi_app, socketio_path=socketio_path
     )
 
-    return asgi_app, sio, container, config
+    return asgi_app, sio, di_container, config
 
 
 def setup_app(**kwargs):
@@ -563,7 +516,7 @@ def setup_app(**kwargs):
     asgi_app, sio, container, config = create_app(**kwargs)
 
     # Set the socket.io instance in handlers module
-    from aetherterm.agentserver.interfaces.web import socket_handlers
+    from aetherterm.agentserver.endpoint.websocket import socket_handlers
     from aetherterm.core.container import DIContainer
 
     # Wire the DI container first
@@ -595,6 +548,11 @@ def setup_app(**kwargs):
     sio.on("context_inference_subscribe", socket_handlers.context_inference_subscribe)
     sio.on("predict_next_commands", socket_handlers.predict_next_commands)
     sio.on("get_operation_analytics", socket_handlers.get_operation_analytics)
+    
+    # Register AI chat and log search handlers
+    sio.on("ai_chat", socket_handlers.ai_chat)
+    sio.on("ai_log_search", socket_handlers.log_search)
+    sio.on("ai_search_suggestions", socket_handlers.search_suggestions)
 
     # P0 緊急対応: MainAgent-SubAgent通信ハンドラー
     # DEPRECATED: 後方互換性のため一時的に保持（将来削除予定）
@@ -613,9 +571,11 @@ def setup_app(**kwargs):
     sio.on("agent_hello", socket_handlers.agent_hello)
 
     # Set up auto-blocker integration
-    from aetherterm.agentserver.auto_blocker import set_socket_io_instance
-
-    set_socket_io_instance(sio)
+    try:
+        from aetherterm.agentserver.auto_blocker import set_socket_io_instance
+        set_socket_io_instance(sio)
+    except ImportError as e:
+        log.warning(f"Auto-blocker not available: {e}")
 
     # Initialize inventory service
     async def startup_inventory_service():
@@ -630,7 +590,7 @@ def setup_app(**kwargs):
     # Initialize log processing
     async def startup_log_processing():
         try:
-            from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+            from aetherterm.agentserver.domain.entities.terminals.asyncio_terminal import AsyncioTerminal
 
             await AsyncioTerminal.start_log_processing()
             log.info("Log processing service started successfully")
@@ -664,7 +624,7 @@ def setup_app(**kwargs):
 
     async def shutdown():
         try:
-            from aetherterm.agentserver.terminals.asyncio_terminal import AsyncioTerminal
+            from aetherterm.agentserver.domain.entities.terminals.asyncio_terminal import AsyncioTerminal
 
             await AsyncioTerminal.stop_log_processing()
             log.info("Log processing service stopped")
@@ -688,26 +648,8 @@ def create_asgi_app():
     This is called by uvicorn/hypercorn when using:
     uvicorn aetherterm.agentserver.server:create_asgi_app --factory
     """
-    import os
-
-    # Get configuration from environment variables
-    config = {}
-
-    # Basic settings
-    config["host"] = os.getenv("AETHERTERM_HOST", "localhost")
-    config["port"] = int(os.getenv("AETHERTERM_PORT", "57575"))
-    config["debug"] = os.getenv("AETHERTERM_DEBUG", "").lower() in ("true", "1", "yes")
-    config["more"] = os.getenv("AETHERTERM_MORE", "").lower() in ("true", "1", "yes")
-    config["unsecure"] = os.getenv("AETHERTERM_UNSECURE", "").lower() in ("true", "1", "yes")
-    config["uri_root_path"] = os.getenv("AETHERTERM_URI_ROOT_PATH", "")
-    config["login"] = os.getenv("AETHERTERM_LOGIN", "").lower() in ("true", "1", "yes")
-    config["pam_profile"] = os.getenv("AETHERTERM_PAM_PROFILE", "")
-    config["ai_mode"] = os.getenv("AETHERTERM_AI_MODE", "streaming")
-    config["ai_provider"] = os.getenv(
-        "AETHERTERM_AI_PROVIDER", "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock"
-    )
-    config["ai_api_key"] = os.getenv("ANTHROPIC_API_KEY")
-    config["ai_model"] = os.getenv("AETHERTERM_AI_MODEL", "claude-3-5-sonnet-20241022")
+    # Get configuration from environment variables using the config module
+    config = parse_environment_config()
 
     # Setup and return the app
     return setup_app(**config)

@@ -7,11 +7,11 @@ Provides session-related routes for listing and managing terminal sessions.
 import logging
 from typing import Dict, Any
 
-from dependency_injector.wiring import Provide, inject
+# from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
+# from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
 
 # Initialize router
 router = APIRouter()
@@ -19,11 +19,7 @@ log = logging.getLogger("aetherterm.routes.session")
 
 
 @router.get("/sessions/list.json")
-@inject
-async def sessions_list(
-    request: Request,
-    config=Provide[MainContainer.application.config],
-) -> JSONResponse:
+async def sessions_list(request: Request) -> JSONResponse:
     """Get the list of active sessions."""
     # Check if remote authentication is being used
     is_remote_authentication = bool(

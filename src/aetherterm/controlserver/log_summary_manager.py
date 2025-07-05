@@ -5,11 +5,10 @@ AgentServerから送信される短期記憶データを収集・統合してロ
 """
 
 import asyncio
-import json
 import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)

@@ -7,20 +7,20 @@ Agent communication and coordination handlers with Dependency Injection.
 import logging
 from datetime import datetime
 from uuid import uuid4
-from dependency_injector.wiring import inject, Provide
+# from dependency_injector.wiring import inject, Provide
 
-from aetherterm.agentserver.application.services.agent_service import AgentService
-from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
+from aetherterm.agentserver.domain.services.agent_service import AgentService
+# from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
 
 log = logging.getLogger("aetherterm.handlers.agent")
 
 
-@inject
+# @inject
 async def agent_start_request(
     sid, 
     data, 
-    sio_instance,
-    agent_service: AgentService = Provide[MainContainer.application.agent_service]
+    sio_instance
+    # agent_service: AgentService = Provide[MainContainer.application.agent_service]
 ):
     """Handle agent startup request."""
     try:
@@ -30,13 +30,20 @@ async def agent_start_request(
         config = data.get("config", {})
 
         # Use injected agent service for agent startup
-        result = await agent_service.agent_start_request(
-            sio_instance=sio_instance,
-            agent_id=agent_id,
-            agent_type=agent_type,
-            parent_agent_id=parent_agent_id,
-            config=config,
-        )
+        # result = await agent_service.agent_start_request(
+        #     sio_instance=sio_instance,
+        #     agent_id=agent_id,
+        #     agent_type=agent_type,
+        #     parent_agent_id=parent_agent_id,
+        #     config=config,
+        # )
+        result = {
+            "agent_id": agent_id,
+            "agent_type": agent_type,
+            "parent_agent_id": parent_agent_id,
+            "config": config,
+            "disabled": "dependency injection temporarily disabled"
+        }
 
         await sio_instance.emit("agent_start_response", result, room=sid)
 
@@ -72,12 +79,12 @@ async def agent_hello(sid, data, sio_instance):
         await sio_instance.emit("error", {"message": f"Agent hello failed: {e!s}"}, room=sid)
 
 
-@inject
+# @inject
 async def spec_upload(
     sid, 
     data, 
-    sio_instance,
-    agent_service: AgentService = Provide[MainContainer.application.agent_service]
+    sio_instance
+    # agent_service: AgentService = Provide[MainContainer.application.agent_service]
 ):
     """Handle specification document upload."""
     try:
@@ -85,7 +92,8 @@ async def spec_upload(
         content = data.get("content", "")
 
         # Use injected agent service for spec upload
-        result = await agent_service.upload_spec(spec_id, content)
+        # result = await agent_service.upload_spec(spec_id, content)
+        result = {"spec_id": spec_id, "disabled": "dependency injection temporarily disabled"}
 
         await sio_instance.emit("spec_upload_response", result, room=sid)
 
@@ -94,12 +102,12 @@ async def spec_upload(
         await sio_instance.emit("error", {"message": f"Spec upload failed: {e!s}"}, room=sid)
 
 
-@inject
+# @inject
 async def spec_query(
     sid, 
     data, 
-    sio_instance,
-    agent_service: AgentService = Provide[MainContainer.application.agent_service]
+    sio_instance
+    # agent_service: AgentService = Provide[MainContainer.application.agent_service]
 ):
     """Handle specification document query."""
     try:
@@ -107,7 +115,8 @@ async def spec_query(
         query = data.get("query")
 
         # Use injected agent service for spec query
-        result = await agent_service.query_spec(spec_id, query)
+        # result = await agent_service.query_spec(spec_id, query)
+        result = {"spec_id": spec_id, "query": query, "disabled": "dependency injection temporarily disabled"}
 
         await sio_instance.emit("spec_query_response", result, room=sid)
 

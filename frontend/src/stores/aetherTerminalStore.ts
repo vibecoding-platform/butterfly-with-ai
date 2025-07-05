@@ -58,7 +58,7 @@ export const useAetherTerminalStore = defineStore('aetherTerminal', () => {
 
     try {
       // Socket.IO接続を作成
-      socket.value = io('ws://localhost:57575', {
+      socket.value = io('http://localhost:57575', {
         transports: ['websocket', 'polling'],
         timeout: 10000,
         forceNew: true

@@ -434,7 +434,8 @@
     flex-grow: 1; /* Make terminal-container grow to fill space */
     overflow: hidden;
     background-color: #1e1e1e;
-    transition: width 0.1s ease-out;
+    will-change: transform; /* GPU最適化ヒント */
+    /* transition削除 - performanceのため */
   }
 
   #chat-container {

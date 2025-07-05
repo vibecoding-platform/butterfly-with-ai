@@ -31,8 +31,8 @@ from datetime import datetime
 from logging import getLogger
 from typing import Dict, List, Optional
 
-from aetherterm.agentserver import utils
-from aetherterm.agentserver.short_term_memory import ShortTermMemoryManager
+from aetherterm.agentserver.infrastructure.config import utils
+from aetherterm.agentserver.short_term_memory_local import LocalShortTermAnalyzer
 
 from .base_terminal import BaseTerminal
 
@@ -47,6 +47,9 @@ class AsyncioTerminal(BaseTerminal):
     # Log processing infrastructure
     log_buffer = []  # Global log buffer for all sessions
     log_processing_task = None  # Background task for log processing
+    
+    # Local short-term memory analyzer
+    local_analyzer = None  # Shared across all sessions
 
     # Short-term memory management
     short_term_memory_manager = None  # Shared across all sessions
@@ -83,7 +86,7 @@ class AsyncioTerminal(BaseTerminal):
         self, user, path, session, socket, uri, render_string, broadcast, login, pam_profile
     ):
         self.sessions[session] = self
-        self.history_size = 50000
+        self.history_size = 500000  # Increased from 50KB to 500KB for better buffer capacity
         self.history = ""
         self.uri = uri
         self.session = session
@@ -143,7 +146,14 @@ class AsyncioTerminal(BaseTerminal):
             # Add to log buffer for processing
             self.add_to_log_buffer(message)
 
-        self.broadcast(self.session, message)
+            # Chunk large messages to prevent WebSocket frame size issues
+            MAX_CHUNK_SIZE = 65536  # 64KB chunks
+            if len(message) > MAX_CHUNK_SIZE:
+                for i in range(0, len(message), MAX_CHUNK_SIZE):
+                    chunk = message[i:i + MAX_CHUNK_SIZE]
+                    self.broadcast(self.session, chunk)
+            else:
+                self.broadcast(self.session, message)
 
     async def start_pty(self):
         """Start the PTY process using asyncio."""
@@ -307,9 +317,15 @@ class AsyncioTerminal(BaseTerminal):
                         # Decode and send to clients
                         try:
                             text = data.decode("utf-8", "replace")
+                            
+                            # Record performance metric for data reading
+                            data_size = len(data)
+                            self.record_performance_metric("pty_data_size", data_size, "bytes")
+                            
                             self.send(text)
                         except Exception as e:
                             log.error(f"Error decoding PTY data: {e}")
+                            self.record_error_event("pty_decode_error", str(e))
 
                 except asyncio.TimeoutError:
                     # No data available, continue
@@ -337,12 +353,25 @@ class AsyncioTerminal(BaseTerminal):
 
         try:
             log.debug("WRIT<%r" % message)
+            
+            # Record user interaction for local analysis
+            self.record_user_interaction("terminal_input", message[:100])
+            
+            # Detect potential commands
+            message_clean = message.strip()
+            if message_clean and not message_clean.startswith('\x1b') and len(message_clean) > 2:
+                # Record as potential command for analysis
+                start_time = __import__("time").time()
+                self.record_command_execution(message_clean, exit_code=None, execution_time=None)
+            
             # Write to PTY
             await asyncio.get_event_loop().run_in_executor(
                 None, os.write, self.fd, message.encode("utf-8")
             )
         except Exception as e:
             log.error(f"Error writing to PTY: {e}")
+            # Record error for analysis
+            self.record_error_event("pty_write_error", str(e))
             await self.close()
 
     async def resize(self, cols, rows):
@@ -351,11 +380,21 @@ class AsyncioTerminal(BaseTerminal):
             return
 
         try:
+            start_time = __import__("time").time()
             s = struct.pack("HHHH", rows, cols, 0, 0)
             fcntl.ioctl(self.fd, termios.TIOCSWINSZ, s)
+            
+            # Record performance metric
+            resize_time = (__import__("time").time() - start_time) * 1000  # Convert to ms
+            self.record_performance_metric("terminal_resize_time", resize_time, "ms")
+            
+            # Record user interaction
+            self.record_user_interaction("terminal_resize", f"{cols}x{rows}")
+            
             log.info("SIZE (%d, %d)" % (cols, rows))
         except Exception as e:
             log.error(f"Error resizing PTY: {e}")
+            self.record_error_event("pty_resize_error", str(e))
 
     async def close(self):
         """Close the terminal and clean up resources."""
@@ -437,15 +476,15 @@ class AsyncioTerminal(BaseTerminal):
     async def _send_motd_direct(self):
         """Send MOTD (Message of the Day) directly to socket before shell starts."""
         try:
-            from aetherterm.agentserver.containers import ApplicationContainer
-            from aetherterm.agentserver.utils import render_motd
+            from aetherterm.agentserver.infrastructure.config.di_container import get_container
+            from aetherterm.agentserver.infrastructure.config.utils import render_motd
 
             # Get configuration from DI container
             try:
                 # Try to get injected values, fallback to defaults if not available
-                unsecure = getattr(ApplicationContainer.config, "unsecure", lambda: False)()
+                unsecure = getattr(get_container().application.config(), "unsecure", lambda: False)()
                 i_hereby_declare = getattr(
-                    ApplicationContainer.config,
+                    get_container().application.config(),
                     "i_hereby_declare_i_dont_want_any_security_whatsoever",
                     lambda: False,
                 )()
@@ -484,15 +523,15 @@ class AsyncioTerminal(BaseTerminal):
     async def _send_motd(self):
         """Send MOTD (Message of the Day) to the terminal."""
         try:
-            from aetherterm.agentserver.containers import ApplicationContainer
-            from aetherterm.agentserver.utils import render_motd
+            from aetherterm.agentserver.infrastructure.config.di_container import get_container
+            from aetherterm.agentserver.infrastructure.config.utils import render_motd
 
             # Get configuration from DI container
             try:
                 # Try to get injected values, fallback to defaults if not available
-                unsecure = getattr(ApplicationContainer.config, "unsecure", lambda: False)()
+                unsecure = getattr(get_container().application.config(), "unsecure", lambda: False)()
                 i_hereby_declare = getattr(
-                    ApplicationContainer.config,
+                    get_container().application.config(),
                     "i_hereby_declare_i_dont_want_any_security_whatsoever",
                     lambda: False,
                 )()
@@ -779,6 +818,12 @@ class AsyncioTerminal(BaseTerminal):
             cls.short_term_memory_manager = ShortTermMemoryManager(agent_id)
             await cls.short_term_memory_manager.start()
             log.info(f"Short-term memory manager initialized for agent {agent_id}")
+        
+        # ローカル分析器も初期化
+        if cls.local_analyzer is None:
+            cls.local_analyzer = LocalShortTermAnalyzer(agent_id)
+            await cls.local_analyzer.start()
+            log.info(f"Local short-term analyzer initialized for agent {agent_id}")
 
     @classmethod
     def set_control_server_connection(cls, websocket):
@@ -798,12 +843,29 @@ class AsyncioTerminal(BaseTerminal):
                 exit_code=exit_code,
                 execution_time=execution_time,
             )
+        
+        # ローカル分析器にも記録
+        if self.local_analyzer:
+            self.local_analyzer.record_command(
+                session_id=self.session,
+                command=command,
+                exit_code=exit_code,
+                execution_time=execution_time,
+            )
 
     def record_user_interaction(self, interaction_type: str, details: str = None):
         """ユーザーインタラクションを短期記憶に記録"""
         if self.short_term_memory_manager:
             self.short_term_memory_manager.record_user_interaction(
                 session_id=self.session, interaction_type=interaction_type, details=details
+            )
+        
+        # ローカル分析器にも記録
+        if self.local_analyzer:
+            self.local_analyzer.record_user_interaction(
+                session_id=self.session,
+                interaction_type=interaction_type,
+                details=details,
             )
 
     def record_error_event(self, error_type: str, error_message: str, stack_trace: str = None):
@@ -814,6 +876,14 @@ class AsyncioTerminal(BaseTerminal):
                 error_type=error_type,
                 error_message=error_message,
                 stack_trace=stack_trace,
+            )
+        
+        # ローカル分析器にも記録
+        if self.local_analyzer:
+            self.local_analyzer.record_error(
+                session_id=self.session,
+                error_type=error_type,
+                error_message=error_message,
             )
 
     def record_performance_metric(
@@ -827,4 +897,13 @@ class AsyncioTerminal(BaseTerminal):
                 value=value,
                 unit=unit,
                 threshold_exceeded=threshold_exceeded,
+            )
+        
+        # ローカル分析器にも記録
+        if self.local_analyzer:
+            self.local_analyzer.record_performance(
+                session_id=self.session,
+                metric_name=metric_name,
+                value=value,
+                unit=unit,
             )

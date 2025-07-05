@@ -6,10 +6,10 @@ Core terminal functionality and basic operations with Dependency Injection.
 
 import logging
 from datetime import datetime
-from dependency_injector.wiring import inject, Provide
+# from dependency_injector.wiring import inject, Provide
 
-from aetherterm.agentserver.application.services.workspace_service import WorkspaceService
-from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
+from aetherterm.agentserver.domain.services.workspace_service import WorkspaceService
+# from aetherterm.agentserver.infrastructure.config.di_container import MainContainer
 
 log = logging.getLogger("aetherterm.handlers.core")
 
@@ -40,17 +40,18 @@ def broadcast_to_session(session_id, message):
         log.error(f"Failed to broadcast to session {session_id}: {e}")
 
 
-@inject
+# @inject
 async def system_status(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Get system status information."""
     try:
         # Get system status from workspace service
-        status = await workspace_service.get_system_status()
+        # status = await workspace_service.get_system_status()
+        status = {"status": "ok", "disabled": "dependency injection temporarily disabled"}
         
         await sio_instance.emit("system_status", {
             "status": status,
@@ -62,12 +63,12 @@ async def system_status(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-@inject
+# @inject
 async def ping(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Handle ping requests for connection testing."""
     try:
@@ -84,19 +85,20 @@ async def ping(
         log.error(f"Failed to handle ping: {e}")
 
 
-@inject
+# @inject
 async def get_session_info(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Get information about current session."""
     try:
         session_id = data.get("session_id")
         
         # Get session info from workspace service
-        session_info = await workspace_service.get_session_info(session_id)
+        # session_info = await workspace_service.get_session_info(session_id)
+        session_info = {"disabled": "dependency injection temporarily disabled"}
         
         await sio_instance.emit("session_info", {
             "session_id": session_id,
@@ -109,17 +111,18 @@ async def get_session_info(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-@inject
+# @inject
 async def list_sessions(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """List all available sessions for current user."""
     try:
         # Get session list from workspace service
-        sessions = await workspace_service.list_user_sessions(sid)
+        # sessions = await workspace_service.list_user_sessions(sid)
+        sessions = []
         
         await sio_instance.emit("sessions_list", {
             "sessions": sessions,
@@ -132,12 +135,12 @@ async def list_sessions(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-@inject
+# @inject
 async def cleanup_session(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Clean up a specific session."""
     try:
@@ -149,7 +152,8 @@ async def cleanup_session(
             return
         
         # Clean up session through workspace service
-        result = await workspace_service.cleanup_session(session_id, force=force)
+        # result = await workspace_service.cleanup_session(session_id, force=force)
+        result = True
         
         await sio_instance.emit("session_cleaned", {
             "session_id": session_id,
@@ -162,17 +166,18 @@ async def cleanup_session(
         await sio_instance.emit("error", {"message": str(e)}, room=sid)
 
 
-@inject
+# @inject
 async def get_resource_usage(
     sid, 
     data,
-    sio_instance,
-    workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
+    sio_instance
+    # workspace_service: WorkspaceService = Provide[MainContainer.application.workspace_service]
 ):
     """Get current resource usage statistics."""
     try:
         # Get resource usage from workspace service
-        usage = await workspace_service.get_resource_usage()
+        # usage = await workspace_service.get_resource_usage()
+        usage = {"disabled": "dependency injection temporarily disabled"}
         
         await sio_instance.emit("resource_usage", {
             "usage": usage,

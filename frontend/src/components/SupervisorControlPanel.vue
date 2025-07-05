@@ -14,29 +14,91 @@
         <div class="status-item">
           <span class="label">Session ID:</span>
           <span class="value">{{ terminalStore.session.id }}</span>
-          -------
         </div>
         <div class="status-item">
           <span class="label">Supervisor Control:</span>
           <span class="value" :class="{ active: terminalStore.session.supervisorControlled }">
             {{ terminalStore.session.supervisorControlled ? 'Enabled' : 'Disabled' }}
           </span>
-          -------
         </div>
         <div class="status-item">
-          <span class="label">AIRisk:</span>
+          <span class="label">AI Risk:</span>
           <span class="value" :class="`risk-${terminalStore.aiMonitoring.riskAssessment}`">
             {{ terminalStore.aiMonitoring.riskAssessment.toUpperCase() }}
           </span>
         </div>
-        -------
         <div class="status-item">
-          <span class="label">Procedure Status:</span>
-          <span class="value">
-            {{ terminalStore.aiMonitoring.procedureStep }}/{{
-              terminalStore.aiMonitoring.totalSteps
-            }}
+          <span class="label">Supervisord MCP:</span>
+          <span class="value" :class="{ active: supervisordStatus.mcp_server_running }">
+            {{ supervisordStatus.mcp_server_running ? 'Running' : 'Stopped' }}
           </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supervisord Process Management Section -->
+    <div class="control-section">
+      <h4>Process Management (Supervisord)</h4>
+      <div class="supervisord-controls">
+        <div class="control-buttons">
+          <button @click="refreshProcesses" :disabled="loading" class="control-btn refresh-btn">
+            {{ loading ? 'Loading...' : 'Refresh Processes' }}
+          </button>
+          <button @click="startAllProcesses" :disabled="loading" class="control-btn start-btn">
+            Start All
+          </button>
+          <button @click="stopAllProcesses" :disabled="loading" class="control-btn stop-btn">
+            Stop All
+          </button>
+        </div>
+        
+        <div v-if="processes.length > 0" class="process-list">
+          <div
+            v-for="process in processes"
+            :key="process.name"
+            class="process-item"
+            :class="getProcessStatusClass(process.state)"
+          >
+            <div class="process-info">
+              <div class="process-name">{{ process.name }}</div>
+              <div class="process-state">{{ process.state }}</div>
+              <div v-if="process.pid" class="process-pid">PID: {{ process.pid }}</div>
+            </div>
+            <div class="process-actions">
+              <button 
+                @click="startProcess(process.name)"
+                :disabled="process.state === 'RUNNING' || loading"
+                class="action-btn start-btn-small"
+              >
+                Start
+              </button>
+              <button 
+                @click="stopProcess(process.name)"
+                :disabled="process.state === 'STOPPED' || loading"
+                class="action-btn stop-btn-small"
+              >
+                Stop
+              </button>
+              <button 
+                @click="restartProcess(process.name)"
+                :disabled="loading"
+                class="action-btn restart-btn-small"
+              >
+                Restart
+              </button>
+              <button 
+                @click="viewProcessLogs(process)"
+                :disabled="loading"
+                class="action-btn logs-btn-small"
+              >
+                Logs
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div v-else-if="!loading" class="no-processes">
+          No processes found. Check supervisord configuration.
         </div>
       </div>
     </div>
@@ -202,6 +264,22 @@
       </div>
     </div>
 
+    <!-- Process Logs Dialog -->
+    <div v-if="showLogsModal" class="modal-overlay" @click="closeLogsDialog">
+      <div class="modal-content logs-modal" @click.stop>
+        <h3>{{ selectedProcessForLogs?.name }} Logs</h3>
+        <div class="logs-container">
+          <pre class="logs-content">{{ processLogs }}</pre>
+        </div>
+        <div class="modal-actions">
+          <button @click="refreshProcessLogs" :disabled="loadingLogs" class="action-btn refresh-btn">
+            {{ loadingLogs ? 'Loading...' : 'Refresh' }}
+          </button>
+          <button @click="closeLogsDialog" class="action-btn cancel-btn">Close</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Reject Command Dialog -->
     <div v-if="showRejectModal" class="modal-overlay" @click="closeRejectDialog">
       <div class="modal-content" @click.stop>
@@ -265,15 +343,30 @@
   import { computed, onMounted, ref } from 'vue'
   import type { TerminalCommand } from '../stores/aetherTerminalServiceStore'
   import { useAetherTerminalServiceStore } from '../stores/aetherTerminalServiceStore'
+  import { useAetherTerminalStore } from '../stores/aetherTerminalStore'
   import { getCurrentUser, getJWTToken, decodeJWT, isSupervisor } from '../utils/auth'
 
   const terminalStore = useAetherTerminalServiceStore()
+  const aetherStore = useAetherTerminalStore()
 
   // User authentication state
   const userInfo = ref<{ email?: string; roles?: string[]; isSupervisor: boolean } | null>(null)
 
+  // Supervisord state
+  const processes = ref<any[]>([])
+  const supervisordStatus = ref<any>({
+    mcp_server_running: false,
+    supervisord_url: '',
+    config_path: ''
+  })
+  const loading = ref(false)
+  const loadingLogs = ref(false)
+  const showLogsModal = ref(false)
+  const selectedProcessForLogs = ref<any>(null)
+  const processLogs = ref('')
+
   // Check authentication on mount
-  onMounted(() => {
+  onMounted(async () => {
     userInfo.value = getCurrentUser()
 
     // Debug JWT token status
@@ -290,6 +383,12 @@
       console.log('No JWT token found')
     }
     console.log('=================================')
+
+    // Initialize supervisord status if user is supervisor
+    if (userInfo.value?.isSupervisor) {
+      await refreshSupervisordStatus()
+      await refreshProcesses()
+    }
   })
 
   // Local state
@@ -349,6 +448,140 @@
 
   const formatTime = (date: Date) => {
     return new Date(date).toLocaleTimeString()
+  }
+
+  // Supervisord MCP methods
+  const refreshSupervisordStatus = async () => {
+    try {
+      if (!aetherStore.socket) return
+      const response: any = await new Promise((resolve) => {
+        aetherStore.socket!.emit('get_supervisord_status', {}, resolve)
+      })
+      if (response?.status === 'ok') {
+        supervisordStatus.value = response.supervisord
+      }
+    } catch (error) {
+      console.error('Failed to get supervisord status:', error)
+    }
+  }
+
+  const refreshProcesses = async () => {
+    loading.value = true
+    try {
+      if (!aetherStore.socket) return
+      const response: any = await new Promise((resolve) => {
+        aetherStore.socket!.emit('get_processes_list', {}, resolve)
+      })
+      if (response?.status === 'ok') {
+        processes.value = response.processes || []
+      }
+    } catch (error) {
+      console.error('Failed to get processes:', error)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const startProcess = async (name: string) => {
+    try {
+      if (!aetherStore.socket) return
+      const response: any = await new Promise((resolve) => {
+        aetherStore.socket!.emit('start_process', { name }, resolve)
+      })
+      if (response?.status === 'ok') {
+        await refreshProcesses()
+      }
+    } catch (error) {
+      console.error(`Failed to start process ${name}:`, error)
+    }
+  }
+
+  const stopProcess = async (name: string) => {
+    try {
+      if (!aetherStore.socket) return
+      const response: any = await new Promise((resolve) => {
+        aetherStore.socket!.emit('stop_process', { name }, resolve)
+      })
+      if (response?.status === 'ok') {
+        await refreshProcesses()
+      }
+    } catch (error) {
+      console.error(`Failed to stop process ${name}:`, error)
+    }
+  }
+
+  const restartProcess = async (name: string) => {
+    try {
+      if (!aetherStore.socket) return
+      const response: any = await new Promise((resolve) => {
+        aetherStore.socket!.emit('restart_process', { name }, resolve)
+      })
+      if (response?.status === 'ok') {
+        await refreshProcesses()
+      }
+    } catch (error) {
+      console.error(`Failed to restart process ${name}:`, error)
+    }
+  }
+
+  const startAllProcesses = async () => {
+    const stoppedProcesses = processes.value.filter(p => p.state === 'STOPPED')
+    for (const process of stoppedProcesses) {
+      await startProcess(process.name)
+    }
+  }
+
+  const stopAllProcesses = async () => {
+    const runningProcesses = processes.value.filter(p => p.state === 'RUNNING')
+    for (const process of runningProcesses) {
+      await stopProcess(process.name)
+    }
+  }
+
+  const viewProcessLogs = async (process: any) => {
+    selectedProcessForLogs.value = process
+    showLogsModal.value = true
+    await refreshProcessLogs()
+  }
+
+  const refreshProcessLogs = async () => {
+    if (!selectedProcessForLogs.value || !aetherStore.socket) return
+    
+    loadingLogs.value = true
+    try {
+      const response: any = await new Promise((resolve) => {
+        aetherStore.socket!.emit('get_process_logs', {
+          name: selectedProcessForLogs.value.name,
+          lines: 200
+        }, resolve)
+      })
+      if (response?.status === 'ok') {
+        processLogs.value = response.logs || 'No logs available'
+      } else {
+        processLogs.value = 'Failed to load logs'
+      }
+    } catch (error) {
+      console.error('Failed to get process logs:', error)
+      processLogs.value = 'Error loading logs'
+    } finally {
+      loadingLogs.value = false
+    }
+  }
+
+  const closeLogsDialog = () => {
+    showLogsModal.value = false
+    selectedProcessForLogs.value = null
+    processLogs.value = ''
+  }
+
+  const getProcessStatusClass = (state: string) => {
+    switch (state) {
+      case 'RUNNING': return 'process-running'
+      case 'STOPPED': return 'process-stopped'
+      case 'STARTING': return 'process-starting'
+      case 'STOPPING': return 'process-stopping'
+      default: return 'process-unknown'
+    }
   }
 </script>
 
@@ -890,5 +1123,148 @@
     color: #4caf50;
     font-family: 'Courier New', monospace;
     font-size: 11px;
+  }
+
+  /* Supervisord styles */
+  .supervisord-controls {
+    margin-top: 10px;
+  }
+
+  .process-list {
+    margin-top: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .process-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border-left: 3px solid;
+  }
+
+  .process-item.process-running {
+    border-left-color: #4caf50;
+    background-color: rgba(76, 175, 80, 0.1);
+  }
+
+  .process-item.process-stopped {
+    border-left-color: #f44336;
+    background-color: rgba(244, 67, 54, 0.1);
+  }
+
+  .process-item.process-starting {
+    border-left-color: #ff9800;
+    background-color: rgba(255, 152, 0, 0.1);
+  }
+
+  .process-item.process-stopping {
+    border-left-color: #ff5722;
+    background-color: rgba(255, 87, 34, 0.1);
+  }
+
+  .process-item.process-unknown {
+    border-left-color: #666;
+    background-color: rgba(102, 102, 102, 0.1);
+  }
+
+  .process-info {
+    flex: 1;
+  }
+
+  .process-name {
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+
+  .process-state {
+    font-size: 12px;
+    color: #ccc;
+  }
+
+  .process-pid {
+    font-size: 11px;
+    color: #999;
+  }
+
+  .process-actions {
+    display: flex;
+    gap: 5px;
+  }
+
+  .start-btn-small, .stop-btn-small, .restart-btn-small, .logs-btn-small {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .start-btn-small {
+    background-color: #4caf50;
+    color: white;
+  }
+
+  .stop-btn-small {
+    background-color: #f44336;
+    color: white;
+  }
+
+  .restart-btn-small {
+    background-color: #ff9800;
+    color: white;
+  }
+
+  .logs-btn-small {
+    background-color: #2196f3;
+    color: white;
+  }
+
+  .no-processes {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+    font-style: italic;
+  }
+
+  .logs-modal {
+    max-width: 800px;
+    width: 90%;
+  }
+
+  .logs-container {
+    max-height: 400px;
+    overflow-y: auto;
+    background-color: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    margin-bottom: 15px;
+  }
+
+  .logs-content {
+    padding: 10px;
+    margin: 0;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .refresh-btn {
+    background-color: #2196f3;
+    color: white;
+  }
+
+  .start-btn {
+    background-color: #4caf50;
+    color: white;
+  }
+
+  .stop-btn {
+    background-color: #f44336;
+    color: white;
   }
 </style>
