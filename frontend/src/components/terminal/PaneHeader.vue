@@ -30,6 +30,17 @@
 
     <!-- Pane Actions -->
     <div class="pane-actions">
+      <!-- Search Control -->
+      <v-btn
+        icon
+        size="x-small"
+        variant="text"
+        @click="openSearch"
+        title="Search Terminal (Ctrl+Shift+F)"
+      >
+        <v-icon>mdi-magnify</v-icon>
+      </v-btn>
+      
       <!-- Buffer Controls -->
       <v-btn
         icon
@@ -77,6 +88,29 @@
         </template>
         
         <v-list>
+          <v-list-item @click="copySelection">
+            <v-list-item-title>
+              <v-icon start>mdi-content-copy</v-icon>
+              Copy Selection
+            </v-list-item-title>
+          </v-list-item>
+          
+          <v-list-item @click="pasteFromClipboard">
+            <v-list-item-title>
+              <v-icon start>mdi-content-paste</v-icon>
+              Paste
+            </v-list-item-title>
+          </v-list-item>
+          
+          <v-list-item @click="selectAll">
+            <v-list-item-title>
+              <v-icon start>mdi-select-all</v-icon>
+              Select All
+            </v-list-item-title>
+          </v-list-item>
+          
+          <v-divider />
+          
           <v-list-item @click="saveBuffer">
             <v-list-item-title>
               <v-icon start>mdi-content-save</v-icon>
@@ -201,6 +235,10 @@ interface Emits {
   (e: 'save-buffer', paneId: string): void
   (e: 'restore-buffer', paneId: string): void
   (e: 'export-buffer', paneId: string): void
+  (e: 'open-search', paneId: string): void
+  (e: 'copy-selection', paneId: string): void
+  (e: 'paste-clipboard', paneId: string): void
+  (e: 'select-all', paneId: string): void
 }
 
 const props = defineProps<Props>()
@@ -324,6 +362,23 @@ const restoreBuffer = () => {
 
 const exportBuffer = () => {
   emit('export-buffer', props.pane.id)
+}
+
+// Search and editing methods
+const openSearch = () => {
+  emit('open-search', props.pane.id)
+}
+
+const copySelection = () => {
+  emit('copy-selection', props.pane.id)
+}
+
+const pasteFromClipboard = () => {
+  emit('paste-clipboard', props.pane.id)
+}
+
+const selectAll = () => {
+  emit('select-all', props.pane.id)
 }
 </script>
 

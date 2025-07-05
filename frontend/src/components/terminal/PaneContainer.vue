@@ -11,6 +11,10 @@
         @save-buffer="handleSaveBuffer"
         @restore-buffer="handleRestoreBuffer"
         @export-buffer="handleExportBuffer"
+        @open-search="handleOpenSearch"
+        @copy-selection="handleCopySelection"
+        @paste-clipboard="handlePasteClipboard"
+        @select-all="handleSelectAll"
       />
       <div class="pane-content">
         <AetherTerminalComponent 
@@ -256,6 +260,39 @@ const handleExportBuffer = (paneId: string) => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     console.log('🔧 BUFFER: Exported buffer for pane:', paneId)
+  }
+}
+
+// Search and editing handlers
+const handleOpenSearch = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    terminalRef.openSearch()
+    console.log('🔍 SEARCH: Opened search for pane:', paneId)
+  }
+}
+
+const handleCopySelection = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    terminalRef.copySelection()
+    console.log('📋 COPY: Copied selection for pane:', paneId)
+  }
+}
+
+const handlePasteClipboard = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    terminalRef.pasteFromClipboard()
+    console.log('📋 PASTE: Pasted clipboard for pane:', paneId)
+  }
+}
+
+const handleSelectAll = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    terminalRef.selectAll()
+    console.log('🔘 SELECT: Selected all for pane:', paneId)
   }
 }
 

@@ -12,6 +12,8 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, watchEffect, nextTick } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useAetherTerminalStore } from '../../stores/aetherTerminalStore'
 import { useTerminalTabStore } from '../../stores/terminalTabStore'
 import { useTerminalPaneStore } from '../../stores/terminalPaneStore'
@@ -42,6 +44,8 @@ const containerRef = ref<HTMLElement | null>(null)
 const terminalRef = ref<HTMLElement | null>(null)
 const terminal = ref<Terminal | null>(null)
 const fitAddon = ref<FitAddon | null>(null)
+const searchAddon = ref<SearchAddon | null>(null)
+const webLinksAddon = ref<WebLinksAddon | null>(null)
 
 // Store references（新しいクリーンなストア）
 const aetherStore = useAetherTerminalStore()
@@ -150,9 +154,14 @@ const initializeTerminal = async () => {
     // rendererType: 'canvas' // xterm.js 5.x では廃止されたオプション
   })
 
-  // Fit addon
+  // Load addons
   fitAddon.value = new FitAddon()
+  searchAddon.value = new SearchAddon()
+  webLinksAddon.value = new WebLinksAddon()
+  
   terminal.value.loadAddon(fitAddon.value)
+  terminal.value.loadAddon(searchAddon.value)
+  terminal.value.loadAddon(webLinksAddon.value)
 
   // ターミナルをDOMに追加
   terminal.value.open(terminalRef.value)
@@ -194,6 +203,32 @@ const setupInput = () => {
     } else {
       console.warn(`⚠️ AETHER_TERMINAL: No session for ${props.mode}:`, props.id)
     }
+  })
+
+  // Keyboard shortcuts
+  terminal.value.attachCustomKeyEventHandler((event) => {
+    // Ctrl+Shift+F for search
+    if (event.ctrlKey && event.shiftKey && event.key === 'F') {
+      event.preventDefault()
+      openSearch()
+      return false
+    }
+    
+    // Ctrl+Shift+C for copy
+    if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+      event.preventDefault()
+      copySelection()
+      return false
+    }
+    
+    // Ctrl+Shift+V for paste
+    if (event.ctrlKey && event.shiftKey && event.key === 'V') {
+      event.preventDefault()
+      pasteFromClipboard()
+      return false
+    }
+    
+    return true
   })
 }
 
@@ -372,6 +407,69 @@ const getBufferStats = () => {
   return { totalLines: 0, currentLine: 0, maxLines: 0 }
 }
 
+// Search functionality
+const openSearch = () => {
+  if (!searchAddon.value) return
+  
+  const searchTerm = prompt('Search terminal:')
+  if (searchTerm) {
+    searchAddon.value.findNext(searchTerm)
+  }
+}
+
+const searchNext = (term: string) => {
+  if (searchAddon.value) {
+    searchAddon.value.findNext(term)
+  }
+}
+
+const searchPrevious = (term: string) => {
+  if (searchAddon.value) {
+    searchAddon.value.findPrevious(term)
+  }
+}
+
+// Copy/Paste functionality
+const copySelection = () => {
+  if (!terminal.value) return
+  
+  const selection = terminal.value.getSelection()
+  if (selection) {
+    navigator.clipboard.writeText(selection).then(() => {
+      console.log('📋 TERMINAL: Text copied to clipboard')
+    }).catch((err) => {
+      console.error('❌ TERMINAL: Failed to copy text', err)
+    })
+  }
+}
+
+const pasteFromClipboard = async () => {
+  if (!terminal.value || !sessionId.value) return
+  
+  try {
+    const text = await navigator.clipboard.readText()
+    if (text) {
+      aetherStore.sendInput(sessionId.value, text)
+      console.log('📋 TERMINAL: Text pasted from clipboard')
+    }
+  } catch (err) {
+    console.error('❌ TERMINAL: Failed to paste text', err)
+  }
+}
+
+// Selection utilities
+const selectAll = () => {
+  if (terminal.value) {
+    terminal.value.selectAll()
+  }
+}
+
+const clearSelection = () => {
+  if (terminal.value) {
+    terminal.value.clearSelection()
+  }
+}
+
 // 外部API
 defineExpose({
   terminal,
@@ -385,7 +483,16 @@ defineExpose({
   saveBufferState,
   restoreBufferState,
   exportBuffer,
-  getBufferStats
+  getBufferStats,
+  // Search API
+  openSearch,
+  searchNext,
+  searchPrevious,
+  // Copy/Paste API
+  copySelection,
+  pasteFromClipboard,
+  selectAll,
+  clearSelection
 })
 </script>
 
