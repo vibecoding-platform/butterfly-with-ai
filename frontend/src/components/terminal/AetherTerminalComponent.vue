@@ -9,13 +9,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, watchEffect, nextTick } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useAetherTerminalStore } from '../../stores/aetherTerminalStore'
 import { useTerminalTabStore } from '../../stores/terminalTabStore'
 import { useTerminalPaneStore } from '../../stores/terminalPaneStore'
 import { useThemeStore } from '../../stores/themeStore'
+import { useScreenBufferStore } from '../../stores/screenBufferStore'
 import '@xterm/xterm/css/xterm.css'
 
 interface Props {
@@ -47,6 +48,7 @@ const aetherStore = useAetherTerminalStore()
 const tabStore = useTerminalTabStore()
 const paneStore = useTerminalPaneStore()
 const themeStore = useThemeStore()
+const screenBufferStore = useScreenBufferStore()
 
 // State
 const sessionId = ref<string | null>(null)
@@ -135,15 +137,17 @@ const initializeTerminal = async () => {
     return
   }
 
-  // xterm.js作成
+  // xterm.js作成 - パフォーマンス最適化
   terminal.value = new Terminal({
-    cursorBlink: themeStore.themeConfig.cursorBlink,
+    cursorBlink: false, // パフォーマンス向上のため無効化
     theme: terminalTheme.value,
     fontSize: themeStore.themeConfig.fontSize,
     fontFamily: themeStore.themeConfig.fontFamily,
-    rows: 30,
-    cols: 120,
-    scrollback: 1000
+    // 固定サイズを削除 - FitAddonに任せる
+    scrollback: 500, // メモリ使用量削減
+    fastScrollModifier: 'shift', // 高速スクロール有効化
+    rightClickSelectsWord: false, // 選択処理オーバーヘッド削減
+    // rendererType: 'canvas' // xterm.js 5.x では廃止されたオプション
   })
 
   // Fit addon
@@ -153,8 +157,18 @@ const initializeTerminal = async () => {
   // ターミナルをDOMに追加
   terminal.value.open(terminalRef.value)
   
-  // サイズ調整
-  setTimeout(() => fitAddon.value?.fit(), 100)
+  // ResizeObserverでfitを最適化
+  let fitTimeout: number | null = null
+  const debouncedFit = () => {
+    if (fitTimeout) clearTimeout(fitTimeout)
+    fitTimeout = setTimeout(() => {
+      fitAddon.value?.fit()
+      fitTimeout = null
+    }, 100)
+  }
+  
+  // 初回サイズ調整
+  debouncedFit()
 
   // 入力処理セットアップ
   setupInput()
@@ -174,6 +188,8 @@ const setupInput = () => {
 
   terminal.value.onData((data) => {
     if (sessionId.value) {
+      // Add input to screen buffer
+      screenBufferStore.addLine(sessionId.value, data, 'input')
       aetherStore.sendInput(sessionId.value, data)
     } else {
       console.warn(`⚠️ AETHER_TERMINAL: No session for ${props.mode}:`, props.id)
@@ -210,8 +226,24 @@ const requestSession = async () => {
 const setupOutput = () => {
   if (!sessionId.value || !terminal.value) return
 
+  // 出力バッファリングでパフォーマンス最適化
+  let outputBuffer = ''
+  let flushTimeout: number | null = null
+  
   const outputCallback = (data: string) => {
-    terminal.value?.write(data)
+    outputBuffer += data
+    
+    if (flushTimeout) clearTimeout(flushTimeout)
+    
+    flushTimeout = setTimeout(() => {
+      if (outputBuffer && terminal.value && sessionId.value) {
+        terminal.value.write(outputBuffer)
+        // Add output to screen buffer
+        screenBufferStore.addLine(sessionId.value, outputBuffer, 'output')
+        outputBuffer = ''
+      }
+      flushTimeout = null
+    }, 16) // ~60fps でフラッシュ
   }
 
   aetherStore.registerOutputCallback(sessionId.value, outputCallback)
@@ -248,21 +280,30 @@ watch(() => aetherStore.connectionState.isConnected, (connected) => {
   }
 })
 
-// テーマ変更監視
-watch(() => themeStore.currentColors, () => {
-  updateTerminalTheme()
-}, { deep: true })
+// テーマ変更監視 - 統合・debounce最適化
+let themeUpdateTimeout: number | null = null
+const debouncedThemeUpdate = () => {
+  if (themeUpdateTimeout) clearTimeout(themeUpdateTimeout)
+  themeUpdateTimeout = setTimeout(() => {
+    updateTerminalTheme()
+    // レイアウト変更が必要な場合のみfit実行
+    if (fitAddon.value) {
+      fitAddon.value.fit()
+    }
+    themeUpdateTimeout = null
+  }, 50) // 50msでdebounce
+}
 
-watch(() => themeStore.themeConfig.fontSize, () => {
-  updateTerminalTheme()
-  // Also trigger a fit when font size changes
-  setTimeout(() => fitAddon.value?.fit(), 100)
-})
-
-watch(() => themeStore.themeConfig.fontFamily, () => {
-  updateTerminalTheme()
-  // Also trigger a fit when font family changes
-  setTimeout(() => fitAddon.value?.fit(), 100)
+// 統合されたテーマwatcher
+watchEffect(() => {
+  // currentColors, fontSize, fontFamilyの変更を監視
+  themeStore.currentColors
+  themeStore.themeConfig.fontSize
+  themeStore.themeConfig.fontFamily
+  
+  if (terminal.value) {
+    debouncedThemeUpdate()
+  }
 })
 
 // ライフサイクル
@@ -288,6 +329,49 @@ onBeforeUnmount(() => {
   terminal.value?.dispose()
 })
 
+// Screen buffer API
+const clearScreenBuffer = () => {
+  if (sessionId.value) {
+    screenBufferStore.clearBuffer(sessionId.value)
+    terminal.value?.clear()
+  }
+}
+
+const saveBufferState = (stateName: string) => {
+  if (sessionId.value) {
+    screenBufferStore.saveBufferState(sessionId.value, stateName)
+  }
+}
+
+const restoreBufferState = (stateName: string) => {
+  if (sessionId.value) {
+    const restored = screenBufferStore.restoreBufferState(sessionId.value, stateName)
+    if (restored && terminal.value) {
+      terminal.value.clear()
+      const lines = screenBufferStore.getBufferLines(sessionId.value)
+      lines.forEach(line => {
+        terminal.value?.write(line.content)
+      })
+    }
+    return restored
+  }
+  return false
+}
+
+const exportBuffer = (format: 'text' | 'json' = 'text') => {
+  if (sessionId.value) {
+    return screenBufferStore.exportBuffer(sessionId.value, format)
+  }
+  return ''
+}
+
+const getBufferStats = () => {
+  if (sessionId.value) {
+    return screenBufferStore.getBufferStats(sessionId.value)
+  }
+  return { totalLines: 0, currentLine: 0, maxLines: 0 }
+}
+
 // 外部API
 defineExpose({
   terminal,
@@ -295,7 +379,13 @@ defineExpose({
   focus: () => terminal.value?.focus(),
   fit: () => fitAddon.value?.fit(),
   clear: () => terminal.value?.clear(),
-  write: (data: string) => terminal.value?.write(data)
+  write: (data: string) => terminal.value?.write(data),
+  // Screen buffer API
+  clearScreenBuffer,
+  saveBufferState,
+  restoreBufferState,
+  exportBuffer,
+  getBufferStats
 })
 </script>
 

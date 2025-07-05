@@ -7,12 +7,18 @@
         @split="handleSplit"
         @close="handleClose"
         @rename="handleRename"
+        @clear-buffer="handleClearBuffer"
+        @save-buffer="handleSaveBuffer"
+        @restore-buffer="handleRestoreBuffer"
+        @export-buffer="handleExportBuffer"
       />
       <div class="pane-content">
-        <TerminalTab 
-          :tab-id="panes[0].id" 
+        <AetherTerminalComponent 
+          :id="panes[0].id" 
+          mode="pane"
           :sub-type="panes[0].subType"
           @terminal-initialized="handleTerminalInitialized"
+          :ref="(el) => setTerminalRef(panes[0].id, el)"
         />
       </div>
     </div>
@@ -30,12 +36,17 @@
           @split="handleSplit"
           @close="handleClose"
           @rename="handleRename"
+          @clear-buffer="handleClearBuffer"
+          @save-buffer="handleSaveBuffer"
+          @restore-buffer="handleRestoreBuffer"
+          @export-buffer="handleExportBuffer"
         />
         <div class="pane-content">
           <AetherTerminalComponent 
             :id="pane.id" 
             mode="pane"
             :sub-type="pane.subType"
+            :ref="(el) => setTerminalRef(pane.id, el)"
           />
         </div>
         <!-- Resize Handle -->
@@ -60,12 +71,17 @@
           @split="handleSplit"
           @close="handleClose"
           @rename="handleRename"
+          @clear-buffer="handleClearBuffer"
+          @save-buffer="handleSaveBuffer"
+          @restore-buffer="handleRestoreBuffer"
+          @export-buffer="handleExportBuffer"
         />
         <div class="pane-content">
           <AetherTerminalComponent 
             :id="pane.id" 
             mode="pane"
             :sub-type="pane.subType"
+            :ref="(el) => setTerminalRef(pane.id, el)"
           />
         </div>
         <!-- Resize Handle -->
@@ -95,12 +111,17 @@
           @split="handleSplit"
           @close="handleClose"
           @rename="handleRename"
+          @clear-buffer="handleClearBuffer"
+          @save-buffer="handleSaveBuffer"
+          @restore-buffer="handleRestoreBuffer"
+          @export-buffer="handleExportBuffer"
         />
         <div class="pane-content">
           <AetherTerminalComponent 
             :id="pane.id" 
             mode="pane"
             :sub-type="pane.subType"
+            :ref="(el) => setTerminalRef(pane.id, el)"
           />
         </div>
       </div>
@@ -130,6 +151,9 @@ const emit = defineEmits<Emits>()
 
 // Store
 const paneStore = useTerminalPaneStore()
+
+// Terminal references
+const terminalRefs = ref<Map<string, any>>(new Map())
 
 // Computed
 const panes = computed(() => paneStore.getPanesByTab(props.tabId))
@@ -180,7 +204,62 @@ const handleRename = (paneId: string, newTitle: string) => {
   }
 }
 
-const handleTerminalInitialized = (terminal: any) => {
+// Terminal reference management
+const setTerminalRef = (paneId: string, el: any) => {
+  if (el) {
+    terminalRefs.value.set(paneId, el)
+  } else {
+    terminalRefs.value.delete(paneId)
+  }
+}
+
+// Buffer management handlers
+const handleClearBuffer = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    terminalRef.clearScreenBuffer()
+    console.log('🔧 BUFFER: Cleared buffer for pane:', paneId)
+  }
+}
+
+const handleSaveBuffer = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const stateName = `save_${timestamp}`
+    terminalRef.saveBufferState(stateName)
+    console.log('🔧 BUFFER: Saved buffer state for pane:', paneId, 'as:', stateName)
+  }
+}
+
+const handleRestoreBuffer = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    // For demo purposes, restore the most recent save
+    // In a real implementation, you might want to show a dialog to select which save to restore
+    console.log('🔧 BUFFER: Restore buffer for pane:', paneId)
+    // This would need to be implemented based on your save/restore strategy
+  }
+}
+
+const handleExportBuffer = (paneId: string) => {
+  const terminalRef = terminalRefs.value.get(paneId)
+  if (terminalRef) {
+    const bufferContent = terminalRef.exportBuffer('text')
+    const blob = new Blob([bufferContent], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `terminal_buffer_${paneId}_${new Date().toISOString()}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    console.log('🔧 BUFFER: Exported buffer for pane:', paneId)
+  }
+}
+
+const handleTerminalInitialized = () => {
   console.log('🔧 PANE: Terminal initialized for pane')
 }
 

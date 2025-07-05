@@ -16,8 +16,6 @@
           'terminal': tab.type === 'terminal',
           'ai-agent': tab.type === 'ai-agent',
           'log-monitor': tab.type === 'log-monitor',
-          'pure-terminal': tab.type === 'terminal' && tab.subType === 'pure',
-          'inventory-terminal': tab.type === 'terminal' && tab.subType === 'inventory',
           'connecting': tab.status === 'connecting',
           'error': tab.status === 'error'
         }"
@@ -26,7 +24,7 @@
         <div class="tab-content">
           <span class="tab-icon">
             {{ tab.type === 'terminal' 
-                ? (tab.subType === 'inventory' ? '📊' : '💻') 
+                ? '💻' 
                 : tab.type === 'ai-agent'
                   ? '🤖'
                   : '📈' }}
@@ -102,9 +100,9 @@ const switchToLogMonitor = () => {
   tabStore.switchToLogMonitor()
 }
 
-const addNewTab = (type: 'terminal' | 'ai-agent', subType?: 'pure' | 'inventory') => {
-  console.log('🔥 ADD NEW TAB CALLED:', { type, subType })
-  const newTab = tabStore.createTab(type, undefined, subType)
+const addNewTab = (type: 'terminal' | 'ai-agent') => {
+  console.log('🔥 ADD NEW TAB CALLED:', { type })
+  const newTab = tabStore.createTab(type)
   console.log('🔥 NEW TAB CREATED:', newTab)
 }
 

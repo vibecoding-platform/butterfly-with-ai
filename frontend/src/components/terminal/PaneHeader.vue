@@ -23,8 +23,24 @@
       />
     </div>
 
+    <!-- Buffer Status -->
+    <div class="buffer-status" v-if="bufferStats.totalLines > 0">
+      <span class="buffer-lines">{{ bufferStats.totalLines }} lines</span>
+    </div>
+
     <!-- Pane Actions -->
     <div class="pane-actions">
+      <!-- Buffer Controls -->
+      <v-btn
+        icon
+        size="x-small"
+        variant="text"
+        @click="clearBuffer"
+        title="Clear Buffer"
+      >
+        <v-icon>mdi-broom</v-icon>
+      </v-btn>
+      
       <!-- Split Buttons -->
       <v-btn
         icon
@@ -61,6 +77,29 @@
         </template>
         
         <v-list>
+          <v-list-item @click="saveBuffer">
+            <v-list-item-title>
+              <v-icon start>mdi-content-save</v-icon>
+              Save Buffer
+            </v-list-item-title>
+          </v-list-item>
+          
+          <v-list-item @click="restoreBuffer">
+            <v-list-item-title>
+              <v-icon start>mdi-restore</v-icon>
+              Restore Buffer
+            </v-list-item-title>
+          </v-list-item>
+          
+          <v-list-item @click="exportBuffer">
+            <v-list-item-title>
+              <v-icon start>mdi-download</v-icon>
+              Export Buffer
+            </v-list-item-title>
+          </v-list-item>
+          
+          <v-divider />
+          
           <v-list-item @click="duplicatePane">
             <v-list-item-title>
               <v-icon start>mdi-content-duplicate</v-icon>
@@ -148,6 +187,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { useTerminalPaneStore, type TerminalPane } from '../../stores/terminalPaneStore'
+import { useScreenBufferStore } from '../../stores/screenBufferStore'
 
 interface Props {
   pane: TerminalPane
@@ -157,6 +197,10 @@ interface Emits {
   (e: 'split', paneId: string, direction: 'horizontal' | 'vertical'): void
   (e: 'close', paneId: string): void
   (e: 'rename', paneId: string, newTitle: string): void
+  (e: 'clear-buffer', paneId: string): void
+  (e: 'save-buffer', paneId: string): void
+  (e: 'restore-buffer', paneId: string): void
+  (e: 'export-buffer', paneId: string): void
 }
 
 const props = defineProps<Props>()
@@ -164,6 +208,7 @@ const emit = defineEmits<Emits>()
 
 // Store
 const paneStore = useTerminalPaneStore()
+const screenBufferStore = useScreenBufferStore()
 
 // Title editing
 const isEditingTitle = ref(false)
@@ -192,6 +237,13 @@ const statusColor = computed(() => {
     case 'error': return 'error'
     default: return 'grey'
   }
+})
+
+const bufferStats = computed(() => {
+  if (props.pane.sessionId) {
+    return screenBufferStore.getBufferStats(props.pane.sessionId)
+  }
+  return { totalLines: 0, currentLine: 0, maxLines: 0 }
 })
 
 // Methods
@@ -256,6 +308,23 @@ const formatDate = (date: Date): string => {
     second: '2-digit'
   }).format(date)
 }
+
+// Buffer management methods
+const clearBuffer = () => {
+  emit('clear-buffer', props.pane.id)
+}
+
+const saveBuffer = () => {
+  emit('save-buffer', props.pane.id)
+}
+
+const restoreBuffer = () => {
+  emit('restore-buffer', props.pane.id)
+}
+
+const exportBuffer = () => {
+  emit('export-buffer', props.pane.id)
+}
 </script>
 
 <style scoped lang="scss">
@@ -316,6 +385,22 @@ const formatDate = (date: Date): string => {
 .status-indicator {
   @include flex-center;
   min-width: 20px;
+}
+
+.buffer-status {
+  @include flex-center;
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  padding: 0 $spacing-xs;
+  
+  .buffer-lines {
+    background-color: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: 4px;
+    padding: 2px 6px;
+    min-width: 50px;
+    text-align: center;
+  }
 }
 
 .pane-actions {
